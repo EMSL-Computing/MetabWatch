@@ -28,6 +28,9 @@ class RawFileWatcher:
                     candidates.append(path)
         return sorted(candidates)
 
+    def list_current_raw_files(self) -> list[Path]:
+        return self._iter_raw_candidates()
+
     def get_stable_new_files(self) -> list[Path]:
         stable: list[Path] = []
         now = time.time()

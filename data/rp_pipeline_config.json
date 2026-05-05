@@ -1,0 +1,24 @@
+{
+  "processor": {
+    "standards_csv": "data/qc_search_space/hilic_qc_search.csv",
+    "params_path": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+    "output_dir": "data/results_hilic_pos",
+    "mz_tolerance_ppm": 5.0,
+    "rt_tolerance": 0.5,
+    "min_area": 5000,
+    "plot_eics": false,
+    "plot_tic": true
+  },
+  "watcher": {
+    "raw_dir": "data/raw_positive",
+    "poll_interval_sec": 10.0,
+    "stability_wait_sec": 20.0
+  },
+  "synthesizer": {
+    "debounce_sec": 5.0
+  },
+  "stale_in_progress_sec": 3600,
+  "max_retries": 3,
+  "initial_backoff_sec": 10.0,
+  "backoff_multiplier": 2.0
+}

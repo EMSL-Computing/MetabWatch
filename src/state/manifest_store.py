@@ -144,3 +144,6 @@ class ManifestStateStore:
         key = str(raw_file.resolve())
         entry = self._entries.get(key)
         return entry.attempts if entry else 0
+
+    def has_entries(self) -> bool:
+        return bool(self._entries)
