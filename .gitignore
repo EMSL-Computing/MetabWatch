@@ -2,3 +2,6 @@ data/raw_negative
 data/raw_positive
 .vscode/
 .DS_Store
+
+# Ignore all __pycache__ directories
+__pycache__/
