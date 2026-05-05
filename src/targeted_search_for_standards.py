@@ -1,405 +1,347 @@
 """
-Targeted search for standards using calculated m/z values.
+Single-file targeted LCMS search for QC standards.
 
-This script performs targeted mass feature detection on LC-MS data using pre-calculated
-m/z values for standards (isotopically labeled or unlabeled). It uses CoreMS for data processing.
+This module processes one Thermo .raw file at a time, matches observed mass features
+against a standards CSV, writes a CSV of matched observed features, and returns the
+same results as a pandas DataFrame.
 """
+
 import argparse
 from pathlib import Path
-from multiprocessing import Pool
 
 import pandas as pd
-from tqdm import tqdm
-from matplotlib.backends.backend_pdf import PdfPages
-from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
-from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
 from dotenv import load_dotenv
+from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
+from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
 
-def set_lcms_parameters(lcms_obj, params_path=None):
-    """
-    Set parameters on LCMS object from TOML configuration file.
-    
-    Parameters
-    ----------
-    lcms_obj : LCMSBase
-        The LCMS object to configure
-    params_path : Path or str, optional
-        Path to TOML parameter file. If None, uses default parameters.
-    """
-    load_and_set_toml_parameters_lcms(lcms_obj, params_path)
+REQUIRED_STANDARDS_COLUMNS = {
+    "compound_name",
+    "ion_type",
+    "mz",
+    "retention_time",
+    "polarity",
+}
 
 
-def process_single_file(raw_file, all_targets_df, config):
+def _validate_inputs(
+    raw_file: Path,
+    standards_csv: Path,
+    params_path: Path,
+    output_csv: Path,
+    mz_tolerance_ppm: float,
+    rt_tolerance: float,
+    min_area: float,
+) -> None:
+    if not raw_file.exists() or not raw_file.is_file():
+        raise FileNotFoundError(f"Raw file not found: {raw_file}")
+    if raw_file.suffix.lower() != ".raw":
+        raise ValueError(f"Expected a .raw file, got: {raw_file}")
+
+    if not standards_csv.exists() or not standards_csv.is_file():
+        raise FileNotFoundError(f"Standards CSV not found: {standards_csv}")
+
+    if not params_path.exists() or not params_path.is_file():
+        raise FileNotFoundError(f"CoreMS params TOML not found: {params_path}")
+
+    if mz_tolerance_ppm <= 0:
+        raise ValueError("mz_tolerance_ppm must be > 0")
+    if rt_tolerance <= 0:
+        raise ValueError("rt_tolerance must be > 0")
+    if min_area < 0:
+        raise ValueError("min_area must be >= 0")
+
+    output_parent = output_csv.parent
+    if output_parent and not output_parent.exists():
+        output_parent.mkdir(parents=True, exist_ok=True)
+
+
+def _load_and_validate_standards(standards_csv: Path) -> pd.DataFrame:
+    standards_df = pd.read_csv(standards_csv)
+    missing_columns = sorted(REQUIRED_STANDARDS_COLUMNS - set(standards_df.columns))
+    if missing_columns:
+        raise ValueError(
+            "Standards CSV is missing required columns: " + ", ".join(missing_columns)
+        )
+
+    standards_df["polarity"] = standards_df["polarity"].astype(str).str.strip().str.lower()
+    standards_df["mz"] = pd.to_numeric(standards_df["mz"], errors="coerce")
+    standards_df["retention_time"] = pd.to_numeric(
+        standards_df["retention_time"], errors="coerce"
+    )
+
+    if standards_df["mz"].isna().any():
+        raise ValueError("Standards CSV contains non-numeric values in mz")
+    if standards_df["retention_time"].isna().any():
+        raise ValueError("Standards CSV contains non-numeric values in retention_time")
+
+    return standards_df
+
+
+def process_raw_to_observed_features_df(
+    raw_file: Path,
+    standards_csv: Path,
+    params_path: Path,
+    output_csv: Path,
+    mz_tolerance_ppm: float = 5.0,
+    rt_tolerance: float = 0.5,
+    min_area: float = 1e4,
+    plot_eics: bool = False,
+    plot_pdf: Path | None = None,
+    plot_tic: bool = False,
+    tic_png: Path | None = None,
+) -> pd.DataFrame:
     """
-    Process a single raw file for targeted isotope search.
-    
-    Parameters
-    ----------
-    raw_file : Path
-        Path to the raw data file
-    all_targets_df : pd.DataFrame
-        DataFrame with all target masses (all polarities)
-    config : dict
-        Configuration dictionary with keys:
-        - mz_tolerance_ppm: m/z tolerance in ppm
-        - rt_tolerance: RT tolerance in minutes
-        - plot_mass_features: whether to generate plots
-        - plot_dir: directory for saving plots
-        - params_path: path to CoreMS TOML parameter file (optional)
-        
-    Returns
-    -------
-    list
-        List of result dictionaries for all matched mass features
+    Process one .raw file and return matched observed features as a DataFrame.
+
+    A CSV is always written to output_csv.
     """
-    
-    # Load raw data
-    parser = ImportMassSpectraThermoMSFileReader(raw_file)
-    lcms_obj = parser.get_lcms_obj(spectra="ms1")
-    assert lcms_obj is not None, "Failed to instantiate LCMS object."
-    
-    # Set parameters
-    set_lcms_parameters(lcms_obj, config.get('params_path'))
-    
-    # Get polarity and filter targets
-    polarity = lcms_obj.polarity
-    target_df = all_targets_df[all_targets_df['polarity'] == polarity].copy()
-    
-    # Prepare target search dictionary
+    _validate_inputs(
+        raw_file=raw_file,
+        standards_csv=standards_csv,
+        params_path=params_path,
+        output_csv=output_csv,
+        mz_tolerance_ppm=mz_tolerance_ppm,
+        rt_tolerance=rt_tolerance,
+        min_area=min_area,
+    )
+
+    standards_df = _load_and_validate_standards(standards_csv)
+
+    print(f"Loading raw file: {raw_file}")
+    try:
+        parser = ImportMassSpectraThermoMSFileReader(raw_file)
+        lcms_obj = parser.get_lcms_obj(spectra="ms1")
+    except Exception as exc:
+        raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
+
+    if lcms_obj is None:
+        raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
+
+    try:
+        load_and_set_toml_parameters_lcms(lcms_obj, params_path)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to load CoreMS parameter file {params_path}: {exc}"
+        ) from exc
+
+    raw_polarity = str(lcms_obj.polarity).strip().lower()
+    target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
+    if target_df.empty:
+        raise ValueError(
+            f"No standards found for raw file polarity '{raw_polarity}'. "
+            "Confirm the standards CSV polarity column values."
+        )
+
     target_search_dict = {
         "target_mz_list": target_df["mz"].tolist(),
         "target_rt_list": target_df["retention_time"].tolist(),
-        "mz_tolerance_ppm": config['mz_tolerance_ppm'],
-        "rt_tolerance": config['rt_tolerance'],
-        "type": "internal standard"
+        "mz_tolerance_ppm": mz_tolerance_ppm,
+        "rt_tolerance": rt_tolerance,
+        "type": "qc standard",
     }
-    
-    # Perform targeted search
-    lcms_obj.find_mass_features(
-        targeted_search=True,
-        target_search_dict=target_search_dict
-    )
-    
-    # Integrate and add MS data
+
+    lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
     lcms_obj.integrate_mass_features()
-    lcms_obj.add_associated_ms1(use_parser=False, spectrum_mode="profile")
-    lcms_obj.add_associated_ms2_dda(use_parser=True, spectrum_mode="centroid")
-    
-    # Export to DataFrame
+    lcms_obj.add_associated_ms1()
+    lcms_obj.cluster_mass_features()
+
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
-    
-    # Match mass features to targets
+    required_mf_columns = {"mz", "scan_time"}
+    missing_mf_columns = sorted(required_mf_columns - set(mf_df.columns))
+    if missing_mf_columns:
+        raise RuntimeError(
+            "CoreMS mass features DataFrame missing required columns: "
+            + ", ".join(missing_mf_columns)
+        )
+
+    if min_area > 0 and "area" not in mf_df.columns:
+        raise RuntimeError(
+            "CoreMS mass features DataFrame does not contain 'area', "
+            "but min_area filtering was requested"
+        )
+
     file_results = []
     for idx, mf_row in mf_df.iterrows():
-        mf_mz = mf_row.get('mz')
-        mf_rt = mf_row.get('scan_time')
-                    
-        # Find matching targets within tolerance
-        mz_ppm_diff = abs((target_df['mz'] - mf_mz) / target_df['mz'] * 1e6)
-        rt_diff = abs(target_df['retention_time'] - mf_rt)
-        
+        observed_mz = mf_row.get("mz")
+        observed_rt = mf_row.get("scan_time")
+
+        mz_ppm_diff = abs((target_df["mz"] - observed_mz) / target_df["mz"] * 1e6)
+        rt_diff = abs(target_df["retention_time"] - observed_rt)
+
         matches = target_df[
-            (mz_ppm_diff <= config['mz_tolerance_ppm']) & 
-            (rt_diff <= config['rt_tolerance'])
+            (mz_ppm_diff <= mz_tolerance_ppm) & (rt_diff <= rt_tolerance)
         ]
-        
-        # Keep all matches within tolerance
-        for match_idx, match_row in matches.iterrows():
+
+        for _, match_row in matches.iterrows():
             result = {
-                'mf_id': idx,
-                'filename': raw_file.name,
-                'refmet_name': match_row['refmet_name'],
-                'ion_type': match_row['ion_type'],
-                'target_mz': match_row['mz'],
-                'target_rt': match_row['retention_time'],
-                'observed_mz': mf_mz,
-                'observed_rt': mf_rt,
-                'mz_error_ppm': (mf_mz - match_row['mz']) / match_row['mz'] * 1e6,
-                'rt_error': mf_rt - match_row['retention_time']
+                "mf_id": idx,
+                "filename": raw_file.name,
+                "compound_name": match_row["compound_name"],
+                "ion_type": match_row["ion_type"],
+                "polarity": match_row["polarity"],
+                "target_mz": match_row["mz"],
+                "target_rt": match_row["retention_time"],
+                "observed_mz": observed_mz,
+                "observed_rt": observed_rt,
+                "mz_error_ppm": (observed_mz - match_row["mz"]) / match_row["mz"] * 1e6,
+                "rt_error": observed_rt - match_row["retention_time"],
             }
-            
-            # Add isotope_label if present in target data
-            if 'isotope_label' in match_row.index and pd.notna(match_row['isotope_label']) and match_row['isotope_label'] != '':
-                result['isotope_label'] = match_row['isotope_label']
-            
-            # Add other columns from mass features dataframe
             for col in mf_df.columns:
                 if col not in result:
                     result[col] = mf_row[col]
-            
             file_results.append(result)
-    
-    # Apply filters before plotting (if specified)
-    if config.get('min_area', 0) > 0 or config.get('min_intensity', 0) > 0:
-        filtered_results = []
-        for result in file_results:
-            include = True
-            if config.get('min_area', 0) > 0:
-                if result.get('area', 0) < config['min_area']:
-                    include = False
-            if config.get('min_intensity', 0) > 0:
-                if result.get('intensity', 0) < config['min_intensity']:
-                    include = False
-            if include:
-                filtered_results.append(result)
-        file_results = filtered_results
-    
-    # Generate plots if requested (must be done while lcms_obj is in scope)
-    if config['plot_mass_features'] and len(file_results) > 0:
-        plot_dir = config['plot_dir']
-        plot_dir.mkdir(parents=True, exist_ok=True)
-        
-        pdf_filename = plot_dir / f"{raw_file.stem}_mass_features.pdf"
-        
-        # Group results by mf_id
-        mf_candidates = {}
-        mf_observed = {}
-        for result in file_results:
-            mf_id = result['mf_id']
-            if mf_id not in mf_candidates:
-                mf_candidates[mf_id] = []
-                mf_observed[mf_id] = {
-                    'mz': result['observed_mz'],
-                    'rt': result['observed_rt'],
-                    'area': result.get('area', 'N/A'),
-                    'intensity': result.get('intensity', 'N/A')
-                }
-            # Build candidate label with optional isotope_label
-            isotope_str = f" ({result['isotope_label']})" if result.get('isotope_label') else ""
-            candidate_label = (f"{result['refmet_name']}{isotope_str} {result['ion_type']} "
-                             f"[Target m/z: {result['target_mz']:.4f}, RT: {result['target_rt']:.2f}]")
-            if candidate_label not in mf_candidates[mf_id]:
-                mf_candidates[mf_id].append(candidate_label)
-        
-        # Create multi-page PDF
-        with PdfPages(pdf_filename) as pdf:
-            for mf_id, candidates in sorted(mf_candidates.items()):
+
+    results_df = pd.DataFrame(file_results)
+
+    if min_area > 0 and not results_df.empty:
+        results_df = results_df[results_df["area"] >= min_area].copy()
+
+    # Keep one hit per compound by selecting the highest-intensity matched feature.
+    if not results_df.empty:
+        if "intensity" not in results_df.columns:
+            raise RuntimeError(
+                "Expected 'intensity' in matched results for duplicate resolution"
+            )
+        results_df = (
+            results_df.sort_values("intensity", ascending=False)
+            .drop_duplicates(subset=["compound_name"], keep="first")
+            .reset_index(drop=True)
+        )
+
+    if plot_eics and not results_df.empty:
+        if plot_pdf is None:
+            plot_pdf = output_csv.with_suffix(".eics.pdf")
+        plot_pdf.parent.mkdir(parents=True, exist_ok=True)
+
+        mf_compounds = (
+            results_df.groupby("mf_id")["compound_name"]
+            .apply(lambda s: sorted(set(s.astype(str).tolist())))
+            .to_dict()
+        )
+
+        with PdfPages(plot_pdf) as pdf:
+            for mf_id in sorted(mf_compounds):
+                if mf_id not in lcms_obj.mass_features:
+                    continue
                 fig = lcms_obj.mass_features[mf_id].plot()
-                candidates_str = "\n".join(candidates)
-                obs = mf_observed[mf_id]
-                area_str = f"{obs['area']:.2e}" if isinstance(obs['area'], (int, float)) else obs['area']
-                intensity_str = f"{obs['intensity']:.2e}" if isinstance(obs['intensity'], (int, float)) else obs['intensity']
-                fig.suptitle(f"Mass Feature {mf_id} [Observed m/z: {obs['mz']:.4f}, RT: {obs['rt']:.2f}, "
-                            f"Area: {area_str}, Intensity: {intensity_str}]\n"
-                            f"Candidates:\n{candidates_str}", 
-                            fontsize=8, y=0.98)
+                compounds = ", ".join(mf_compounds[mf_id])
+                fig.suptitle(
+                    f"Mass Feature ID: {mf_id} | Compound(s): {compounds}",
+                    fontsize=9,
+                    y=0.98,
+                )
                 fig.tight_layout()
                 pdf.savefig(fig)
                 fig.clf()
 
-    
-    return file_results
+        print(f"EIC plots saved to: {plot_pdf}")
 
+    if plot_tic:
+        if tic_png is None:
+            tic_png = output_csv.with_suffix(".tic.png")
+        tic_png.parent.mkdir(parents=True, exist_ok=True)
 
-def apply_filters(results_df, min_area=0, min_intensity=0):
-    """
-    Apply post-processing filters to results.
-    
-    Parameters
-    ----------
-    results_df : pd.DataFrame
-        Results dataframe
-    min_area : float
-        Minimum peak area threshold
-    min_intensity : float
-        Minimum peak intensity threshold
-        
-    Returns
-    -------
-    pd.DataFrame
-        Filtered results
-    """
-    initial_count = len(results_df)
-    
-    if min_area > 0 and 'area' in results_df.columns:
-        results_df = results_df[results_df['area'] >= min_area]
-    
-    if min_intensity > 0 and 'intensity' in results_df.columns:
-        results_df = results_df[results_df['intensity'] >= min_intensity]
-    
-    if len(results_df) < initial_count:
-        print(f"Filtered: {initial_count} -> {len(results_df)} results")
-    
+        tic_df = lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1]
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(tic_df["scan_time"], tic_df["tic"], linewidth=0.8)
+        ax.set_xlabel("Retention Time (min)")
+        ax.set_ylabel("TIC")
+        ax.set_title(f"TIC | Sample: {raw_file.name} | Polarity: {raw_polarity}")
+        fig.tight_layout()
+        fig.savefig(tic_png, dpi=200)
+        plt.close(fig)
+
+        print(f"TIC plot saved to: {tic_png}")
+
+    results_df.to_csv(output_csv, index=False)
+
+    print("=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"Raw file processed: {raw_file.name}")
+    print(f"Polarity: {raw_polarity}")
+    print(f"Standards considered: {len(target_df)}")
+    print(f"Matched features: {len(results_df)}")
+    print(f"Output CSV: {output_csv}")
+
     return results_df
 
 
-def main(target_masses_csv, output_dir, raw_files, config):
-    """
-    Main function to process isotope targeted search.
-    
-    Parameters
-    ----------
-    target_masses_csv : Path
-        Path to target masses CSV file
-    output_dir : Path
-        Directory for output files
-    raw_files : list of Path
-        List of raw files to process
-    config : dict
-        Configuration dictionary with analysis parameters
-    """
-    # Load target masses
-    print(f"Loading target masses from {target_masses_csv}")
-    all_targets_df = pd.read_csv(target_masses_csv)
-    print(f"Loaded {len(all_targets_df)} targets ({len(all_targets_df[all_targets_df['polarity'] == 'positive'])} positive, "
-          f"{len(all_targets_df[all_targets_df['polarity'] == 'negative'])} negative)")
-    
-    # Process files
-    print(f"\nProcessing {len(raw_files)} file(s)...")
-    
-    all_results = []
-    
-    # Process files with or without multiprocessing based on n_cores
-    n_cores = config.get('n_cores', 1)
-    if n_cores > 1 and len(raw_files) > 1:
-        print(f"Using multiprocessing with {n_cores} worker(s)")
-        
-        # Create partial function with fixed arguments
-        from functools import partial
-        process_func = partial(process_single_file, all_targets_df=all_targets_df, config=config)
-        
-        with Pool(processes=n_cores) as pool:
-            results_list = list(tqdm(pool.imap(process_func, raw_files), total=len(raw_files), desc="Processing files"))
-        
-        # Flatten results
-        for file_results in results_list:
-            all_results.extend(file_results)
-    else:
-        # Sequential processing with progress bar
-        for raw_file in tqdm(raw_files, desc="Processing files"):
-            file_results = process_single_file(raw_file, all_targets_df, config)
-            all_results.extend(file_results)
-    
-    # Combine and filter results
-    print("\nCombining results...")
-    results_df = pd.DataFrame(all_results)
-    
-    # Note: Filtering already applied in process_single_file before plotting and returning results
-    
-    # Summary and save
-    print(f"\n{'='*60}")
-    print("SUMMARY")
-    print(f"{'='*60}")
-    print(f"Files processed: {len(raw_files)}")
-    print(f"Total matches: {len(results_df)}")
-    if len(results_df) > 0:
-        print(f"Unique compounds: {results_df['refmet_name'].nunique()}")
-    
-    # Save results
-    output_file = output_dir / config['output_filename']
-    results_df.to_csv(output_file, index=False)
-    print(f"\nResults saved to: {output_file}")
-    
-    print("\nDone!")
-
-
-if __name__ == "__main__":
-    # Load environment variables
+def main() -> None:
     load_dotenv()
-    
-    # Parse command-line arguments
+
     parser = argparse.ArgumentParser(
-        description="Targeted search for standards using calculated m/z values."
+        description=(
+            "Process one .raw file against standards and export matched observed features."
+        )
     )
-    
-    # Required arguments
+    parser.add_argument("--raw_file", type=Path, required=True, help="Path to a .raw file")
     parser.add_argument(
-        "--raw_data_dir",
+        "--standards_csv",
         type=Path,
         required=True,
-        help="Directory containing raw data files (.raw)"
-    )
-    parser.add_argument(
-        "--target_masses",
-        type=Path,
-        required=True,
-        help="Path to CSV file with target masses"
-    )
-    parser.add_argument(
-        "--output_filename",
-        type=str,
-        required=True,
-        help="Name of output CSV file (e.g., 'results.csv')"
-    )
-    
-    # Optional arguments
-    parser.add_argument(
-        "--output_dir",
-        type=Path,
-        default=Path("data"),
-        help="Directory for output files (default: data)"
+        help="Path to standards CSV with required columns",
     )
     parser.add_argument(
         "--params_path",
         type=Path,
-        default=Path("data/corems_params/monet_hilic_corems_lcms_params.toml"),
-        help="Path to CoreMS TOML parameter file (default: data/corems_params/monet_hilic_corems_lcms_params.toml)"
+        required=True,
+        help="Path to CoreMS TOML parameter file",
     )
     parser.add_argument(
-        "--mz_tolerance_ppm",
-        type=float,
-        default=5.0,
-        help="m/z tolerance in ppm (default: 5.0)"
+        "--output_csv", type=Path, required=True, help="Path to output CSV file"
     )
     parser.add_argument(
-        "--rt_tolerance",
-        type=float,
-        default=0.5,
-        help="RT tolerance in minutes (default: 0.5)"
+        "--mz_tolerance_ppm", type=float, default=5.0, help="m/z tolerance in ppm"
     )
     parser.add_argument(
-        "--min_area",
-        type=float,
-        default=1E4,
-        help="Minimum peak area threshold (default: 1E4)"
+        "--rt_tolerance", type=float, default=0.5, help="RT tolerance in minutes"
     )
     parser.add_argument(
-        "--min_intensity",
-        type=float,
-        default=0,
-        help="Minimum peak intensity threshold (default: 0)"
+        "--min_area", type=float, default=1e4, help="Minimum peak area threshold"
     )
     parser.add_argument(
-        "--n_cores",
-        type=int,
-        default=1,
-        help="Number of cores for parallel processing (default: 1)"
-    )
-    parser.add_argument(
-        "--plot_mass_features",
+        "--plot_eics",
         action="store_true",
-        help="Generate plots for mass features (default: False)"
+        help="Generate EIC plots for filtered remaining mass features",
     )
     parser.add_argument(
-        "--plot_dir",
+        "--plot_pdf",
         type=Path,
-        help="Directory for saving plots (required if --plot_mass_features is set)"
+        default=None,
+        help="Optional output PDF path for EIC plots (default: output_csv with .eics.pdf)",
     )
-    
+    parser.add_argument(
+        "--plot_tic",
+        action="store_true",
+        help="Generate TIC plot for the processed sample",
+    )
+    parser.add_argument(
+        "--tic_png",
+        type=Path,
+        default=None,
+        help="Optional output PNG path for TIC plot (default: output_csv with .tic.png)",
+    )
+
     args = parser.parse_args()
-    
-    # Validate plot_dir requirement
-    if args.plot_mass_features and args.plot_dir is None:
-        parser.error("--plot_dir is required when --plot_mass_features is set")
-    
-    # Get raw files
-    raw_files = list(args.raw_data_dir.glob("*.raw"))
-    if not raw_files:
-        raise ValueError(f"No .raw files found in {args.raw_data_dir}")
-    
-    # Build config dictionary
-    config = {
-        'params_path': args.params_path,
-        'mz_tolerance_ppm': args.mz_tolerance_ppm,
-        'rt_tolerance': args.rt_tolerance,
-        'plot_mass_features': args.plot_mass_features,
-        'plot_dir': args.plot_dir,
-        'output_filename': args.output_filename,
-        'min_area': args.min_area,
-        'min_intensity': args.min_intensity,
-        'n_cores': args.n_cores
-    }
-    
-    # Run main
-    main(args.target_masses, args.output_dir, raw_files, config)
+
+    process_raw_to_observed_features_df(
+        raw_file=args.raw_file,
+        standards_csv=args.standards_csv,
+        params_path=args.params_path,
+        output_csv=args.output_csv,
+        mz_tolerance_ppm=args.mz_tolerance_ppm,
+        rt_tolerance=args.rt_tolerance,
+        min_area=args.min_area,
+        plot_eics=args.plot_eics,
+        plot_pdf=args.plot_pdf,
+        plot_tic=args.plot_tic,
+        tic_png=args.tic_png,
+    )
+
+
+if __name__ == "__main__":
+    main()
