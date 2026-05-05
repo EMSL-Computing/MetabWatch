@@ -6,11 +6,10 @@ against a standards CSV, writes a CSV of matched observed features, and returns 
 same results as a pandas DataFrame.
 """
 
-import argparse
+import re
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
@@ -30,7 +29,7 @@ def _validate_inputs(
     raw_file: Path,
     standards_csv: Path,
     params_path: Path,
-    output_csv: Path,
+    output_dir: Path,
     mz_tolerance_ppm: float,
     rt_tolerance: float,
     min_area: float,
@@ -53,9 +52,8 @@ def _validate_inputs(
     if min_area < 0:
         raise ValueError("min_area must be >= 0")
 
-    output_parent = output_csv.parent
-    if output_parent and not output_parent.exists():
-        output_parent.mkdir(parents=True, exist_ok=True)
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _load_and_validate_standards(standards_csv: Path) -> pd.DataFrame:
@@ -84,29 +82,33 @@ def process_raw_to_observed_features_df(
     raw_file: Path,
     standards_csv: Path,
     params_path: Path,
-    output_csv: Path,
+    output_dir: Path,
     mz_tolerance_ppm: float = 5.0,
     rt_tolerance: float = 0.5,
     min_area: float = 1e4,
-    plot_eics: bool = False,
-    plot_pdf: Path | None = None,
-    plot_tic: bool = False,
-    tic_png: Path | None = None,
+    plot_eics: bool = True,
+    plot_tic: bool = True,
 ) -> pd.DataFrame:
     """
     Process one .raw file and return matched observed features as a DataFrame.
 
-    A CSV is always written to output_csv.
+    Output files are saved into output_dir and named from raw file stem.
     """
     _validate_inputs(
         raw_file=raw_file,
         standards_csv=standards_csv,
         params_path=params_path,
-        output_csv=output_csv,
+        output_dir=output_dir,
         mz_tolerance_ppm=mz_tolerance_ppm,
         rt_tolerance=rt_tolerance,
         min_area=min_area,
     )
+
+    raw_tag = raw_file.stem
+    output_csv = output_dir / f"{raw_tag}_targeted_matches.csv"
+    trace_csv = output_dir / f"{raw_tag}_ms1_traces.csv"
+    plot_pdf = output_dir / f"{raw_tag}_eics.pdf"
+    tic_png = output_dir / f"{raw_tag}_tic.png"
 
     standards_df = _load_and_validate_standards(standards_csv)
 
@@ -212,8 +214,6 @@ def process_raw_to_observed_features_df(
         )
 
     if plot_eics and not results_df.empty:
-        if plot_pdf is None:
-            plot_pdf = output_csv.with_suffix(".eics.pdf")
         plot_pdf.parent.mkdir(parents=True, exist_ok=True)
 
         mf_compounds = (
@@ -240,8 +240,6 @@ def process_raw_to_observed_features_df(
         print(f"EIC plots saved to: {plot_pdf}")
 
     if plot_tic:
-        if tic_png is None:
-            tic_png = output_csv.with_suffix(".tic.png")
         tic_png.parent.mkdir(parents=True, exist_ok=True)
 
         tic_df = lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1]
@@ -255,6 +253,43 @@ def process_raw_to_observed_features_df(
         plt.close(fig)
 
         print(f"TIC plot saved to: {tic_png}")
+
+    trace_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    ms1_df = (
+        lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1][["scan", "scan_time", "tic"]]
+        .copy()
+        .rename(columns={"scan_time": "time"})
+        .sort_values("scan")
+        .reset_index(drop=True)
+    )
+
+    if not results_df.empty:
+        final_hits = (
+            results_df[["mf_id", "compound_name"]]
+            .drop_duplicates(subset=["mf_id"], keep="first")
+            .sort_values("mf_id")
+        )
+
+        for _, row in final_hits.iterrows():
+            mf_id = int(row["mf_id"])
+            compound_name = str(row["compound_name"])
+            if mf_id not in lcms_obj.mass_features:
+                continue
+
+            safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
+            col_name = f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
+
+            eic_data = lcms_obj.mass_features[mf_id]._eic_data
+            eic_df = pd.DataFrame({
+                "scan": eic_data.scans,
+                col_name: eic_data.eic,
+            })
+            ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
+
+    ms1_df = ms1_df.drop(columns=["scan"])
+    ms1_df.to_csv(trace_csv, index=False)
+    print(f"MS1 EIC/TIC trace table saved to: {trace_csv}")
 
     results_df.to_csv(output_csv, index=False)
 
@@ -270,78 +305,32 @@ def process_raw_to_observed_features_df(
     return results_df
 
 
-def main() -> None:
-    load_dotenv()
+if __name__ == "__main__":
+    # Example usage with hardcoded paths and parameters for local testing.
+    raw_file = Path(
+        "data/raw_positive/QC_Metab_25-02_Monet_HILIC_Pos-01B_26Dec25_Olympic_WBEH-9262_RR.raw"
+    )
+    standards_csv = Path("data/qc_search_space/hilic_qc_search.csv")
+    params_path = Path("data/corems_params/monet_hilic_corems_lcms_params.toml")
+    output_dir = Path("data/results_hilic_pos")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    parser = argparse.ArgumentParser(
-        description=(
-            "Process one .raw file against standards and export matched observed features."
-        )
-    )
-    parser.add_argument("--raw_file", type=Path, required=True, help="Path to a .raw file")
-    parser.add_argument(
-        "--standards_csv",
-        type=Path,
-        required=True,
-        help="Path to standards CSV with required columns",
-    )
-    parser.add_argument(
-        "--params_path",
-        type=Path,
-        required=True,
-        help="Path to CoreMS TOML parameter file",
-    )
-    parser.add_argument(
-        "--output_csv", type=Path, required=True, help="Path to output CSV file"
-    )
-    parser.add_argument(
-        "--mz_tolerance_ppm", type=float, default=5.0, help="m/z tolerance in ppm"
-    )
-    parser.add_argument(
-        "--rt_tolerance", type=float, default=0.5, help="RT tolerance in minutes"
-    )
-    parser.add_argument(
-        "--min_area", type=float, default=1e4, help="Minimum peak area threshold"
-    )
-    parser.add_argument(
-        "--plot_eics",
-        action="store_true",
-        help="Generate EIC plots for filtered remaining mass features",
-    )
-    parser.add_argument(
-        "--plot_pdf",
-        type=Path,
-        default=None,
-        help="Optional output PDF path for EIC plots (default: output_csv with .eics.pdf)",
-    )
-    parser.add_argument(
-        "--plot_tic",
-        action="store_true",
-        help="Generate TIC plot for the processed sample",
-    )
-    parser.add_argument(
-        "--tic_png",
-        type=Path,
-        default=None,
-        help="Optional output PNG path for TIC plot (default: output_csv with .tic.png)",
-    )
+    mz_tolerance_ppm = 5.0
+    rt_tolerance = 0.5
+    min_area = 5e3
 
-    args = parser.parse_args()
+    # Keep plot toggles configurable for local runs.
+    plot_eics = True
+    plot_tic = True
 
     process_raw_to_observed_features_df(
-        raw_file=args.raw_file,
-        standards_csv=args.standards_csv,
-        params_path=args.params_path,
-        output_csv=args.output_csv,
-        mz_tolerance_ppm=args.mz_tolerance_ppm,
-        rt_tolerance=args.rt_tolerance,
-        min_area=args.min_area,
-        plot_eics=args.plot_eics,
-        plot_pdf=args.plot_pdf,
-        plot_tic=args.plot_tic,
-        tic_png=args.tic_png,
+        raw_file=raw_file,
+        standards_csv=standards_csv,
+        params_path=params_path,
+        output_dir=output_dir,
+        mz_tolerance_ppm=mz_tolerance_ppm,
+        rt_tolerance=rt_tolerance,
+        min_area=min_area,
+        plot_eics=plot_eics,
+        plot_tic=plot_tic,
     )
-
-
-if __name__ == "__main__":
-    main()
