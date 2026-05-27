@@ -9,6 +9,15 @@ import time
 class FileSnapshot:
     size: int
     mtime: float
+    """Lightweight snapshot of file size and mtime.
+
+    Parameters
+    ----------
+    size : int
+        File size in bytes.
+    mtime : float
+        File modification timestamp.
+    """
 
 
 class RawFileWatcher:
@@ -17,6 +26,15 @@ class RawFileWatcher:
         self.stability_wait_sec = stability_wait_sec
         self._first_seen: dict[Path, float] = {}
         self._snapshots: dict[Path, FileSnapshot] = {}
+    """Poll directories and emit paths that have become stable.
+
+    Parameters
+    ----------
+    raw_dirs : tuple[Path, ...]
+        Iterable of directories to scan for `*.raw` files.
+    stability_wait_sec : float, optional
+        Seconds a file must be unmodified to be considered stable.
+    """
 
     def _iter_raw_candidates(self) -> list[Path]:
         candidates: list[Path] = []
@@ -27,6 +45,12 @@ class RawFileWatcher:
                 if path.is_file():
                     candidates.append(path)
         return sorted(candidates)
+    """Return a list of files that have been stable for the configured window.
+
+    The function updates internal snapshots and a `first_seen` timestamp to
+    ensure that files are only considered stable after being unchanged for
+    `stability_wait_sec` seconds.
+    """
 
     def list_current_raw_files(self) -> list[Path]:
         return self._iter_raw_candidates()

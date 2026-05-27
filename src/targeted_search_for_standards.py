@@ -7,6 +7,7 @@ same results as a pandas DataFrame.
 """
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -25,6 +26,88 @@ REQUIRED_STANDARDS_COLUMNS = {
 }
 
 
+def _normalize_acquisition_time(value: object) -> str | None:
+    """Normalize acquisition-time values to UTC ISO8601.
+
+    Parameters
+    ----------
+    value : object
+        Candidate timestamp value from CoreMS metadata.
+
+    Returns
+    -------
+    str | None
+        ISO8601 UTC timestamp or None when parsing fails.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).isoformat()
+
+    if isinstance(value, (int, float)):
+        try:
+            dt = datetime.fromtimestamp(float(value), tz=timezone.utc)
+        except (OverflowError, ValueError):
+            return None
+        return dt.isoformat()
+
+    parsed = pd.to_datetime(value, utc=True, errors="coerce")
+    if pd.isna(parsed):
+        return None
+    return parsed.to_pydatetime().astimezone(timezone.utc).isoformat()
+
+
+def _extract_acquisition_time_iso(parser: object, lcms_obj: object) -> str:
+    """Extract acquisition time from parser/LCMS metadata.
+
+    Parameters
+    ----------
+    parser : object
+        CoreMS parser object.
+    lcms_obj : object
+        CoreMS LCMS object.
+
+    Returns
+    -------
+    str
+        Acquisition timestamp in UTC ISO8601 format.
+
+    Raises
+    ------
+    RuntimeError
+        If no parseable acquisition/creation timestamp can be extracted.
+    """
+    candidate_names = (
+        "get_creation_time",
+        "creation_time",
+        "created_at",
+        "acquisition_time",
+        "run_start_time",
+        "start_time",
+    )
+
+    for container in (parser, lcms_obj):
+        for name in candidate_names:
+            if not hasattr(container, name):
+                continue
+            raw_value = getattr(container, name)
+            if callable(raw_value):
+                try:
+                    raw_value = raw_value()
+                except Exception:
+                    continue
+            normalized = _normalize_acquisition_time(raw_value)
+            if normalized:
+                return normalized
+
+    raise RuntimeError(
+        "Unable to extract acquisition time from CoreMS metadata for this sample"
+    )
+
+
 def _validate_inputs(
     raw_file: Path,
     standards_csv: Path,
@@ -34,6 +117,11 @@ def _validate_inputs(
     rt_tolerance: float,
     min_area: float,
 ) -> None:
+    """Validate input paths and numeric thresholds for a single run.
+
+    Raises informative exceptions for missing files or invalid parameter values.
+    """
+
     if not raw_file.exists() or not raw_file.is_file():
         raise FileNotFoundError(f"Raw file not found: {raw_file}")
     if raw_file.suffix.lower() != ".raw":
@@ -57,6 +145,14 @@ def _validate_inputs(
 
 
 def _load_and_validate_standards(standards_csv: Path) -> pd.DataFrame:
+    """Load standards CSV and validate required columns and types.
+
+    Returns
+    -------
+    pd.DataFrame
+        Validated standards table.
+    """
+
     standards_df = pd.read_csv(standards_csv)
     missing_columns = sorted(REQUIRED_STANDARDS_COLUMNS - set(standards_df.columns))
     if missing_columns:
@@ -89,10 +185,37 @@ def process_raw_to_observed_features_df(
     plot_eics: bool = True,
     plot_tic: bool = True,
 ) -> pd.DataFrame:
-    """
-    Process one .raw file and return matched observed features as a DataFrame.
+    """Process a single `.raw` file and return matched observed features.
 
-    Output files are saved into output_dir and named from raw file stem.
+    The function writes per-sample artifacts (matches CSV, MS1 traces, EIC/TIC
+    plots when requested) into `output_dir` and returns a pandas DataFrame of
+    matched features.
+
+    Parameters
+    ----------
+    raw_file : Path
+        Path to the Thermo `.raw` file.
+    standards_csv : Path
+        Path to the standards CSV providing target compounds.
+    params_path : Path
+        Path to CoreMS TOML parameter file.
+    output_dir : Path
+        Directory where artifacts will be written.
+    mz_tolerance_ppm : float
+        m/z tolerance in ppm.
+    rt_tolerance : float
+        Retention time tolerance in minutes.
+    min_area : float
+        Minimum area threshold for matched features.
+    plot_eics : bool
+        Whether to generate EIC PDFs for matched features.
+    plot_tic : bool
+        Whether to generate a TIC PNG for the sample.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing matched observed features.
     """
     _validate_inputs(
         raw_file=raw_file,
@@ -121,6 +244,8 @@ def process_raw_to_observed_features_df(
 
     if lcms_obj is None:
         raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
+
+    acquisition_time = _extract_acquisition_time_iso(parser=parser, lcms_obj=lcms_obj)
 
     try:
         load_and_set_toml_parameters_lcms(lcms_obj, params_path)
@@ -213,6 +338,9 @@ def process_raw_to_observed_features_df(
             .reset_index(drop=True)
         )
 
+    results_df["acquisition_time"] = acquisition_time
+    results_df.attrs["acquisition_time"] = acquisition_time
+
     if plot_eics and not results_df.empty:
         plot_pdf.parent.mkdir(parents=True, exist_ok=True)
 
@@ -288,6 +416,7 @@ def process_raw_to_observed_features_df(
             ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
 
     ms1_df = ms1_df.drop(columns=["scan"])
+    ms1_df["acquisition_time"] = acquisition_time
     ms1_df.to_csv(trace_csv, index=False)
     print(f"MS1 EIC/TIC trace table saved to: {trace_csv}")
 

@@ -22,6 +22,19 @@ except ImportError:  # pragma: no cover
 
 
 def _build_runtime(config: PipelineConfig):
+    """Build runtime components from a PipelineConfig.
+
+    Parameters
+    ----------
+    config : PipelineConfig
+        Resolved pipeline configuration.
+
+    Returns
+    -------
+    tuple
+        (orchestrator, retry_policy, watcher, queue, state_store, output_tracker, synthesizer)
+    """
+
     orchestrator = ProcessorOrchestrator(
         standards_csv=config.processor.standards_csv,
         params_path=config.processor.params_path,
@@ -56,6 +69,19 @@ def _build_runtime(config: PipelineConfig):
 
 
 def _clickable_path(path: Path) -> str:
+    """Return an OSC-8 terminal hyperlink for a filesystem path.
+
+    Parameters
+    ----------
+    path : Path
+        Path to make clickable in terminals that support OSC-8 links.
+
+    Returns
+    -------
+    str
+        A string containing the OSC-8 escape sequences wrapping the path.
+    """
+
     abs_path = path.resolve()
     uri = f"file://{quote(str(abs_path))}"
     label = str(abs_path)
@@ -69,6 +95,31 @@ def _process_one(
     state_store: ManifestStateStore,
     output_tracker: OutputTracker,
 ) -> ProcessResult:
+    """Process a single raw file with retry/backoff and manifest updates.
+
+    This function marks the file as `in_progress`, invokes the processor,
+    updates the manifest to `completed` or `failed`, and applies retry logic
+    based on the provided `RetryPolicy`.
+
+    Parameters
+    ----------
+    raw_file : Path
+        Path to the `.raw` file to process.
+    orchestrator : ProcessorOrchestrator
+        The processing wrapper to execute the sample run.
+    retry_policy : RetryPolicy
+        Retry/backoff configuration.
+    state_store : ManifestStateStore
+        Manifest state persistence instance.
+    output_tracker : OutputTracker
+        Tracker used to debounce synthesis triggers.
+
+    Returns
+    -------
+    ProcessResult
+        Result object describing success/failure and artifact paths.
+    """
+
     backoff = retry_policy.initial_backoff_sec
 
     while True:
@@ -80,6 +131,7 @@ def _process_one(
                 raw_file=raw_file,
                 output_csv=result.output_csv,
                 trace_csv=result.trace_csv,
+                acquisition_time=result.acquisition_time,
             )
             output_tracker.register_new_output()
             print(f"[completed] {raw_file.name} rows={result.rows}")
@@ -97,6 +149,21 @@ def _process_one(
 
 
 def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
+    """Run the watch loop: discover, enqueue, process, and synthesize.
+
+    Parameters
+    ----------
+    config : PipelineConfig
+        Resolved pipeline configuration.
+    once : bool, optional
+        If True, performs a single iteration and exits.
+
+    Returns
+    -------
+    int
+        Exit code (0 for success, >0 for errors).
+    """
+
     (
         orchestrator,
         retry_policy,
@@ -151,7 +218,12 @@ def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
 
         if output_tracker.synthesis_due():
             html_path = synthesizer.render()
-            print(f"[synthesized] Dashboard: {_clickable_path(html_path)}")
+            print(
+                "[synthesized] Dashboard: "
+                f"{_clickable_path(html_path)} "
+                f"(compound pages: {synthesizer.last_compound_pages}, "
+                f"skipped samples: {synthesizer.last_skipped_samples})"
+            )
             output_tracker.clear()
             if not once:
                 print("[watching] Waiting for new stable .raw files. Press Ctrl+C to exit.")
@@ -167,6 +239,21 @@ def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
 
 
 def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
+    """Process a single raw file (CLI `--mode process`) and synthesize.
+
+    Parameters
+    ----------
+    config : PipelineConfig
+        Resolved pipeline configuration.
+    raw_file : Path
+        Path to the `.raw` file to process.
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+
     (
         orchestrator,
         retry_policy,
@@ -190,11 +277,28 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     )
 
     html_path = synthesizer.render()
-    print(f"[synthesized] {html_path}")
+    print(
+        f"[synthesized] {html_path} "
+        f"(compound pages: {synthesizer.last_compound_pages}, "
+        f"skipped samples: {synthesizer.last_skipped_samples})"
+    )
     return 0
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
+    """Parse CLI arguments for the pipeline entrypoint.
+
+    Parameters
+    ----------
+    argv : list[str]
+        List of CLI arguments (excluding program name).
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed arguments.
+    """
+
     parser = argparse.ArgumentParser(description="LCMS QC watcher/processor pipeline")
     parser.add_argument("--mode", choices=["watch", "process"], default="watch")
     parser.add_argument("--config", type=Path, required=True, help="Required JSON config path")
@@ -204,6 +308,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Main entrypoint for running the pipeline.
+
+    Parameters
+    ----------
+    argv : list[str] | None
+        Argument vector to parse (defaults to process argv).
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+
     args = parse_args(argv or sys.argv[1:])
     repo_root = Path(__file__).resolve().parent.parent
     config = load_pipeline_config(args.config, repo_root=repo_root)

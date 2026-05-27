@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+"""Pipeline configuration models and loader.
+
+This module defines the dataclasses used to configure the pipeline runtime and
+provides a loader to read a JSON configuration file and resolve repository
+relative paths to absolute `pathlib.Path` objects.
+"""
+
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +14,27 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ProcessorConfig:
+    """Configuration for the processing step.
+
+    Parameters
+    ----------
+    standards_csv : Path
+        Path to the standards CSV used for targeted matching.
+    params_path : Path
+        Path to the CoreMS TOML parameter file.
+    output_dir : Path
+        Directory where outputs (CSVs, plots) will be written.
+    mz_tolerance_ppm : float
+        m/z matching tolerance in ppm.
+    rt_tolerance : float
+        Retention time tolerance in minutes.
+    min_area : float
+        Minimum peak area threshold.
+    plot_eics : bool
+        Whether to generate EIC plots.
+    plot_tic : bool
+        Whether to generate a TIC plot.
+    """
     standards_csv: Path
     params_path: Path
     output_dir: Path
@@ -19,6 +47,17 @@ class ProcessorConfig:
 
 @dataclass(frozen=True)
 class WatcherConfig:
+    """Configuration for the raw-file watcher.
+
+    Parameters
+    ----------
+    raw_dir : Path
+        Directory to poll for incoming `.raw` files.
+    poll_interval_sec : float
+        Seconds between poll cycles.
+    stability_wait_sec : float
+        Number of seconds a file must remain unchanged to be treated as stable.
+    """
     raw_dir: Path
     poll_interval_sec: float = 10.0
     stability_wait_sec: float = 20.0
@@ -26,12 +65,32 @@ class WatcherConfig:
 
 @dataclass(frozen=True)
 class StateConfig:
+    """Configuration for persistent pipeline state.
+
+    Parameters
+    ----------
+    pipeline_manifest : Path
+        Path to the pipeline manifest JSON used for idempotency and tracking.
+    stale_in_progress_sec : int
+        Seconds after which an `in_progress` entry is considered stale.
+    """
     pipeline_manifest: Path
     stale_in_progress_sec: int = 3600
 
 
 @dataclass(frozen=True)
 class SynthesizerConfig:
+    """Configuration for HTML synthesizer behavior.
+
+    Parameters
+    ----------
+    html_output : Path
+        Path where the dashboard HTML will be written.
+    output_dir : Path
+        Directory containing per-sample outputs to aggregate.
+    debounce_sec : float
+        Debounce interval (seconds) before regenerating the dashboard.
+    """
     html_output: Path
     output_dir: Path
     debounce_sec: float = 5.0
@@ -39,6 +98,19 @@ class SynthesizerConfig:
 
 @dataclass(frozen=True)
 class PipelineConfig:
+    """Top-level pipeline configuration container.
+
+    Attributes
+    ----------
+    processor : ProcessorConfig
+        Processor-specific configuration.
+    watcher : WatcherConfig
+        Watcher-specific configuration.
+    state : StateConfig
+        Persistence/state configuration.
+    synthesizer : SynthesizerConfig
+        Dashboard generation configuration.
+    """
     processor: ProcessorConfig
     watcher: WatcherConfig
     state: StateConfig
@@ -49,6 +121,25 @@ class PipelineConfig:
 
 
 def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
+    """Load pipeline configuration from a JSON file.
+
+    The JSON structure mirrors the dataclass layout under top-level keys
+    such as `processor`, `watcher`, and `synthesizer`. Relative paths in the
+    JSON are resolved against `repo_root`.
+
+    Parameters
+    ----------
+    config_path : Path
+        Path to the JSON configuration file.
+    repo_root : Path
+        Repository root used to resolve relative paths present in the JSON.
+
+    Returns
+    -------
+    PipelineConfig
+        Fully resolved pipeline configuration.
+    """
+
     with config_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
 
