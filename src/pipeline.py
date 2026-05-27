@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from pathlib import Path
@@ -64,8 +65,24 @@ def _build_runtime(config: PipelineConfig):
     synthesizer = HTMLSynthesizer(
         output_dirs=(config.synthesizer.output_dir,),
         html_output=config.synthesizer.html_output,
+        mz_tolerance_ppm=config.synthesizer.mz_tolerance_ppm,
+        rt_tolerance=config.synthesizer.rt_tolerance,
     )
     return orchestrator, retry_policy, watcher, queue, state_store, output_tracker, synthesizer
+
+
+def _compile_sample_regex(pattern_text: str | None) -> re.Pattern[str] | None:
+    """Compile optional filename-stem regex for sample gating."""
+    if not pattern_text:
+        return None
+    return re.compile(pattern_text)
+
+
+def _sample_allowed(raw_file: Path, sample_regex: re.Pattern[str] | None) -> bool:
+    """Return True when a sample should be processed under regex gating."""
+    if sample_regex is None:
+        return True
+    return bool(sample_regex.search(raw_file.stem))
 
 
 def _clickable_path(path: Path) -> str:
@@ -148,7 +165,11 @@ def _process_one(
         backoff = backoff * retry_policy.backoff_multiplier
 
 
-def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
+def run_watch_mode(
+    config: PipelineConfig,
+    once: bool = False,
+    force_reprocess: bool = False,
+) -> int:
     """Run the watch loop: discover, enqueue, process, and synthesize.
 
     Parameters
@@ -173,27 +194,50 @@ def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
         output_tracker,
         synthesizer,
     ) = _build_runtime(config)
+    try:
+        sample_regex = _compile_sample_regex(config.watcher.sample_name_regex)
+    except re.error as exc:
+        print(f"Invalid watcher.sample_name_regex: {exc}")
+        return 2
 
     print(
         "[watching] Monitoring for stable .raw files "
         f"in {config.watcher.raw_dir}. Press Ctrl+C to exit."
     )
 
-    if not state_store.has_entries():
+    forced_enqueued: set[Path] = set()
+
+    if force_reprocess or not state_store.has_entries():
         bootstrap_files = watcher.list_current_raw_files()
         if bootstrap_files:
-            print(f"[bootstrap] first run detected; enqueueing {len(bootstrap_files)} existing raw files")
+            if force_reprocess:
+                print(f"[bootstrap] force-reprocess enabled; enqueueing {len(bootstrap_files)} existing raw files")
+            else:
+                print(f"[bootstrap] first run detected; enqueueing {len(bootstrap_files)} existing raw files")
         for raw_file in bootstrap_files:
-            if state_store.should_process(raw_file):
+            if not _sample_allowed(raw_file, sample_regex):
+                print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                continue
+            if force_reprocess or state_store.should_process(raw_file):
                 queue.enqueue(raw_file)
+                forced_enqueued.add(raw_file)
 
     state_store.recover_stale_in_progress()
 
     while True:
         for raw_file in watcher.get_stable_new_files():
+            if not _sample_allowed(raw_file, sample_regex):
+                print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                continue
+            if force_reprocess and raw_file in forced_enqueued:
+                continue
             if not state_store.should_process(raw_file):
+                if force_reprocess:
+                    continue
                 continue
             queue.enqueue(raw_file)
+            if force_reprocess:
+                forced_enqueued.add(raw_file)
 
         batch: list[Path] = []
         while queue.has_pending():
@@ -216,7 +260,8 @@ def run_watch_mode(config: PipelineConfig, once: bool = False) -> int:
                 output_tracker=output_tracker,
             )
 
-        if output_tracker.synthesis_due():
+        should_synthesize = output_tracker.synthesis_due() or (once and total > 0)
+        if should_synthesize:
             html_path = synthesizer.render()
             print(
                 "[synthesized] Dashboard: "
@@ -263,10 +308,19 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         output_tracker,
         synthesizer,
     ) = _build_runtime(config)
+    try:
+        sample_regex = _compile_sample_regex(config.watcher.sample_name_regex)
+    except re.error as exc:
+        print(f"Invalid watcher.sample_name_regex: {exc}")
+        return 2
 
     if not raw_file.exists():
         print(f"Raw file missing: {raw_file}")
         return 1
+
+    if not _sample_allowed(raw_file, sample_regex):
+        print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+        return 0
 
     _process_one(
         raw_file=raw_file,
@@ -304,6 +358,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--config", type=Path, required=True, help="Required JSON config path")
     parser.add_argument("--raw", type=Path, default=None, help="Raw file for process mode")
     parser.add_argument("--once", action="store_true", help="Run one watch iteration and exit")
+    parser.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Reprocess existing files even when manifest marks them completed (watch mode)",
+    )
     return parser.parse_args(argv)
 
 
@@ -332,7 +391,11 @@ def main(argv: list[str] | None = None) -> int:
         return run_process_mode(config=config, raw_file=args.raw)
 
     try:
-        return run_watch_mode(config=config, once=args.once)
+        return run_watch_mode(
+            config=config,
+            once=args.once,
+            force_reprocess=args.force_reprocess,
+        )
     except KeyboardInterrupt:
         print("\n[stopped] Watch mode interrupted by user (Ctrl+C).")
         return 130

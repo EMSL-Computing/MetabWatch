@@ -2,7 +2,7 @@
 This repository contains scripts for performing quality control (QC) on liquid chromatography-mass spectrometry (LCMS) data using the CoreMS software.  The scripts are designed to process raw LCMS data files, perform a targeted search for specific compounds.
 
 # CoreMS
-This uses a DEVELOPMENT version of CoreMS available at https://github.com/EMSL-Computing/CoreMS/commit/88f6d0021ed594b5d0a3efe6285f8379858fd039 which is not yet merged into main (>v4.0.0).  We recommend using the Docker approach above since it will ensure the correct version of CoreMS is used and will handle the installation of CoreMS, its dependencies, and some tricky dependencies needed to read .raw files (e.g., Thermo .raw files).
+This uses a DEVELOPMENT version of CoreMS available at https://github.com/EMSL-Computing/CoreMS/commit/88f6d0021ed594b5d0a3efe6285f8379858fd039 which is not yet merged into main (>v4.0.0).
 
 # Single-File Targeted Search
 The script in [src/targeted_search_for_standards.py](src/targeted_search_for_standards.py) now processes one `.raw` file per run and writes a CSV of matched observed features.
@@ -53,6 +53,12 @@ One-shot watch loop (useful for cron/systemd testing):
 python src/pipeline.py --mode watch --config data/pipeline_config.example.json --once
 ```
 
+Force reprocess previously completed files in watch mode:
+
+```bash
+python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
+```
+
 Manual one-file processing through orchestrator + synthesis:
 
 ```bash
@@ -70,6 +76,26 @@ Then run:
 python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
 ```
 
+### Optional sample gating (pipeline-level)
+
+Use `watcher.sample_name_regex` to process only sample files whose raw filename stem
+matches a regex pattern.
+
+- Matching target: raw filename stem (without `.raw`)
+- Scope: pipeline-level (non-matching files are ignored, not processed)
+- Applies to both `--mode watch` and `--mode process`
+
+Example:
+
+```json
+"watcher": {
+	"raw_dir": "data/raw_positive",
+	"poll_interval_sec": 10.0,
+	"stability_wait_sec": 20.0,
+	"sample_name_regex": "Pos-(02|03)_"
+}
+```
+
 ## Outputs
 
 - Match CSVs and trace CSVs in configured output directory.
@@ -80,6 +106,14 @@ python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
 ## Compound Dashboard Layout
 
 The landing dashboard now lists detected compounds and links to a per-compound page.
+
+Above the compound index table, the landing page includes two QC summary plots:
+
+1. m/z window vs ppm error range per compound
+2. RT window vs RT error range per compound
+
+For each compound, bars show tolerance-window x-range and historical error min/max y-range.
+The strict global newest sample is overlaid as a dot when that compound is present in that sample.
 
 Each compound page contains 4 plots:
 

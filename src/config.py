@@ -57,10 +57,13 @@ class WatcherConfig:
         Seconds between poll cycles.
     stability_wait_sec : float
         Number of seconds a file must remain unchanged to be treated as stable.
+    sample_name_regex : str | None
+        Optional regex applied to raw filename stem to decide processing.
     """
     raw_dir: Path
     poll_interval_sec: float = 10.0
     stability_wait_sec: float = 20.0
+    sample_name_regex: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,10 +93,16 @@ class SynthesizerConfig:
         Directory containing per-sample outputs to aggregate.
     debounce_sec : float
         Debounce interval (seconds) before regenerating the dashboard.
+    mz_tolerance_ppm : float
+        m/z tolerance used when drawing landing QC summary ranges.
+    rt_tolerance : float
+        Retention-time tolerance used when drawing landing QC summary ranges.
     """
     html_output: Path
     output_dir: Path
     debounce_sec: float = 5.0
+    mz_tolerance_ppm: float = 5.0
+    rt_tolerance: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -164,6 +173,7 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
             raw_dir=repo_root / watcher["raw_dir"],
             poll_interval_sec=float(watcher.get("poll_interval_sec", 10.0)),
             stability_wait_sec=float(watcher.get("stability_wait_sec", 20.0)),
+            sample_name_regex=watcher.get("sample_name_regex"),
         ),
         state=StateConfig(
             pipeline_manifest=output_dir / "pipeline_manifest.json",
@@ -173,6 +183,8 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
             html_output=output_dir / "dashboard.html",
             output_dir=output_dir,
             debounce_sec=float(synthesizer.get("debounce_sec", 5.0)),
+            mz_tolerance_ppm=float(processor.get("mz_tolerance_ppm", 5.0)),
+            rt_tolerance=float(processor.get("rt_tolerance", 0.5)),
         ),
         max_retries=int(payload.get("max_retries", 3)),
         initial_backoff_sec=float(payload.get("initial_backoff_sec", 10.0)),

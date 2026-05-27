@@ -20,9 +20,17 @@ class HTMLSynthesizer:
         Landing index path (`dashboard.html`).
     """
 
-    def __init__(self, output_dirs: tuple[Path, ...], html_output: Path):
+    def __init__(
+        self,
+        output_dirs: tuple[Path, ...],
+        html_output: Path,
+        mz_tolerance_ppm: float,
+        rt_tolerance: float,
+    ):
         self.output_dirs = output_dirs
         self.html_output = html_output
+        self.mz_tolerance_ppm = mz_tolerance_ppm
+        self.rt_tolerance = rt_tolerance
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
 
@@ -131,6 +139,8 @@ class HTMLSynthesizer:
                     intensity = pd.to_numeric(row.get("intensity"), errors="coerce")
                     target_mz = pd.to_numeric(row.get("target_mz"), errors="coerce")
                     target_rt = pd.to_numeric(row.get("target_rt"), errors="coerce")
+                    mz_error_ppm = pd.to_numeric(row.get("mz_error_ppm"), errors="coerce")
+                    rt_error = pd.to_numeric(row.get("rt_error"), errors="coerce")
                     mf_id_val = pd.to_numeric(row.get("mf_id"), errors="coerce")
                     if pd.isna(mf_id_val):
                         continue
@@ -143,6 +153,8 @@ class HTMLSynthesizer:
                         "intensity": float(intensity) if not pd.isna(intensity) else None,
                         "target_mz": float(target_mz) if not pd.isna(target_mz) else None,
                         "target_rt": float(target_rt) if not pd.isna(target_rt) else None,
+                        "mz_error_ppm": float(mz_error_ppm) if not pd.isna(mz_error_ppm) else None,
+                        "rt_error": float(rt_error) if not pd.isna(rt_error) else None,
                         "mf_id": mf_id,
                         "trace_col": trace_col,
                     }
@@ -174,6 +186,8 @@ class HTMLSynthesizer:
                         "intensity": metric["intensity"],
                         "target_mz": metric["target_mz"],
                         "target_rt": metric["target_rt"],
+                        "mz_error_ppm": metric["mz_error_ppm"],
+                        "rt_error": metric["rt_error"],
                         "trace_csv": sample["trace_csv"],
                         "trace_col": metric["trace_col"],
                     }
@@ -181,18 +195,266 @@ class HTMLSynthesizer:
 
         return samples, compounds
 
-    def _render_index(self, compounds: dict[str, dict], generated_at: str) -> str:
+    @staticmethod
+    def _first_number(values: list[float | None]) -> float | None:
+        for value in values:
+            if value is None:
+                continue
+            return float(value)
+        return None
+
+    @staticmethod
+    def _min_max(values: list[float | None]) -> tuple[float, float] | tuple[None, None]:
+        numeric = [float(v) for v in values if v is not None]
+        if not numeric:
+            return None, None
+        return min(numeric), max(numeric)
+
+    @staticmethod
+    def _mean_cv(values: list[float | None]) -> tuple[float | None, float | None]:
+        numeric = [float(v) for v in values if v is not None]
+        if not numeric:
+            return None, None
+        series = pd.Series(numeric, dtype="float64")
+        mean_val = float(series.mean())
+        if mean_val == 0:
+            return mean_val, None
+        cv_percent = float((series.std(ddof=0) / abs(mean_val)) * 100.0)
+        return mean_val, cv_percent
+
+    def _build_landing_qc_plots(self, samples: list[dict], compounds: dict[str, dict]) -> tuple[dict, dict]:
+        newest_sample_name = samples[-1]["sample"] if samples else None
+
+        mz_range_x: list[float] = []
+        mz_range_y: list[float] = []
+        mz_range_plus: list[float] = []
+        mz_range_minus: list[float] = []
+        mz_range_custom: list[list[str | float]] = []
+        mz_latest_x: list[float] = []
+        mz_latest_y: list[float] = []
+        mz_latest_custom: list[list[str | float]] = []
+
+        rt_range_x: list[float] = []
+        rt_range_y: list[float] = []
+        rt_range_plus: list[float] = []
+        rt_range_minus: list[float] = []
+        rt_range_custom: list[list[str | float]] = []
+        rt_latest_x: list[float] = []
+        rt_latest_y: list[float] = []
+        rt_latest_custom: list[list[str | float]] = []
+
+        for compound_name in sorted(compounds):
+            compound = compounds[compound_name]
+            series = compound["samples"]
+            if not series:
+                continue
+
+            target_mz = self._first_number([row.get("target_mz") for row in series])
+            ppm_min, ppm_max = self._min_max([row.get("mz_error_ppm") for row in series])
+            if target_mz is not None and ppm_min is not None and ppm_max is not None:
+                mz_half_width = (target_mz * self.mz_tolerance_ppm) / 1e6
+                ppm_center = (ppm_min + ppm_max) / 2.0
+                mz_range_x.append(target_mz)
+                mz_range_y.append(ppm_center)
+                mz_range_plus.append(ppm_max - ppm_center)
+                mz_range_minus.append(ppm_center - ppm_min)
+                mz_range_custom.append(
+                    [
+                        compound_name,
+                        target_mz,
+                        target_mz - mz_half_width,
+                        target_mz + mz_half_width,
+                        ppm_min,
+                        ppm_max,
+                    ]
+                )
+
+            target_rt = self._first_number([row.get("target_rt") for row in series])
+            rt_err_min, rt_err_max = self._min_max([row.get("rt_error") for row in series])
+            if target_rt is not None and rt_err_min is not None and rt_err_max is not None:
+                rt_err_center = (rt_err_min + rt_err_max) / 2.0
+                rt_range_x.append(target_rt)
+                rt_range_y.append(rt_err_center)
+                rt_range_plus.append(rt_err_max - rt_err_center)
+                rt_range_minus.append(rt_err_center - rt_err_min)
+                rt_range_custom.append(
+                    [
+                        compound_name,
+                        target_rt,
+                        target_rt - self.rt_tolerance,
+                        target_rt + self.rt_tolerance,
+                        rt_err_min,
+                        rt_err_max,
+                    ]
+                )
+
+            if newest_sample_name is None:
+                continue
+
+            newest_row = next((row for row in series if row["sample"] == newest_sample_name), None)
+            if newest_row is None:
+                continue
+
+            newest_mz = newest_row.get("observed_mz")
+            newest_ppm = newest_row.get("mz_error_ppm")
+            if newest_mz is not None and newest_ppm is not None:
+                mz_latest_x.append(float(newest_mz))
+                mz_latest_y.append(float(newest_ppm))
+                mz_latest_custom.append([compound_name, newest_sample_name])
+
+            newest_rt = newest_row.get("target_rt")
+            newest_rt_err = newest_row.get("rt_error")
+            if newest_rt is not None and newest_rt_err is not None:
+                rt_latest_x.append(float(newest_rt))
+                rt_latest_y.append(float(newest_rt_err))
+                rt_latest_custom.append([compound_name, newest_sample_name])
+
+        mz_plot = {
+            "data": [
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch ppm range",
+                    "x": mz_range_x,
+                    "y": mz_range_y,
+                    "error_y": {
+                        "type": "data",
+                        "symmetric": False,
+                        "array": mz_range_plus,
+                        "arrayminus": mz_range_minus,
+                        "thickness": 1.4,
+                        "width": 0,
+                        "color": "#2c7f6d",
+                    },
+                    "customdata": mz_range_custom,
+                    "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[0]}<br>"
+                        "Target m/z: %{customdata[1]:.6f}<br>"
+                        "Tolerance window: [%{customdata[2]:.6f}, %{customdata[3]:.6f}]<br>"
+                        "ppm range: [%{customdata[4]:.3f}, %{customdata[5]:.3f}]<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Newest sample",
+                    "x": mz_latest_x,
+                    "y": mz_latest_y,
+                    "customdata": mz_latest_custom,
+                    "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[0]}<br>"
+                        "Sample: %{customdata[1]}<br>"
+                        "Observed m/z: %{x:.6f}<br>"
+                        "ppm error: %{y:.3f}<extra></extra>"
+                    ),
+                },
+            ],
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "showlegend": True,
+                "title": {"text": "Mass accuracy overview"},
+                "xaxis": {"title": "m/z (target on range markers; newest observed on dots)"},
+                "yaxis": {
+                    "title": "ppm error (batch min to max)",
+                    "zeroline": True,
+                    "range": [-self.mz_tolerance_ppm, self.mz_tolerance_ppm],
+                },
+            },
+        }
+
+        rt_plot = {
+            "data": [
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch RT error range",
+                    "x": rt_range_x,
+                    "y": rt_range_y,
+                    "error_y": {
+                        "type": "data",
+                        "symmetric": False,
+                        "array": rt_range_plus,
+                        "arrayminus": rt_range_minus,
+                        "thickness": 1.4,
+                        "width": 0,
+                        "color": "#3f9f8a",
+                    },
+                    "customdata": rt_range_custom,
+                    "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[0]}<br>"
+                        "Target RT: %{customdata[1]:.4f} min<br>"
+                        "Tolerance window: [%{customdata[2]:.4f}, %{customdata[3]:.4f}] min<br>"
+                        "RT error range: [%{customdata[4]:.4f}, %{customdata[5]:.4f}] min<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Newest sample",
+                    "x": rt_latest_x,
+                    "y": rt_latest_y,
+                    "customdata": rt_latest_custom,
+                    "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[0]}<br>"
+                        "Sample: %{customdata[1]}<br>"
+                        "Target RT: %{x:.4f} min<br>"
+                        "RT error: %{y:.4f} min<extra></extra>"
+                    ),
+                },
+            ],
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "showlegend": True,
+                "title": {"text": "Retention time overview"},
+                "xaxis": {"title": "Retention time (target on range markers; newest observed on dots)"},
+                "yaxis": {
+                    "title": "RT error (batch min to max)",
+                    "zeroline": True,
+                    "range": [-self.rt_tolerance, self.rt_tolerance],
+                },
+            },
+        }
+
+        return mz_plot, rt_plot
+
+    def _render_index(self, samples: list[dict], compounds: dict[str, dict], generated_at: str) -> str:
         rows = []
         for compound_name in sorted(compounds):
             c = compounds[compound_name]
+            series = c["samples"]
+            ppm_values = [row.get("mz_error_ppm") for row in series]
+            rt_error_values = [row.get("rt_error") for row in series]
+            intensity_values = [row.get("intensity") for row in series]
+
+            avg_ppm, _ = self._mean_cv(ppm_values)
+            avg_rt_error, _ = self._mean_cv(rt_error_values)
+            _, intensity_cv = self._mean_cv(intensity_values)
+
+            avg_ppm_text = f"{avg_ppm:.3f}" if avg_ppm is not None else "n/a"
+            avg_rt_error_text = f"{avg_rt_error:.4f}" if avg_rt_error is not None else "n/a"
+            intensity_cv_text = f"{intensity_cv:.2f}%" if intensity_cv is not None else "n/a"
+            intensity_cv_style = " style='color:#b42318;font-weight:700;'" if intensity_cv is not None and intensity_cv > 30.0 else ""
+
             rows.append(
                 "<tr>"
                 f"<td><a href='compounds/{escape(c['slug'])}.html'>{escape(c['name'])}</a></td>"
                 f"<td>{len(c['samples'])}</td>"
+                f"<td>{avg_ppm_text}</td>"
+                f"<td>{avg_rt_error_text}</td>"
+                f"<td{intensity_cv_style}>{intensity_cv_text}</td>"
                 "</tr>"
             )
 
-        table_rows = "\n".join(rows) if rows else "<tr><td colspan='2'>No compounds detected yet.</td></tr>"
+        table_rows = "\n".join(rows) if rows else "<tr><td colspan='5'>No compounds detected yet.</td></tr>"
+        mz_plot, rt_plot = self._build_landing_qc_plots(samples=samples, compounds=compounds)
+        mz_json = json.dumps(mz_plot)
+        rt_json = json.dumps(rt_plot)
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -200,6 +462,7 @@ class HTMLSynthesizer:
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>LCMS QC Compound Index</title>
+    <script src=\"https://cdn.plot.ly/plotly-2.35.2.min.js\"></script>
   <style>
     :root {{
       --bg: #f6f7f2;
@@ -229,21 +492,42 @@ class HTMLSynthesizer:
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
+        .section-title {{ margin: 22px 0 10px; }}
   </style>
 </head>
 <body>
   <section class=\"card\">
     <h1>LCMS QC Compound Index</h1>
     <p>Generated: {escape(generated_at)}</p>
+
+        <h2 class=\"section-title\">Mass accuracy overview</h2>
+        <div id=\"landing-mz\"></div>
+
+        <h2 class=\"section-title\">Retention time overview</h2>
+        <div id=\"landing-rt\"></div>
+
+        <h2 class=\"section-title\">Compound Index</h2>
     <table>
       <thead>
-        <tr><th>Compound</th><th>Detected Samples</th></tr>
+                <tr>
+                    <th>Compound</th>
+                    <th>Detected Samples</th>
+                    <th>Avg ppm</th>
+                    <th>Avg RT Error (min)</th>
+                    <th>Intensity CV</th>
+                </tr>
       </thead>
       <tbody>
         {table_rows}
       </tbody>
     </table>
   </section>
+    <script>
+        const mzPlot = {mz_json};
+        const rtPlot = {rt_json};
+        Plotly.newPlot('landing-mz', mzPlot.data, mzPlot.layout, {{responsive: true}});
+        Plotly.newPlot('landing-rt', rtPlot.data, rtPlot.layout, {{responsive: true}});
+    </script>
 </body>
 </html>
 """
@@ -262,19 +546,19 @@ class HTMLSynthesizer:
         series = compound["samples"]
         full_samples = [row["sample"] for row in series]
         samples = [self._acquisition_label(row["acquisition_time_iso"]) for row in series]
-        mz_values = [row["observed_mz"] for row in series]
+        ppm_values = [row.get("mz_error_ppm") for row in series]
         rt_values = [row["observed_rt"] for row in series]
+        rt_error_values = [row.get("rt_error") for row in series]
         intensity_values = [row["intensity"] for row in series]
 
-        target_mz_values = [row.get("target_mz") for row in series if row.get("target_mz") is not None]
         target_rt_values = [row.get("target_rt") for row in series if row.get("target_rt") is not None]
-        target_mz = target_mz_values[0] if target_mz_values else None
         target_rt = target_rt_values[0] if target_rt_values else None
 
         eic_traces = []
         for idx, row in enumerate(series):
             trace_csv = row["trace_csv"]
             trace_col = row["trace_col"]
+            line_color = self._line_color(idx, len(series))
             try:
                 trace_df = pd.read_csv(trace_csv)
             except Exception:
@@ -298,69 +582,174 @@ class HTMLSynthesizer:
                         "Sample: " + row["sample"] + "<br>"
                         "RT: %{x:.3f} min<br>EIC: %{y:.4g}<extra></extra>"
                     ),
-                    "line": {"color": self._line_color(idx, len(series)), "width": 1.8},
+                    "line": {"color": line_color, "width": 1.8},
                 }
             )
 
-        shapes = []
-        if target_mz is not None:
-            shapes.append(
+            picked_rt = row.get("observed_rt")
+            if picked_rt is None:
+                continue
+
+            try:
+                rt_value = float(picked_rt)
+            except (TypeError, ValueError):
+                continue
+
+            valid_times = times[mask]
+            valid_eic = eic[mask]
+            if valid_times.empty or valid_eic.empty:
+                continue
+
+            nearest_idx = (valid_times - rt_value).abs().idxmin()
+            picked_intensity = valid_eic.loc[nearest_idx]
+            if pd.isna(picked_intensity):
+                continue
+
+            eic_traces.append(
                 {
-                    "type": "line",
-                    "xref": "x",
-                    "yref": "y",
-                    "x0": samples[0] if samples else 0,
-                    "x1": samples[-1] if samples else 1,
-                    "y0": target_mz,
-                    "y1": target_mz,
-                    "line": {"color": "#8a3d2b", "width": 1.2, "dash": "dot"},
+                    "x": [rt_value],
+                    "y": [float(picked_intensity)],
+                    "name": self._acquisition_label(row["acquisition_time_iso"]) + " peak",
+                    "showlegend": False,
+                    "mode": "markers",
+                    "type": "scatter",
+                    "hovertemplate": (
+                        "Sample: " + row["sample"] + "<br>"
+                        "Picked peak RT: %{x:.3f} min<br>"
+                        "Picked peak EIC: %{y:.4g}<extra></extra>"
+                    ),
+                    "marker": {
+                        "size": 8,
+                        "color": line_color,
+                        "line": {"color": "#4a4a4a", "width": 0.8},
+                    },
                 }
             )
-        if target_rt is not None:
-            shapes.append(
-                {
-                    "type": "line",
-                    "xref": "x",
-                    "yref": "y2",
-                    "x0": samples[0] if samples else 0,
-                    "x1": samples[-1] if samples else 1,
-                    "y0": target_rt,
-                    "y1": target_rt,
-                    "line": {"color": "#8a3d2b", "width": 1.2, "dash": "dot"},
-                }
-            )
+
+        ppm_mean, ppm_cv = self._mean_cv(ppm_values)
+        rt_mean, rt_cv = self._mean_cv(rt_values)
+        intensity_mean, intensity_cv = self._mean_cv(intensity_values)
+
+        ppm_summary = (
+            f"Avg ppm: {ppm_mean:.3f}<br>PPM CV: {ppm_cv:.2f}%"
+            if ppm_mean is not None and ppm_cv is not None
+            else "Avg ppm: n/a<br>PPM CV: n/a"
+        )
+        rt_summary = (
+            f"Avg RT: {rt_mean:.4f} min<br>RT CV: {rt_cv:.2f}%"
+            if rt_mean is not None and rt_cv is not None
+            else "Avg RT: n/a<br>RT CV: n/a"
+        )
+        intensity_summary = (
+            f"Avg intensity: {intensity_mean:.4g}<br>Intensity CV: {intensity_cv:.2f}%"
+            if intensity_mean is not None and intensity_cv is not None
+            else "Avg intensity: n/a<br>Intensity CV: n/a"
+        )
+
+        shapes = [
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "y",
+                "x0": samples[0] if samples else 0,
+                "x1": samples[-1] if samples else 1,
+                "y0": 0,
+                "y1": 0,
+                "line": {"color": "#8a3d2b", "width": 1.2, "dash": "dot"},
+            },
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "y2",
+                "x0": samples[0] if samples else 0,
+                "x1": samples[-1] if samples else 1,
+                "y0": 0,
+                "y1": 0,
+                "line": {"color": "#8a3d2b", "width": 1.2, "dash": "dot"},
+            },
+        ]
+
+        annotations = [
+            {
+                "xref": "paper",
+                "yref": "paper",
+                "x": 0.99,
+                "y": 0.99,
+                "xanchor": "right",
+                "yanchor": "top",
+                "align": "right",
+                "showarrow": False,
+                "bgcolor": "rgba(255,255,255,0.82)",
+                "bordercolor": "#dde3dc",
+                "borderwidth": 1,
+                "text": ppm_summary,
+                "font": {"size": 11},
+            },
+            {
+                "xref": "paper",
+                "yref": "paper",
+                "x": 0.99,
+                "y": 0.65,
+                "xanchor": "right",
+                "yanchor": "top",
+                "align": "right",
+                "showarrow": False,
+                "bgcolor": "rgba(255,255,255,0.82)",
+                "bordercolor": "#dde3dc",
+                "borderwidth": 1,
+                "text": rt_summary,
+                "font": {"size": 11},
+            },
+            {
+                "xref": "paper",
+                "yref": "paper",
+                "x": 0.99,
+                "y": 0.31,
+                "xanchor": "right",
+                "yanchor": "top",
+                "align": "right",
+                "showarrow": False,
+                "bgcolor": "rgba(255,255,255,0.82)",
+                "bordercolor": "#dde3dc",
+                "borderwidth": 1,
+                "text": intensity_summary,
+                "font": {"size": 11},
+            },
+        ]
 
         top_plot = {
             "data": [
                 {
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": "Observed m/z",
+                    "name": "PPM error",
                     "x": samples,
-                    "y": mz_values,
+                    "y": ppm_values,
                     "customdata": full_samples,
                     "hovertemplate": (
                         "Sample: %{customdata}<br>"
-                        "Observed m/z: %{y:.6f}<extra></extra>"
+                        "PPM error: %{y:.3f}<extra></extra>"
                     ),
                     "xaxis": "x",
                     "yaxis": "y",
                     "line": {"color": "#2c7f6d"},
+                    "marker": {"size": 8, "color": "#2c7f6d"},
                 },
                 {
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": "Observed RT",
+                    "name": "RT error",
                     "x": samples,
-                    "y": rt_values,
+                    "y": rt_error_values,
                     "customdata": full_samples,
                     "hovertemplate": (
                         "Sample: %{customdata}<br>"
-                        "Observed RT: %{y:.4f} min<extra></extra>"
+                        "RT error: %{y:.4f} min<extra></extra>"
                     ),
                     "xaxis": "x",
                     "yaxis": "y2",
                     "line": {"color": "#3f9f8a"},
+                    "marker": {"size": 8, "color": "#3f9f8a"},
                 },
                 {
                     "type": "bar",
@@ -382,6 +771,7 @@ class HTMLSynthesizer:
                 "showlegend": False,
                 "margin": {"l": 90, "r": 20, "t": 40, "b": 110},
                 "shapes": shapes,
+                "annotations": annotations,
                 "xaxis": {
                     "anchor": "y3",
                     "side": "bottom",
@@ -394,16 +784,16 @@ class HTMLSynthesizer:
                     "automargin": True,
                 },
                 "yaxis": {
-                    "title": {"text": "Observed m/z", "standoff": 8},
+                    "title": {"text": "PPM error", "standoff": 8},
                     "automargin": True,
                     "domain": [0.72, 1.0],
-                    "range": [target_mz - 0.02, target_mz + 0.02] if target_mz is not None else None,
+                    "range": [-self.mz_tolerance_ppm, self.mz_tolerance_ppm],
                 },
                 "yaxis2": {
-                    "title": {"text": "Observed retention time", "standoff": 8},
+                    "title": {"text": "RT error (min)", "standoff": 8},
                     "automargin": True,
                     "domain": [0.38, 0.66],
-                    "range": [target_rt - 0.5, target_rt + 0.5] if target_rt is not None else None,
+                    "range": [-self.rt_tolerance, self.rt_tolerance],
                 },
                 "yaxis3": {
                     "title": {"text": "Intensity", "standoff": 8},
@@ -502,7 +892,7 @@ class HTMLSynthesizer:
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         samples, compounds = self._build_dataset()
 
-        index_html = self._render_index(compounds=compounds, generated_at=generated_at)
+        index_html = self._render_index(samples=samples, compounds=compounds, generated_at=generated_at)
         self._write_atomic(self.html_output, index_html)
 
         compounds_dir = self.html_output.parent / "compounds"
