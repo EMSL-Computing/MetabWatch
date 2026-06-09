@@ -45,6 +45,11 @@ class HTMLSynthesizer:
         return f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
 
     @staticmethod
+    def _target_trace_col(compound_name: str) -> str:
+        safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
+        return f"target_{safe_name}" if safe_name else "target_compound"
+
+    @staticmethod
     def _acquisition_label(acquisition_time_iso: str) -> str:
         """Return a readable UTC datetime label for x-axis ticks."""
         dt = pd.to_datetime(acquisition_time_iso, utc=True, errors="coerce")
@@ -165,6 +170,7 @@ class HTMLSynthesizer:
                             "name": compound_name,
                             "slug": self._slugify(compound_name),
                             "samples": [],
+                            "detected_count": 0,
                         }
 
             samples.append(sample_record)
@@ -174,22 +180,23 @@ class HTMLSynthesizer:
         for compound_name, compound in compounds.items():
             for sample in samples:
                 metric = sample["compounds"].get(compound_name)
-                if not metric:
-                    continue
+                if metric:
+                    compound["detected_count"] += 1
                 compound["samples"].append(
                     {
                         "sample": sample["sample"],
                         "acquisition_time": sample["acquisition_time"],
                         "acquisition_time_iso": sample["acquisition_time_iso"],
-                        "observed_mz": metric["observed_mz"],
-                        "observed_rt": metric["observed_rt"],
-                        "intensity": metric["intensity"],
-                        "target_mz": metric["target_mz"],
-                        "target_rt": metric["target_rt"],
-                        "mz_error_ppm": metric["mz_error_ppm"],
-                        "rt_error": metric["rt_error"],
+                        "observed_mz": metric["observed_mz"] if metric else None,
+                        "observed_rt": metric["observed_rt"] if metric else None,
+                        "intensity": metric["intensity"] if metric else None,
+                        "target_mz": metric["target_mz"] if metric else None,
+                        "target_rt": metric["target_rt"] if metric else None,
+                        "mz_error_ppm": metric["mz_error_ppm"] if metric else None,
+                        "rt_error": metric["rt_error"] if metric else None,
                         "trace_csv": sample["trace_csv"],
-                        "trace_col": metric["trace_col"],
+                        "trace_col": metric["trace_col"] if metric else self._target_trace_col(compound_name),
+                        "detected": bool(metric),
                     }
                 )
 
@@ -260,6 +267,7 @@ class HTMLSynthesizer:
                 mz_range_minus.append(ppm_center - ppm_min)
                 mz_range_custom.append(
                     [
+                        compound["slug"],
                         compound_name,
                         target_mz,
                         target_mz - mz_half_width,
@@ -279,6 +287,7 @@ class HTMLSynthesizer:
                 rt_range_minus.append(rt_err_center - rt_err_min)
                 rt_range_custom.append(
                     [
+                        compound["slug"],
                         compound_name,
                         target_rt,
                         target_rt - self.rt_tolerance,
@@ -300,21 +309,21 @@ class HTMLSynthesizer:
             if newest_mz is not None and newest_ppm is not None:
                 mz_latest_x.append(float(newest_mz))
                 mz_latest_y.append(float(newest_ppm))
-                mz_latest_custom.append([compound_name, newest_sample_name])
+                mz_latest_custom.append([compound["slug"], compound_name, newest_sample_name])
 
             newest_rt = newest_row.get("target_rt")
             newest_rt_err = newest_row.get("rt_error")
             if newest_rt is not None and newest_rt_err is not None:
                 rt_latest_x.append(float(newest_rt))
                 rt_latest_y.append(float(newest_rt_err))
-                rt_latest_custom.append([compound_name, newest_sample_name])
+                rt_latest_custom.append([compound["slug"], compound_name, newest_sample_name])
 
         mz_plot = {
             "data": [
                 {
                     "type": "scatter",
                     "mode": "markers",
-                    "name": "Batch ppm range",
+                    "name": "Batch ppm range data",
                     "x": mz_range_x,
                     "y": mz_range_y,
                     "error_y": {
@@ -328,12 +337,22 @@ class HTMLSynthesizer:
                     },
                     "customdata": mz_range_custom,
                     "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "showlegend": False,
                     "hovertemplate": (
-                        "Compound: %{customdata[0]}<br>"
-                        "Target m/z: %{customdata[1]:.6f}<br>"
-                        "Tolerance window: [%{customdata[2]:.6f}, %{customdata[3]:.6f}]<br>"
-                        "ppm range: [%{customdata[4]:.3f}, %{customdata[5]:.3f}]<extra></extra>"
+                        "Compound: %{customdata[1]}<br>"
+                        "Target m/z: %{customdata[2]:.6f}<br>"
+                        "Tolerance window: [%{customdata[3]:.6f}, %{customdata[4]:.6f}]<br>"
+                        "ppm range: [%{customdata[5]:.3f}, %{customdata[6]:.3f}]<extra></extra>"
                     ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch ppm range",
+                    "x": [None],
+                    "y": [None],
+                    "hoverinfo": "skip",
+                    "marker": {"size": 8, "color": "#2c7f6d"},
                 },
                 {
                     "type": "scatter",
@@ -344,8 +363,8 @@ class HTMLSynthesizer:
                     "customdata": mz_latest_custom,
                     "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
                     "hovertemplate": (
-                        "Compound: %{customdata[0]}<br>"
-                        "Sample: %{customdata[1]}<br>"
+                        "Compound: %{customdata[1]}<br>"
+                        "Sample: %{customdata[2]}<br>"
                         "Observed m/z: %{x:.6f}<br>"
                         "ppm error: %{y:.3f}<extra></extra>"
                     ),
@@ -370,7 +389,7 @@ class HTMLSynthesizer:
                 {
                     "type": "scatter",
                     "mode": "markers",
-                    "name": "Batch RT error range",
+                    "name": "Batch RT error range data",
                     "x": rt_range_x,
                     "y": rt_range_y,
                     "error_y": {
@@ -384,12 +403,22 @@ class HTMLSynthesizer:
                     },
                     "customdata": rt_range_custom,
                     "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "showlegend": False,
                     "hovertemplate": (
-                        "Compound: %{customdata[0]}<br>"
-                        "Target RT: %{customdata[1]:.4f} min<br>"
-                        "Tolerance window: [%{customdata[2]:.4f}, %{customdata[3]:.4f}] min<br>"
-                        "RT error range: [%{customdata[4]:.4f}, %{customdata[5]:.4f}] min<extra></extra>"
+                        "Compound: %{customdata[1]}<br>"
+                        "Target RT: %{customdata[2]:.4f} min<br>"
+                        "Tolerance window: [%{customdata[3]:.4f}, %{customdata[4]:.4f}] min<br>"
+                        "RT error range: [%{customdata[5]:.4f}, %{customdata[6]:.4f}] min<extra></extra>"
                     ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch RT error range",
+                    "x": [None],
+                    "y": [None],
+                    "hoverinfo": "skip",
+                    "marker": {"size": 8, "color": "#3f9f8a"},
                 },
                 {
                     "type": "scatter",
@@ -400,8 +429,8 @@ class HTMLSynthesizer:
                     "customdata": rt_latest_custom,
                     "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
                     "hovertemplate": (
-                        "Compound: %{customdata[0]}<br>"
-                        "Sample: %{customdata[1]}<br>"
+                        "Compound: %{customdata[1]}<br>"
+                        "Sample: %{customdata[2]}<br>"
                         "Target RT: %{x:.4f} min<br>"
                         "RT error: %{y:.4f} min<extra></extra>"
                     ),
@@ -444,7 +473,7 @@ class HTMLSynthesizer:
             rows.append(
                 "<tr>"
                 f"<td><a href='compounds/{escape(c['slug'])}.html'>{escape(c['name'])}</a></td>"
-                f"<td>{len(c['samples'])}</td>"
+                f"<td>{c.get('detected_count', len(c['samples']))}</td>"
                 f"<td>{avg_ppm_text}</td>"
                 f"<td>{avg_rt_error_text}</td>"
                 f"<td{intensity_cv_style}>{intensity_cv_text}</td>"
@@ -564,11 +593,19 @@ class HTMLSynthesizer:
             except Exception:
                 continue
 
-            if "time" not in trace_df.columns or trace_col not in trace_df.columns:
+            if "time" not in trace_df.columns:
                 continue
 
             times = pd.to_numeric(trace_df["time"], errors="coerce")
-            eic = pd.to_numeric(trace_df[trace_col], errors="coerce")
+            if trace_col and trace_col in trace_df.columns:
+                eic = pd.to_numeric(trace_df[trace_col], errors="coerce")
+                detected = True
+            elif self._target_trace_col(compound["name"]) in trace_df.columns:
+                eic = pd.to_numeric(trace_df[self._target_trace_col(compound["name"])], errors="coerce")
+                detected = False
+            else:
+                continue
+
             mask = (~times.isna()) & (~eic.isna())
             if not mask.any():
                 continue
@@ -578,16 +615,26 @@ class HTMLSynthesizer:
                     "x": times[mask].tolist(),
                     "y": eic[mask].tolist(),
                     "name": self._acquisition_label(row["acquisition_time_iso"]),
+                    "detected": detected,
                     "hovertemplate": (
                         "Sample: " + row["sample"] + "<br>"
-                        "RT: %{x:.3f} min<br>EIC: %{y:.4g}<extra></extra>"
+                        +
+                        (
+                            "RT: %{x:.3f} min<br>EIC: %{y:.4g}<extra></extra>"
+                            if detected
+                            else "RT: %{x:.3f} min<br>EIC: %{y:.4g} (no detected peak)<extra></extra>"
+                        )
                     ),
-                    "line": {"color": line_color, "width": 1.8},
+                    "line": {
+                        "color": line_color,
+                        "width": 1.8,
+                        "dash": "dot" if not detected else "solid",
+                    },
                 }
             )
 
             picked_rt = row.get("observed_rt")
-            if picked_rt is None:
+            if picked_rt is None or not detected:
                 continue
 
             try:
@@ -803,6 +850,27 @@ class HTMLSynthesizer:
             },
         }
 
+        eic_x_range = [target_rt - 2.0, target_rt + 2.0] if target_rt is not None else None
+        eic_window_max = 0.0
+        non_detect_indices: list[int] = []
+        for trace_index, trace in enumerate(eic_traces):
+            if not bool(trace.get("detected", True)):
+                non_detect_indices.append(trace_index)
+            x_vals = trace.get("x", [])
+            y_vals = trace.get("y", [])
+            for x_val, y_val in zip(x_vals, y_vals):
+                if y_val is None:
+                    continue
+                if eic_x_range is not None and (x_val < eic_x_range[0] or x_val > eic_x_range[1]):
+                    continue
+                if y_val > eic_window_max:
+                    eic_window_max = float(y_val)
+
+        for trace in eic_traces:
+            trace.pop("detected", None)
+
+        eic_y_range = [0.0, eic_window_max * 1.05] if eic_window_max > 0 else [0.0, 1.0]
+
         eic_plot = {
             "data": eic_traces,
             "layout": {
@@ -812,9 +880,9 @@ class HTMLSynthesizer:
                 "margin": {"l": 70, "r": 20, "t": 40, "b": 60},
                 "xaxis": {
                     "title": "Retention time (min)",
-                    "range": [target_rt - 2.0, target_rt + 2.0] if target_rt is not None else None,
+                    "range": eic_x_range,
                 },
-                "yaxis": {"title": "EIC intensity"},
+                "yaxis": {"title": "EIC intensity", "range": eic_y_range},
             },
         }
 

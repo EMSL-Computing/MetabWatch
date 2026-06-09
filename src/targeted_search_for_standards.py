@@ -10,10 +10,12 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
+from corems.mass_spectra.factory.chromat_data import EIC_Data
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
 
@@ -24,6 +26,12 @@ REQUIRED_STANDARDS_COLUMNS = {
     "retention_time",
     "polarity",
 }
+
+
+def _target_trace_col(compound_name: str) -> str:
+    """Return deterministic trace column name for target-based EIC extraction."""
+    safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
+    return f"target_{safe_name}" if safe_name else "target_compound"
 
 
 def _normalize_acquisition_time(value: object) -> str | None:
@@ -58,6 +66,63 @@ def _normalize_acquisition_time(value: object) -> str | None:
     if pd.isna(parsed):
         return None
     return parsed.to_pydatetime().astimezone(timezone.utc).isoformat()
+
+
+def _build_eics_for_mz_list(
+    lcms_obj: object,
+    mz_values: list[float],
+    mz_tolerance_ppm: float,
+) -> None:
+    """Build EICs directly from raw MS1 points for requested m/z values.
+
+    This is used when integration is disabled and CoreMS has not populated
+    `lcms_obj.eics`.
+    """
+    if not mz_values:
+        return
+
+    raw_data = getattr(lcms_obj, "_ms_unprocessed", {}).get(1)
+    if raw_data is None or raw_data.empty:
+        return
+
+    scan_df_sub = (
+        lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1][["scan", "scan_time"]]
+        .copy()
+        .reset_index(drop=True)
+    )
+    if scan_df_sub.empty:
+        return
+
+    raw_data_sorted = raw_data.sort_values(["mz", "scan"]).reset_index(drop=True)
+    raw_data_mz = raw_data_sorted["mz"].to_numpy()
+
+    for mz in sorted(set(float(x) for x in mz_values)):
+        if mz in lcms_obj.eics:
+            continue
+
+        mz_tol = mz * mz_tolerance_ppm / 1e6
+        mz_min = mz - mz_tol
+        mz_max = mz + mz_tol
+
+        left_idx = int(np.searchsorted(raw_data_mz, mz_min, side="left"))
+        right_idx = int(np.searchsorted(raw_data_mz, mz_max, side="right"))
+        raw_data_sub = raw_data_sorted.iloc[left_idx:right_idx].copy()
+
+        if raw_data_sub.empty:
+            intensity_by_scan = pd.DataFrame({"scan": [], "intensity": []})
+        else:
+            intensity_by_scan = (
+                raw_data_sub.groupby(["scan"])["intensity"].sum().reset_index()
+            )
+
+        merged = scan_df_sub.merge(intensity_by_scan, on="scan", how="left")
+        merged["intensity"] = merged["intensity"].fillna(0.0)
+
+        lcms_obj.eics[mz] = EIC_Data(
+            scans=merged["scan"].to_numpy(),
+            time=merged["scan_time"].to_numpy(),
+            eic=merged["intensity"].to_numpy(),
+        )
 
 
 def _extract_acquisition_time_iso(parser: object, lcms_obj: object) -> str:
@@ -184,6 +249,8 @@ def process_raw_to_observed_features_df(
     min_area: float = 1e4,
     plot_eics: bool = True,
     plot_tic: bool = True,
+    integrate_mass_features: bool = False,
+    cluster_mass_features: bool = False,
 ) -> pd.DataFrame:
     """Process a single `.raw` file and return matched observed features.
 
@@ -211,6 +278,10 @@ def process_raw_to_observed_features_df(
         Whether to generate EIC PDFs for matched features.
     plot_tic : bool
         Whether to generate a TIC PNG for the sample.
+    integrate_mass_features : bool
+        Whether to run CoreMS integration on detected mass features.
+    cluster_mass_features : bool
+        Whether to run CoreMS clustering on detected mass features.
 
     Returns
     -------
@@ -271,9 +342,11 @@ def process_raw_to_observed_features_df(
     }
 
     lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
-    lcms_obj.integrate_mass_features()
+    if integrate_mass_features:
+        lcms_obj.integrate_mass_features()
     lcms_obj.add_associated_ms1()
-    lcms_obj.cluster_mass_features()
+    if cluster_mass_features:
+        lcms_obj.cluster_mass_features()
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     required_mf_columns = {"mz", "scan_time"}
@@ -284,10 +357,11 @@ def process_raw_to_observed_features_df(
             + ", ".join(missing_mf_columns)
         )
 
-    if min_area > 0 and "area" not in mf_df.columns:
-        raise RuntimeError(
-            "CoreMS mass features DataFrame does not contain 'area', "
-            "but min_area filtering was requested"
+    has_area = "area" in mf_df.columns
+    if min_area > 0 and not has_area:
+        print(
+            "[warning] 'area' is unavailable in CoreMS mass features; "
+            "skipping min_area filtering"
         )
 
     file_results = []
@@ -323,7 +397,7 @@ def process_raw_to_observed_features_df(
 
     results_df = pd.DataFrame(file_results)
 
-    if min_area > 0 and not results_df.empty:
+    if min_area > 0 and not results_df.empty and has_area:
         results_df = results_df[results_df["area"] >= min_area].copy()
 
     # Keep one hit per compound by selecting the highest-intensity matched feature.
@@ -392,6 +466,20 @@ def process_raw_to_observed_features_df(
         .reset_index(drop=True)
     )
 
+    # Integration-disabled mode does not populate `lcms_obj.eics`; build target and
+    # matched-feature EICs directly so dashboard traces are still available.
+    if not getattr(lcms_obj, "eics", None):
+        mz_values_for_eics = target_df["mz"].dropna().astype(float).tolist()
+        if not results_df.empty and "observed_mz" in results_df.columns:
+            mz_values_for_eics.extend(
+                results_df["observed_mz"].dropna().astype(float).tolist()
+            )
+        _build_eics_for_mz_list(
+            lcms_obj=lcms_obj,
+            mz_values=mz_values_for_eics,
+            mz_tolerance_ppm=mz_tolerance_ppm,
+        )
+
     if not results_df.empty:
         final_hits = (
             results_df[["mf_id", "compound_name"]]
@@ -409,11 +497,58 @@ def process_raw_to_observed_features_df(
             col_name = f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
 
             eic_data = lcms_obj.mass_features[mf_id]._eic_data
+            if eic_data is None:
+                mf_mz = float(lcms_obj.mass_features[mf_id].mz)
+                mz_tol = mf_mz * mz_tolerance_ppm / 1e6
+                key = lcms_obj.get_eic_mz_for_mass_feature(mf_mz, tolerance=mz_tol)
+                if key is not None and key in lcms_obj.eics:
+                    eic_data = lcms_obj.eics[key]
+            if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
+                continue
+            if eic_data.scans is None or eic_data.eic is None:
+                continue
             eic_df = pd.DataFrame({
                 "scan": eic_data.scans,
                 col_name: eic_data.eic,
             })
             ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
+
+    # Always export target-based EIC traces for each expected compound so
+    # non-detected compounds still have a real CoreMS-extracted chromatogram.
+    target_export = (
+        target_df[["compound_name", "mz"]]
+        .dropna(subset=["compound_name", "mz"])
+        .drop_duplicates(subset=["compound_name"], keep="first")
+    )
+    eic_keys = list(lcms_obj.eics.keys()) if getattr(lcms_obj, "eics", None) else []
+    for _, row in target_export.iterrows():
+        compound_name = str(row["compound_name"])
+        target_mz = float(row["mz"])
+        col_name = _target_trace_col(compound_name)
+
+        key = None
+        abs_tolerance = target_mz * mz_tolerance_ppm / 1e6
+        try:
+            key = lcms_obj.get_eic_mz_for_mass_feature(target_mz, tolerance=abs_tolerance)
+        except Exception:
+            key = None
+
+        if key is None and eic_keys:
+            key = min(eic_keys, key=lambda candidate: abs(float(candidate) - target_mz))
+
+        if key is None or key not in lcms_obj.eics:
+            continue
+
+        eic_data = lcms_obj.eics[key]
+        if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
+            continue
+        if eic_data.scans is None or eic_data.eic is None:
+            continue
+        eic_df = pd.DataFrame({
+            "scan": eic_data.scans,
+            col_name: eic_data.eic,
+        })
+        ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
 
     ms1_df = ms1_df.drop(columns=["scan"])
     ms1_df["acquisition_time"] = acquisition_time

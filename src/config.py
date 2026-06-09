@@ -34,6 +34,10 @@ class ProcessorConfig:
         Whether to generate EIC plots.
     plot_tic : bool
         Whether to generate a TIC plot.
+    integrate_mass_features : bool
+        Whether to run CoreMS mass-feature integration.
+    cluster_mass_features : bool
+        Whether to run CoreMS mass-feature clustering.
     """
     standards_csv: Path
     params_path: Path
@@ -43,6 +47,8 @@ class ProcessorConfig:
     min_area: float = 5e3
     plot_eics: bool = False
     plot_tic: bool = True
+    integrate_mass_features: bool = False
+    cluster_mass_features: bool = False
 
 
 @dataclass(frozen=True)
@@ -168,6 +174,8 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
             min_area=float(processor.get("min_area", 5e3)),
             plot_eics=bool(processor.get("plot_eics", False)),
             plot_tic=bool(processor.get("plot_tic", True)),
+            integrate_mass_features=bool(processor.get("integrate_mass_features", False)),
+            cluster_mass_features=bool(processor.get("cluster_mass_features", False)),
         ),
         watcher=WatcherConfig(
             raw_dir=repo_root / watcher["raw_dir"],

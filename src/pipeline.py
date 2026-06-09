@@ -45,6 +45,8 @@ def _build_runtime(config: PipelineConfig):
         min_area=config.processor.min_area,
         plot_eics=config.processor.plot_eics,
         plot_tic=config.processor.plot_tic,
+        integrate_mass_features=config.processor.integrate_mass_features,
+        cluster_mass_features=config.processor.cluster_mass_features,
     )
     retry_policy = RetryPolicy(
         max_retries=config.max_retries,

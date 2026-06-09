@@ -70,6 +70,8 @@ class ProcessorOrchestrator:
         min_area: float,
         plot_eics: bool,
         plot_tic: bool,
+        integrate_mass_features: bool,
+        cluster_mass_features: bool,
     ):
         self.standards_csv = standards_csv
         self.params_path = params_path
@@ -79,6 +81,8 @@ class ProcessorOrchestrator:
         self.min_area = min_area
         self.plot_eics = plot_eics
         self.plot_tic = plot_tic
+        self.integrate_mass_features = integrate_mass_features
+        self.cluster_mass_features = cluster_mass_features
         """Wrap invocation of the CoreMS-based processing function.
 
         Parameters
@@ -130,6 +134,8 @@ class ProcessorOrchestrator:
                 min_area=self.min_area,
                 plot_eics=self.plot_eics,
                 plot_tic=self.plot_tic,
+                integrate_mass_features=self.integrate_mass_features,
+                cluster_mass_features=self.cluster_mass_features,
             )
             stem = raw_file.stem
             acquisition_time = results_df.attrs.get("acquisition_time")
