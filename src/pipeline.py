@@ -60,7 +60,6 @@ def _build_runtime(config: PipelineConfig):
     queue = ProcessingQueue()
     state_store = ManifestStateStore(
         manifest_json=config.state.pipeline_manifest,
-        manifest_csv=None,
         stale_in_progress_sec=config.state.stale_in_progress_sec,
     )
     output_tracker = OutputTracker(debounce_sec=config.synthesizer.debounce_sec)

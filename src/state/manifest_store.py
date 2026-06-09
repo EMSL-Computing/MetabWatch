@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import hashlib
 import json
 from dataclasses import asdict, dataclass
@@ -63,7 +62,6 @@ class ManifestStateStore:
     def __init__(
         self,
         manifest_json: Path,
-        manifest_csv: Path | None = None,
         stale_in_progress_sec: int = 3600,
     ):
         """Create or load a manifest-backed state store.
@@ -72,15 +70,12 @@ class ManifestStateStore:
         ----------
         manifest_json : Path
             Path to the manifest JSON file that will be read/written.
-        manifest_csv : Path | None
-            Optional CSV mirror path (not used by default in pipeline).
         stale_in_progress_sec : int
             Seconds after which an `in_progress` entry is considered stale
             and will be marked failed on recovery.
         """
 
         self.manifest_json = manifest_json
-        self.manifest_csv = manifest_csv
         self.stale_in_progress_sec = stale_in_progress_sec
         self.manifest_json.parent.mkdir(parents=True, exist_ok=True)
         self._entries: dict[str, ManifestEntry] = {}
@@ -115,7 +110,7 @@ class ManifestStateStore:
             self._entries[entry.raw_file] = entry
 
     def _flush(self) -> None:
-        """Atomically flush in-memory entries to the manifest JSON (and CSV).
+        """Atomically flush in-memory entries to the manifest JSON.
 
         Writes to a temporary file then replaces the canonical path to avoid
         partial writes.
@@ -128,14 +123,6 @@ class ManifestStateStore:
         with tmp_path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
         tmp_path.replace(self.manifest_json)
-
-        if self.manifest_csv:
-            self.manifest_csv.parent.mkdir(parents=True, exist_ok=True)
-            with self.manifest_csv.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=list(ManifestEntry.__dataclass_fields__))
-                writer.writeheader()
-                for entry in self._entries.values():
-                    writer.writerow(asdict(entry))
 
     def recover_stale_in_progress(self) -> None:
         """Mark entries that have been `in_progress` for too long as failed.
