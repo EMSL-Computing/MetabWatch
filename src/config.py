@@ -19,7 +19,10 @@ class ProcessorConfig:
     Parameters
     ----------
     standards_csv : Path
-        Path to the standards CSV used for targeted matching.
+        Path to the standards CSV used for targeted matching. In untargeted
+        mode this field is populated with the derived
+        `<output_dir>/untargeted_search_space.csv` path and is NOT read by
+        the targeted pipeline (the untargeted bootstrap writes to it instead).
     params_path : Path
         Path to the CoreMS TOML parameter file.
     output_dir : Path
@@ -197,8 +200,10 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
             f"search_space.mode must be 'targeted' or 'untargeted', got '{mode}'"
         )
     top_n = int(search_space_payload.get("top_n", 100))
-    if mode == "untargeted" and top_n <= 0:
-        raise ValueError("search_space.top_n must be > 0 when mode is 'untargeted'")
+    if top_n <= 0:
+        raise ValueError(
+            f"search_space.top_n must be > 0, got {top_n}"
+        )
 
     standards_csv_value = processor.get("standards_csv")
     if mode == "untargeted":
