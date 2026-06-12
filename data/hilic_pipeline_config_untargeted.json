@@ -1,0 +1,30 @@
+{
+  "processor": {
+    "params_path": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+    "output_dir": "data/results_hilic_pos_untargeted",
+    "mz_tolerance_ppm": 4.0,
+    "rt_tolerance": 0.8,
+    "min_area": 1000,
+    "plot_eics": false,
+    "plot_tic": true,
+    "integrate_mass_features": false,
+    "cluster_mass_features": false
+  },
+  "watcher": {
+    "raw_dir": "data/raw_positive",
+    "poll_interval_sec": 10.0,
+    "stability_wait_sec": 20.0,
+    "sample_name_regex": "QC_Metab_(.+)"
+  },
+  "synthesizer": {
+    "debounce_sec": 5.0
+  },
+  "search_space": {
+    "mode": "untargeted",
+    "top_n": 100
+  },
+  "stale_in_progress_sec": 3600,
+  "max_retries": 3,
+  "initial_backoff_sec": 10.0,
+  "backoff_multiplier": 2.0
+}
