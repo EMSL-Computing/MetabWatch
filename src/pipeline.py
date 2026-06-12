@@ -306,13 +306,10 @@ def run_watch_mode(
             try:
                 _ensure_untargeted_search_space(config=config, raw_file=raw_file)
             except Exception as exc:
-                state_store.mark_in_progress(raw_file)
                 state_store.mark_failed(
                     raw_file, f"untargeted bootstrap failed: {exc}"
                 )
-                print(
-                    f"[failed] {raw_file.name} untargeted bootstrap: {exc}"
-                )
+                print(f"[failed] {raw_file.name} untargeted bootstrap: {exc}")
                 continue
             _process_one(
                 raw_file=raw_file,
@@ -387,7 +384,6 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     try:
         _ensure_untargeted_search_space(config=config, raw_file=raw_file)
     except Exception as exc:
-        state_store.mark_in_progress(raw_file)
         state_store.mark_failed(
             raw_file, f"untargeted bootstrap failed: {exc}"
         )
