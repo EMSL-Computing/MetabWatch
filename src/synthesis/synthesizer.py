@@ -747,8 +747,8 @@ class HTMLSynthesizer:
         rt_json = json.dumps(rt_plot)
 
         if self.untargeted_mode:
-            _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the bootstrap sample)"
-            _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the bootstrap sample)"
+            _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the seed sample)"
+            _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the seed sample)"
         else:
             _avg_ppm_tooltip = "error vs target"
             _avg_rt_tooltip = "error vs target"

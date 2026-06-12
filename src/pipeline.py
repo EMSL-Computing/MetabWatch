@@ -303,13 +303,26 @@ def run_watch_mode(
             start=1,
         ):
             print(f"[processing {index}/{total}] {raw_file.name}")
+            if (
+                config.search_space.mode == "untargeted"
+                and not config.search_space.csv_path.exists()
+                and state_store.get_attempts(raw_file) > retry_policy.max_retries
+            ):
+                print(
+                    f"[skipped] {raw_file.name} exceeded max_retries "
+                    f"({retry_policy.max_retries}) on untargeted search space build"
+                )
+                continue
             try:
                 _ensure_untargeted_search_space(config=config, raw_file=raw_file)
             except Exception as exc:
+                state_store.mark_in_progress(raw_file)
                 state_store.mark_failed(
-                    raw_file, f"untargeted bootstrap failed: {exc}"
+                    raw_file, f"untargeted search space build failed: {exc}"
                 )
-                print(f"[failed] {raw_file.name} untargeted bootstrap: {exc}")
+                print(
+                    f"[failed] {raw_file.name} untargeted search space build: {exc}"
+                )
                 continue
             _process_one(
                 raw_file=raw_file,
@@ -381,13 +394,25 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
         return 0
 
+    if (
+        config.search_space.mode == "untargeted"
+        and not config.search_space.csv_path.exists()
+        and state_store.get_attempts(raw_file) > retry_policy.max_retries
+    ):
+        print(
+            f"[skipped] {raw_file.name} exceeded max_retries "
+            f"({retry_policy.max_retries}) on untargeted search space build"
+        )
+        return 1
+
     try:
         _ensure_untargeted_search_space(config=config, raw_file=raw_file)
     except Exception as exc:
+        state_store.mark_in_progress(raw_file)
         state_store.mark_failed(
-            raw_file, f"untargeted bootstrap failed: {exc}"
+            raw_file, f"untargeted search space build failed: {exc}"
         )
-        print(f"[failed] {raw_file.name} untargeted bootstrap: {exc}")
+        print(f"[failed] {raw_file.name} untargeted search space build: {exc}")
         return 1
 
     _process_one(
