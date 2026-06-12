@@ -503,7 +503,7 @@ class HTMLSynthesizer:
             mean_mz = self._mean_value(detected_mz)
             mean_rt = self._mean_value(detected_rt)
 
-            if mean_mz is not None and detected_mz:
+            if mean_mz is not None:
                 ppm_devs = [
                     (float(v) - mean_mz) / mean_mz * 1e6 for v in detected_mz
                 ]
@@ -526,7 +526,7 @@ class HTMLSynthesizer:
                     ]
                 )
 
-            if mean_rt is not None and detected_rt:
+            if mean_rt is not None:
                 rt_devs = [float(v) - mean_rt for v in detected_rt]
                 rt_min, rt_max = min(rt_devs), max(rt_devs)
                 rt_center = (rt_min + rt_max) / 2.0
@@ -747,8 +747,8 @@ class HTMLSynthesizer:
         rt_json = json.dumps(rt_plot)
 
         if self.untargeted_mode:
-            _avg_ppm_tooltip = "deviation from batch mean (untargeted mode)"
-            _avg_rt_tooltip = "deviation from batch mean (untargeted mode)"
+            _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the bootstrap sample)"
+            _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the bootstrap sample)"
         else:
             _avg_ppm_tooltip = "error vs target"
             _avg_rt_tooltip = "error vs target"
