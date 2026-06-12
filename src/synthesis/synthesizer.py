@@ -26,11 +26,13 @@ class HTMLSynthesizer:
         html_output: Path,
         mz_tolerance_ppm: float,
         rt_tolerance: float,
+        untargeted_mode: bool = False,
     ):
         self.output_dirs = output_dirs
         self.html_output = html_output
         self.mz_tolerance_ppm = mz_tolerance_ppm
         self.rt_tolerance = rt_tolerance
+        self.untargeted_mode = untargeted_mode
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
 
