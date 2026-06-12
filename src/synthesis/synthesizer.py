@@ -719,6 +719,11 @@ class HTMLSynthesizer:
             avg_rt_error, _ = self._mean_cv(rt_error_values)
             _, intensity_cv = self._mean_cv(intensity_values)
 
+            target_mz = self._first_number([row.get("target_mz") for row in series])
+            target_rt = self._first_number([row.get("target_rt") for row in series])
+
+            target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
+            target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
             avg_ppm_text = f"{avg_ppm:.3f}" if avg_ppm is not None else "n/a"
             avg_rt_error_text = f"{avg_rt_error:.4f}" if avg_rt_error is not None else "n/a"
             intensity_cv_text = f"{intensity_cv:.2f}%" if intensity_cv is not None else "n/a"
@@ -727,6 +732,8 @@ class HTMLSynthesizer:
             rows.append(
                 "<tr>"
                 f"<td><a href='compounds/{escape(c['slug'])}.html'>{escape(c['name'])}</a></td>"
+                f"<td>{target_mz_text}</td>"
+                f"<td>{target_rt_text}</td>"
                 f"<td>{c.get('detected_count', len(c['samples']))}</td>"
                 f"<td>{avg_ppm_text}</td>"
                 f"<td>{avg_rt_error_text}</td>"
@@ -734,7 +741,7 @@ class HTMLSynthesizer:
                 "</tr>"
             )
 
-        table_rows = "\n".join(rows) if rows else "<tr><td colspan='5'>No compounds detected yet.</td></tr>"
+        table_rows = "\n".join(rows) if rows else "<tr><td colspan='7'>No compounds detected yet.</td></tr>"
         if self.untargeted_mode:
             mz_plot, rt_plot = self._build_landing_qc_plots_untargeted(
                 samples=samples, compounds=compounds
@@ -749,9 +756,17 @@ class HTMLSynthesizer:
         if self.untargeted_mode:
             _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the seed sample)"
             _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the seed sample)"
+            _target_mz_label = "Seed m/z"
+            _target_rt_label = "Seed RT (min)"
+            _target_mz_tooltip = "m/z from the untargeted-search-space CSV (set by the seed sample)"
+            _target_rt_tooltip = "RT from the untargeted-search-space CSV (set by the seed sample)"
         else:
             _avg_ppm_tooltip = "error vs target"
             _avg_rt_tooltip = "error vs target"
+            _target_mz_label = "Target m/z"
+            _target_rt_label = "Target RT (min)"
+            _target_mz_tooltip = "m/z from the standards CSV"
+            _target_rt_tooltip = "retention time from the standards CSV"
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -808,6 +823,8 @@ class HTMLSynthesizer:
       <thead>
                 <tr>
                     <th>Compound</th>
+                    <th title="{escape(_target_mz_tooltip)}">{escape(_target_mz_label)}</th>
+                    <th title="{escape(_target_rt_tooltip)}">{escape(_target_rt_label)}</th>
                     <th>Detected Samples</th>
                     <th title="{escape(_avg_ppm_tooltip)}">Avg ppm</th>
                     <th title="{escape(_avg_rt_tooltip)}">Avg RT Error (min)</th>
@@ -850,6 +867,8 @@ class HTMLSynthesizer:
 
         target_rt_values = [row.get("target_rt") for row in series if row.get("target_rt") is not None]
         target_rt = target_rt_values[0] if target_rt_values else None
+        target_mz_values = [row.get("target_mz") for row in series if row.get("target_mz") is not None]
+        target_mz = target_mz_values[0] if target_mz_values else None
 
         eic_traces = []
         for idx, row in enumerate(series):
@@ -1157,6 +1176,10 @@ class HTMLSynthesizer:
         top_json = json.dumps(top_plot)
         eic_json = json.dumps(eic_plot)
 
+        _anchor_label = "Seed (untargeted)" if self.untargeted_mode else "Target"
+        _target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
+        _target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
+
         return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -1198,7 +1221,7 @@ class HTMLSynthesizer:
   <section class=\"card\">
     <p><a href=\"../dashboard.html\">Back to compound index</a></p>
     <h1>{escape(compound['name'])}</h1>
-    <p class=\"meta\">Detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
 
     <h2 class=\"section-title\">Across-sample metrics</h2>
     <div id=\"top-plot\"></div>
