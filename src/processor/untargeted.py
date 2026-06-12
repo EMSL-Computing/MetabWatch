@@ -140,13 +140,10 @@ def build_untargeted_search_space(
     kept["polarity"] = polarity
     kept = kept.rename(columns={"scan_time": "retention_time"})
 
-    csv_df = kept[SEARCH_SPACE_COLUMNS].copy()
-    csv_df.to_csv(output_csv, index=False)
+    diagnostic_df = kept[SEARCH_SPACE_COLUMNS + ["area"]].copy()
+    diagnostic_df.drop(columns=["area"]).to_csv(output_csv, index=False)
     print(
-        f"[untargeted] wrote {output_csv} with {len(csv_df)} features "
+        f"[untargeted] wrote {output_csv} with {len(diagnostic_df)} features "
         f"(polarity={polarity})"
     )
-
-    diagnostic_df = csv_df.copy()
-    diagnostic_df["area"] = kept["area"].values
     return diagnostic_df
