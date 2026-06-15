@@ -65,4 +65,10 @@ Depends on the dev commit pinned in [README.md](README.md): `EMSL-Computing/Core
 - Don't start long-running `watch` mode from this session — use `--once`.
 - Don't delete or rewrite `pipeline_manifest.json` to "fix" reprocessing; use `--force-reprocess`.
 - Don't add `src.` prefixes to imports — `src/` is on `sys.path` via the entrypoint, not a package.
-- Don't make any git commands - instead, prompt for a manual commit and push after verifying changes with `--mode process` or `--mode watch --once`. Provide suggested commit messages if helpful, but don't automate this.
+
+
+## Git Rules
+- Always pull latest changes before starting work, and check that your branch is up to date with `git status`.
+- Use feature branches for new work, and create pull requests for review before merging to main.
+- Don't commit large files or any agent-specific documents; these should be kept local and added to `.gitignore` if necessary.
+- Agents should never commit to main directly; all changes must go through a PR with human review.

@@ -118,12 +118,10 @@ def build_untargeted_search_space(
     #   * mass_feature_cluster_mz_tolerance_rel: bump to 1.5e-5 (15 ppm) so
     #     the post-integration clustering pass collapses the residual ~5-13
     #     ppm duplicates that survive the default 5 ppm window.
-    lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics = True
     lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
 
     lcms_obj.find_mass_features()
     lcms_obj.integrate_mass_features()
-    lcms_obj.add_peak_metrics(remove_by_metrics=True, induced_features=False)
     lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)

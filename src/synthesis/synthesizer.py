@@ -526,11 +526,13 @@ class HTMLSynthesizer:
                     ]
                 )
 
-            if mean_rt is not None:
+            target_rt = self._first_number([row.get("target_rt") for row in series])
+
+            if mean_rt is not None and target_rt is not None:
                 rt_devs = [float(v) - mean_rt for v in detected_rt]
                 rt_min, rt_max = min(rt_devs), max(rt_devs)
                 rt_center = (rt_min + rt_max) / 2.0
-                rt_range_x.append(mean_rt)
+                rt_range_x.append(float(target_rt))
                 rt_range_y.append(rt_center)
                 rt_range_plus.append(rt_max - rt_center)
                 rt_range_minus.append(rt_center - rt_min)
@@ -539,8 +541,8 @@ class HTMLSynthesizer:
                         compound["slug"],
                         compound_name,
                         mean_rt,
-                        mean_rt - self.rt_tolerance,
-                        mean_rt + self.rt_tolerance,
+                        float(target_rt) - self.rt_tolerance,
+                        float(target_rt) + self.rt_tolerance,
                         rt_min,
                         rt_max,
                     ]
@@ -565,8 +567,8 @@ class HTMLSynthesizer:
                 )
 
             newest_rt = newest_row.get("observed_rt")
-            if newest_rt is not None and mean_rt is not None:
-                rt_latest_x.append(float(newest_rt))
+            if newest_rt is not None and mean_rt is not None and target_rt is not None:
+                rt_latest_x.append(float(target_rt))
                 rt_latest_y.append(float(newest_rt) - mean_rt)
                 rt_latest_custom.append(
                     [compound["slug"], compound_name, newest_sample_name]
@@ -660,6 +662,7 @@ class HTMLSynthesizer:
                     "showlegend": False,
                     "hovertemplate": (
                         "Compound: %{customdata[1]}<br>"
+                        "Target RT: %{x:.4f} min<br>"
                         "Batch-mean RT: %{customdata[2]:.4f} min<br>"
                         "Tolerance window: [%{customdata[3]:.4f}, %{customdata[4]:.4f}] min<br>"
                         "RT deviation range: [%{customdata[5]:.4f}, %{customdata[6]:.4f}] min<extra></extra>"
@@ -685,7 +688,7 @@ class HTMLSynthesizer:
                     "hovertemplate": (
                         "Compound: %{customdata[1]}<br>"
                         "Sample: %{customdata[2]}<br>"
-                        "Observed RT: %{x:.4f} min<br>"
+                        "Target RT: %{x:.4f} min<br>"
                         "RT deviation: %{y:.4f} min<extra></extra>"
                     ),
                 },
@@ -695,7 +698,7 @@ class HTMLSynthesizer:
                 "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
                 "showlegend": True,
                 "title": {"text": "Retention time overview (untargeted)"},
-                "xaxis": {"title": "Retention time (batch-mean anchor; newest observed on dots)"},
+                "xaxis": {"title": "Target retention time (min)"},
                 "yaxis": {
                     "title": "RT deviation from batch mean (min)",
                     "zeroline": True,
@@ -756,8 +759,8 @@ class HTMLSynthesizer:
         if self.untargeted_mode:
             _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the seed sample)"
             _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the seed sample)"
-            _target_mz_label = "Seed m/z"
-            _target_rt_label = "Seed RT (min)"
+            _target_mz_label = "Target m/z"
+            _target_rt_label = "Target RT (min)"
             _target_mz_tooltip = "m/z from the untargeted-search-space CSV (set by the seed sample)"
             _target_rt_tooltip = "RT from the untargeted-search-space CSV (set by the seed sample)"
         else:
