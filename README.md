@@ -44,6 +44,30 @@ Process one explicit raw file:
 python src/pipeline.py --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
 ```
 
+## Search-space modes
+
+By default the pipeline runs in `targeted` mode against `processor.standards_csv`. To run untargeted instead, add a `search_space` block to the JSON config:
+
+```json
+"search_space": {
+  "mode": "untargeted",
+  "top_n": 100
+}
+```
+
+In untargeted mode the first sample matching `watcher.sample_name_regex` is used to seed the search space:
+
+1. CoreMS untargeted peak picking + integration runs on that sample.
+2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_dir>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.
+3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
+4. All subsequent samples reuse the persisted CSV.
+
+To rebuild the search space, delete `<output_dir>/untargeted_search_space.csv` and rerun. `processor.standards_csv` is optional in untargeted mode.
+
+A ready-made example config lives at [data/hilic_pipeline_config_untargeted.json](data/hilic_pipeline_config_untargeted.json).
+
+Dashboard caveat: the landing-page mass-accuracy and retention-time overview plots no longer have a truth anchor in untargeted mode. Each feature is plotted relative to its **per-feature batch mean** observed mz/rt; the y-axis shows ppm/min deviation from that mean. The "Avg ppm" / "Avg RT Error" columns in the compound table still show error against the search-space-CSV value (which itself came from the bootstrap sample), not deviation from a known truth — the column tooltips spell this out.
+
 ## Technical Documentation
 
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)

@@ -44,6 +44,7 @@ Top-level sections:
 - `processor`
 - `watcher`
 - `synthesizer`
+- `search_space` (optional; controls targeted vs. untargeted mode — see below)
 - retry settings (`max_retries`, `initial_backoff_sec`, `backoff_multiplier`)
 - stale-state setting (`stale_in_progress_sec`)
 
@@ -65,6 +66,28 @@ Example watcher section:
 }
 ```
 
+## Search-Space Modes
+
+By default the pipeline runs in `targeted` mode against `processor.standards_csv`. To run untargeted instead, add a `search_space` block:
+
+```json
+"search_space": {
+  "mode": "untargeted",
+  "top_n": 100
+}
+```
+
+In untargeted mode:
+
+- The first sample matching `watcher.sample_name_regex` triggers CoreMS untargeted peak picking + integration; the top `top_n` peaks (ranked by integrated area, descending) are written to `<output_dir>/untargeted_search_space.csv`.
+- The same sample is then processed against that CSV (so it shows up in the dashboard like every other sample).
+- All subsequent samples reuse the persisted CSV.
+- `processor.standards_csv` is optional in this mode.
+- Re-bootstrap is manual: delete `untargeted_search_space.csv` and rerun.
+- Bootstrap failures count toward `max_retries` (same cap as per-sample processing). After exhausting retries the file is marked failed and skipped on subsequent polls.
+
+When omitted, `search_space` defaults to `{"mode": "targeted", "top_n": 100}`.
+
 ## Runtime Behavior
 
 The pipeline:
@@ -82,6 +105,7 @@ The pipeline:
 - `dashboard.html`
 - `compounds/<compound-slug>.html`
 - `pipeline_manifest.json`
+- `untargeted_search_space.csv` (untargeted mode only — generated from the first matching sample, reused on subsequent runs)
 
 ## Acquisition-Time Requirement
 

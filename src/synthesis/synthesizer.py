@@ -26,11 +26,13 @@ class HTMLSynthesizer:
         html_output: Path,
         mz_tolerance_ppm: float,
         rt_tolerance: float,
+        untargeted_mode: bool = False,
     ):
         self.output_dirs = output_dirs
         self.html_output = html_output
         self.mz_tolerance_ppm = mz_tolerance_ppm
         self.rt_tolerance = rt_tolerance
+        self.untargeted_mode = untargeted_mode
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
 
@@ -228,6 +230,14 @@ class HTMLSynthesizer:
             return mean_val, None
         cv_percent = float((series.std(ddof=0) / abs(mean_val)) * 100.0)
         return mean_val, cv_percent
+
+    @staticmethod
+    def _mean_value(values: list[float | None]) -> float | None:
+        """Return the arithmetic mean of non-None numeric values, or None."""
+        numeric = [float(v) for v in values if v is not None]
+        if not numeric:
+            return None
+        return float(sum(numeric) / len(numeric))
 
     def _build_landing_qc_plots(self, samples: list[dict], compounds: dict[str, dict]) -> tuple[dict, dict]:
         newest_sample_name = samples[-1]["sample"] if samples else None
@@ -452,6 +462,253 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
+    def _build_landing_qc_plots_untargeted(
+        self,
+        samples: list[dict],
+        compounds: dict[str, dict],
+    ) -> tuple[dict, dict]:
+        """Untargeted landing-page overview plots.
+
+        Anchors each feature at the per-feature batch-mean observed mz/rt
+        instead of a truth value. Plots show deviation from that mean.
+        """
+        newest_sample_name = samples[-1]["sample"] if samples else None
+
+        mz_range_x: list[float] = []
+        mz_range_y: list[float] = []
+        mz_range_plus: list[float] = []
+        mz_range_minus: list[float] = []
+        mz_range_custom: list[list[str | float]] = []
+        mz_latest_x: list[float] = []
+        mz_latest_y: list[float] = []
+        mz_latest_custom: list[list[str | float]] = []
+
+        rt_range_x: list[float] = []
+        rt_range_y: list[float] = []
+        rt_range_plus: list[float] = []
+        rt_range_minus: list[float] = []
+        rt_range_custom: list[list[str | float]] = []
+        rt_latest_x: list[float] = []
+        rt_latest_y: list[float] = []
+        rt_latest_custom: list[list[str | float]] = []
+
+        for compound_name in sorted(compounds):
+            compound = compounds[compound_name]
+            series = compound["samples"]
+            if not series:
+                continue
+
+            detected_mz = [row.get("observed_mz") for row in series if row.get("observed_mz") is not None]
+            detected_rt = [row.get("observed_rt") for row in series if row.get("observed_rt") is not None]
+            mean_mz = self._mean_value(detected_mz)
+            mean_rt = self._mean_value(detected_rt)
+
+            if mean_mz is not None:
+                ppm_devs = [
+                    (float(v) - mean_mz) / mean_mz * 1e6 for v in detected_mz
+                ]
+                ppm_min, ppm_max = min(ppm_devs), max(ppm_devs)
+                ppm_center = (ppm_min + ppm_max) / 2.0
+                mz_half_width = (mean_mz * self.mz_tolerance_ppm) / 1e6
+                mz_range_x.append(mean_mz)
+                mz_range_y.append(ppm_center)
+                mz_range_plus.append(ppm_max - ppm_center)
+                mz_range_minus.append(ppm_center - ppm_min)
+                mz_range_custom.append(
+                    [
+                        compound["slug"],
+                        compound_name,
+                        mean_mz,
+                        mean_mz - mz_half_width,
+                        mean_mz + mz_half_width,
+                        ppm_min,
+                        ppm_max,
+                    ]
+                )
+
+            target_rt = self._first_number([row.get("target_rt") for row in series])
+
+            if mean_rt is not None and target_rt is not None:
+                rt_devs = [float(v) - mean_rt for v in detected_rt]
+                rt_min, rt_max = min(rt_devs), max(rt_devs)
+                rt_center = (rt_min + rt_max) / 2.0
+                rt_range_x.append(float(target_rt))
+                rt_range_y.append(rt_center)
+                rt_range_plus.append(rt_max - rt_center)
+                rt_range_minus.append(rt_center - rt_min)
+                rt_range_custom.append(
+                    [
+                        compound["slug"],
+                        compound_name,
+                        mean_rt,
+                        float(target_rt) - self.rt_tolerance,
+                        float(target_rt) + self.rt_tolerance,
+                        rt_min,
+                        rt_max,
+                    ]
+                )
+
+            if newest_sample_name is None:
+                continue
+
+            newest_row = next(
+                (row for row in series if row["sample"] == newest_sample_name),
+                None,
+            )
+            if newest_row is None:
+                continue
+
+            newest_mz = newest_row.get("observed_mz")
+            if newest_mz is not None and mean_mz is not None:
+                mz_latest_x.append(float(newest_mz))
+                mz_latest_y.append((float(newest_mz) - mean_mz) / mean_mz * 1e6)
+                mz_latest_custom.append(
+                    [compound["slug"], compound_name, newest_sample_name]
+                )
+
+            newest_rt = newest_row.get("observed_rt")
+            if newest_rt is not None and mean_rt is not None and target_rt is not None:
+                rt_latest_x.append(float(target_rt))
+                rt_latest_y.append(float(newest_rt) - mean_rt)
+                rt_latest_custom.append(
+                    [compound["slug"], compound_name, newest_sample_name]
+                )
+
+        mz_plot = {
+            "data": [
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch ppm deviation range data",
+                    "x": mz_range_x,
+                    "y": mz_range_y,
+                    "error_y": {
+                        "type": "data",
+                        "symmetric": False,
+                        "array": mz_range_plus,
+                        "arrayminus": mz_range_minus,
+                        "thickness": 1.4,
+                        "width": 0,
+                        "color": "#2c7f6d",
+                    },
+                    "customdata": mz_range_custom,
+                    "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "showlegend": False,
+                    "hovertemplate": (
+                        "Compound: %{customdata[1]}<br>"
+                        "Batch-mean m/z: %{customdata[2]:.6f}<br>"
+                        "Tolerance window: [%{customdata[3]:.6f}, %{customdata[4]:.6f}]<br>"
+                        "ppm deviation range: [%{customdata[5]:.3f}, %{customdata[6]:.3f}]<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch ppm deviation range",
+                    "x": [None],
+                    "y": [None],
+                    "hoverinfo": "skip",
+                    "marker": {"size": 8, "color": "#2c7f6d"},
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Newest sample",
+                    "x": mz_latest_x,
+                    "y": mz_latest_y,
+                    "customdata": mz_latest_custom,
+                    "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[1]}<br>"
+                        "Sample: %{customdata[2]}<br>"
+                        "Observed m/z: %{x:.6f}<br>"
+                        "ppm deviation: %{y:.3f}<extra></extra>"
+                    ),
+                },
+            ],
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "showlegend": True,
+                "title": {"text": "Mass accuracy overview (untargeted)"},
+                "xaxis": {"title": "m/z (batch-mean anchor; newest observed on dots)"},
+                "yaxis": {
+                    "title": "ppm deviation from batch mean",
+                    "zeroline": True,
+                    "range": [-self.mz_tolerance_ppm, self.mz_tolerance_ppm],
+                },
+            },
+        }
+
+        rt_plot = {
+            "data": [
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch RT deviation range data",
+                    "x": rt_range_x,
+                    "y": rt_range_y,
+                    "error_y": {
+                        "type": "data",
+                        "symmetric": False,
+                        "array": rt_range_plus,
+                        "arrayminus": rt_range_minus,
+                        "thickness": 1.4,
+                        "width": 0,
+                        "color": "#3f9f8a",
+                    },
+                    "customdata": rt_range_custom,
+                    "marker": {"size": 7, "color": "rgba(0,0,0,0)", "line": {"width": 0}},
+                    "showlegend": False,
+                    "hovertemplate": (
+                        "Compound: %{customdata[1]}<br>"
+                        "Target RT: %{x:.4f} min<br>"
+                        "Batch-mean RT: %{customdata[2]:.4f} min<br>"
+                        "Tolerance window: [%{customdata[3]:.4f}, %{customdata[4]:.4f}] min<br>"
+                        "RT deviation range: [%{customdata[5]:.4f}, %{customdata[6]:.4f}] min<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Batch RT deviation range",
+                    "x": [None],
+                    "y": [None],
+                    "hoverinfo": "skip",
+                    "marker": {"size": 8, "color": "#3f9f8a"},
+                },
+                {
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Newest sample",
+                    "x": rt_latest_x,
+                    "y": rt_latest_y,
+                    "customdata": rt_latest_custom,
+                    "marker": {"size": 9, "color": "#8a3d2b", "line": {"color": "#5f291d", "width": 1}},
+                    "hovertemplate": (
+                        "Compound: %{customdata[1]}<br>"
+                        "Sample: %{customdata[2]}<br>"
+                        "Target RT: %{x:.4f} min<br>"
+                        "RT deviation: %{y:.4f} min<extra></extra>"
+                    ),
+                },
+            ],
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "showlegend": True,
+                "title": {"text": "Retention time overview (untargeted)"},
+                "xaxis": {"title": "Target retention time (min)"},
+                "yaxis": {
+                    "title": "RT deviation from batch mean (min)",
+                    "zeroline": True,
+                    "range": [-self.rt_tolerance, self.rt_tolerance],
+                },
+            },
+        }
+
+        return mz_plot, rt_plot
+
     def _render_index(self, samples: list[dict], compounds: dict[str, dict], generated_at: str) -> str:
         rows = []
         for compound_name in sorted(compounds):
@@ -465,6 +722,11 @@ class HTMLSynthesizer:
             avg_rt_error, _ = self._mean_cv(rt_error_values)
             _, intensity_cv = self._mean_cv(intensity_values)
 
+            target_mz = self._first_number([row.get("target_mz") for row in series])
+            target_rt = self._first_number([row.get("target_rt") for row in series])
+
+            target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
+            target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
             avg_ppm_text = f"{avg_ppm:.3f}" if avg_ppm is not None else "n/a"
             avg_rt_error_text = f"{avg_rt_error:.4f}" if avg_rt_error is not None else "n/a"
             intensity_cv_text = f"{intensity_cv:.2f}%" if intensity_cv is not None else "n/a"
@@ -473,6 +735,8 @@ class HTMLSynthesizer:
             rows.append(
                 "<tr>"
                 f"<td><a href='compounds/{escape(c['slug'])}.html'>{escape(c['name'])}</a></td>"
+                f"<td>{target_mz_text}</td>"
+                f"<td>{target_rt_text}</td>"
                 f"<td>{c.get('detected_count', len(c['samples']))}</td>"
                 f"<td>{avg_ppm_text}</td>"
                 f"<td>{avg_rt_error_text}</td>"
@@ -480,10 +744,32 @@ class HTMLSynthesizer:
                 "</tr>"
             )
 
-        table_rows = "\n".join(rows) if rows else "<tr><td colspan='5'>No compounds detected yet.</td></tr>"
-        mz_plot, rt_plot = self._build_landing_qc_plots(samples=samples, compounds=compounds)
+        table_rows = "\n".join(rows) if rows else "<tr><td colspan='7'>No compounds detected yet.</td></tr>"
+        if self.untargeted_mode:
+            mz_plot, rt_plot = self._build_landing_qc_plots_untargeted(
+                samples=samples, compounds=compounds
+            )
+        else:
+            mz_plot, rt_plot = self._build_landing_qc_plots(
+                samples=samples, compounds=compounds
+            )
         mz_json = json.dumps(mz_plot)
         rt_json = json.dumps(rt_plot)
+
+        if self.untargeted_mode:
+            _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the seed sample)"
+            _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the seed sample)"
+            _target_mz_label = "Target m/z"
+            _target_rt_label = "Target RT (min)"
+            _target_mz_tooltip = "m/z from the untargeted-search-space CSV (set by the seed sample)"
+            _target_rt_tooltip = "RT from the untargeted-search-space CSV (set by the seed sample)"
+        else:
+            _avg_ppm_tooltip = "error vs target"
+            _avg_rt_tooltip = "error vs target"
+            _target_mz_label = "Target m/z"
+            _target_rt_label = "Target RT (min)"
+            _target_mz_tooltip = "m/z from the standards CSV"
+            _target_rt_tooltip = "retention time from the standards CSV"
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -540,9 +826,11 @@ class HTMLSynthesizer:
       <thead>
                 <tr>
                     <th>Compound</th>
+                    <th title="{escape(_target_mz_tooltip)}">{escape(_target_mz_label)}</th>
+                    <th title="{escape(_target_rt_tooltip)}">{escape(_target_rt_label)}</th>
                     <th>Detected Samples</th>
-                    <th>Avg ppm</th>
-                    <th>Avg RT Error (min)</th>
+                    <th title="{escape(_avg_ppm_tooltip)}">Avg ppm</th>
+                    <th title="{escape(_avg_rt_tooltip)}">Avg RT Error (min)</th>
                     <th>Intensity CV</th>
                 </tr>
       </thead>
@@ -582,6 +870,8 @@ class HTMLSynthesizer:
 
         target_rt_values = [row.get("target_rt") for row in series if row.get("target_rt") is not None]
         target_rt = target_rt_values[0] if target_rt_values else None
+        target_mz_values = [row.get("target_mz") for row in series if row.get("target_mz") is not None]
+        target_mz = target_mz_values[0] if target_mz_values else None
 
         eic_traces = []
         for idx, row in enumerate(series):
@@ -889,6 +1179,10 @@ class HTMLSynthesizer:
         top_json = json.dumps(top_plot)
         eic_json = json.dumps(eic_plot)
 
+        _anchor_label = "Seed (untargeted)" if self.untargeted_mode else "Target"
+        _target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
+        _target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
+
         return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -930,7 +1224,7 @@ class HTMLSynthesizer:
   <section class=\"card\">
     <p><a href=\"../dashboard.html\">Back to compound index</a></p>
     <h1>{escape(compound['name'])}</h1>
-    <p class=\"meta\">Detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
 
     <h2 class=\"section-title\">Across-sample metrics</h2>
     <div id=\"top-plot\"></div>

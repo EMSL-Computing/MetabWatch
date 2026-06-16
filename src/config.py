@@ -19,7 +19,10 @@ class ProcessorConfig:
     Parameters
     ----------
     standards_csv : Path
-        Path to the standards CSV used for targeted matching.
+        Path to the standards CSV used for targeted matching. In untargeted
+        mode this field is populated with the derived
+        `<output_dir>/untargeted_search_space.csv` path and is NOT read by
+        the targeted pipeline (the untargeted bootstrap writes to it instead).
     params_path : Path
         Path to the CoreMS TOML parameter file.
     output_dir : Path
@@ -112,6 +115,29 @@ class SynthesizerConfig:
 
 
 @dataclass(frozen=True)
+class SearchSpaceConfig:
+    """Configuration for the search-space source.
+
+    Parameters
+    ----------
+    mode : str
+        Either "targeted" (use processor.standards_csv) or "untargeted"
+        (build a top-N peak list from the first matching sample and persist
+        it to `csv_path`).
+    top_n : int
+        Number of peaks to keep when mode == "untargeted". Ignored otherwise.
+    csv_path : Path
+        On-disk location of the search-space CSV. In targeted mode this is
+        identical to processor.standards_csv. In untargeted mode this is
+        always `<processor.output_dir>/untargeted_search_space.csv`.
+    """
+
+    mode: str
+    top_n: int
+    csv_path: Path
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Top-level pipeline configuration container.
 
@@ -125,11 +151,14 @@ class PipelineConfig:
         Persistence/state configuration.
     synthesizer : SynthesizerConfig
         Dashboard generation configuration.
+    search_space : SearchSpaceConfig
+        Search-space source configuration.
     """
     processor: ProcessorConfig
     watcher: WatcherConfig
     state: StateConfig
     synthesizer: SynthesizerConfig
+    search_space: SearchSpaceConfig
     max_retries: int = 3
     initial_backoff_sec: float = 10.0
     backoff_multiplier: float = 2.0
@@ -164,9 +193,36 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
 
     output_dir = repo_root / processor["output_dir"]
 
+    search_space_payload = payload.get("search_space", {}) or {}
+    mode = str(search_space_payload.get("mode", "targeted")).strip().lower()
+    if mode not in {"targeted", "untargeted"}:
+        raise ValueError(
+            f"search_space.mode must be 'targeted' or 'untargeted', got '{mode}'"
+        )
+    top_n = int(search_space_payload.get("top_n", 100))
+    if top_n <= 0:
+        raise ValueError(
+            f"search_space.top_n must be > 0, got {top_n}"
+        )
+
+    standards_csv_value = processor.get("standards_csv")
+    if mode == "untargeted":
+        search_space_csv = output_dir / "untargeted_search_space.csv"
+        if standards_csv_value is None:
+            standards_csv_path = search_space_csv
+        else:
+            standards_csv_path = repo_root / standards_csv_value
+    else:
+        if standards_csv_value is None:
+            raise ValueError(
+                "processor.standards_csv is required when search_space.mode is 'targeted'"
+            )
+        standards_csv_path = repo_root / standards_csv_value
+        search_space_csv = standards_csv_path
+
     return PipelineConfig(
         processor=ProcessorConfig(
-            standards_csv=repo_root / processor["standards_csv"],
+            standards_csv=standards_csv_path,
             params_path=repo_root / processor["params_path"],
             output_dir=output_dir,
             mz_tolerance_ppm=float(processor.get("mz_tolerance_ppm", 5.0)),
@@ -193,6 +249,11 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
             debounce_sec=float(synthesizer.get("debounce_sec", 5.0)),
             mz_tolerance_ppm=float(processor.get("mz_tolerance_ppm", 5.0)),
             rt_tolerance=float(processor.get("rt_tolerance", 0.5)),
+        ),
+        search_space=SearchSpaceConfig(
+            mode=mode,
+            top_n=top_n,
+            csv_path=search_space_csv,
         ),
         max_retries=int(payload.get("max_retries", 3)),
         initial_backoff_sec=float(payload.get("initial_backoff_sec", 10.0)),

@@ -10,7 +10,12 @@ from urllib.parse import quote
 from config import PipelineConfig, load_pipeline_config
 from output import OutputTracker
 from pipeline_queue import ProcessingQueue
-from processor import ProcessResult, ProcessorOrchestrator, RetryPolicy
+from processor import (
+    ProcessResult,
+    ProcessorOrchestrator,
+    RetryPolicy,
+    build_untargeted_search_space,
+)
 from state import ManifestStateStore
 from synthesis import HTMLSynthesizer
 from watcher import RawFileWatcher
@@ -33,11 +38,12 @@ def _build_runtime(config: PipelineConfig):
     Returns
     -------
     tuple
-        (orchestrator, retry_policy, watcher, queue, state_store, output_tracker, synthesizer)
+        (orchestrator, retry_policy, watcher, queue, state_store,
+        output_tracker, synthesizer)
     """
 
     orchestrator = ProcessorOrchestrator(
-        standards_csv=config.processor.standards_csv,
+        standards_csv=config.search_space.csv_path,
         params_path=config.processor.params_path,
         output_dir=config.processor.output_dir,
         mz_tolerance_ppm=config.processor.mz_tolerance_ppm,
@@ -68,8 +74,17 @@ def _build_runtime(config: PipelineConfig):
         html_output=config.synthesizer.html_output,
         mz_tolerance_ppm=config.synthesizer.mz_tolerance_ppm,
         rt_tolerance=config.synthesizer.rt_tolerance,
+        untargeted_mode=(config.search_space.mode == "untargeted"),
     )
-    return orchestrator, retry_policy, watcher, queue, state_store, output_tracker, synthesizer
+    return (
+        orchestrator,
+        retry_policy,
+        watcher,
+        queue,
+        state_store,
+        output_tracker,
+        synthesizer,
+    )
 
 
 def _compile_sample_regex(pattern_text: str | None) -> re.Pattern[str] | None:
@@ -104,6 +119,41 @@ def _clickable_path(path: Path) -> str:
     uri = f"file://{quote(str(abs_path))}"
     label = str(abs_path)
     return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
+
+
+def _ensure_untargeted_search_space(
+    config: PipelineConfig,
+    raw_file: Path,
+) -> None:
+    """Build the untargeted search-space CSV from `raw_file` if missing.
+
+    Idempotent — returns immediately when the CSV already exists. No-op when
+    `config.search_space.mode != 'untargeted'`. Raises on failure; the caller
+    is responsible for marking the sample failed in the manifest.
+
+    Parameters
+    ----------
+    config : PipelineConfig
+        Resolved pipeline configuration.
+    raw_file : Path
+        Sample to use as the untargeted source.
+    """
+    if config.search_space.mode != "untargeted":
+        return
+    if config.search_space.csv_path.exists():
+        return
+
+    print(
+        f"[untargeted] building search space from {raw_file.name} "
+        f"(top_n={config.search_space.top_n})"
+    )
+    build_untargeted_search_space(
+        raw_file=raw_file,
+        params_path=config.processor.params_path,
+        output_csv=config.search_space.csv_path,
+        top_n=config.search_space.top_n,
+        mz_tolerance_ppm=config.processor.mz_tolerance_ppm,
+    )
 
 
 def _process_one(
@@ -253,6 +303,27 @@ def run_watch_mode(
             start=1,
         ):
             print(f"[processing {index}/{total}] {raw_file.name}")
+            if (
+                config.search_space.mode == "untargeted"
+                and not config.search_space.csv_path.exists()
+                and state_store.get_attempts(raw_file) > retry_policy.max_retries
+            ):
+                print(
+                    f"[skipped] {raw_file.name} exceeded max_retries "
+                    f"({retry_policy.max_retries}) on untargeted search space build"
+                )
+                continue
+            try:
+                _ensure_untargeted_search_space(config=config, raw_file=raw_file)
+            except Exception as exc:
+                state_store.mark_in_progress(raw_file)
+                state_store.mark_failed(
+                    raw_file, f"untargeted search space build failed: {exc}"
+                )
+                print(
+                    f"[failed] {raw_file.name} untargeted search space build: {exc}"
+                )
+                continue
             _process_one(
                 raw_file=raw_file,
                 orchestrator=orchestrator,
@@ -322,6 +393,27 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     if not _sample_allowed(raw_file, sample_regex):
         print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
         return 0
+
+    if (
+        config.search_space.mode == "untargeted"
+        and not config.search_space.csv_path.exists()
+        and state_store.get_attempts(raw_file) > retry_policy.max_retries
+    ):
+        print(
+            f"[skipped] {raw_file.name} exceeded max_retries "
+            f"({retry_policy.max_retries}) on untargeted search space build"
+        )
+        return 1
+
+    try:
+        _ensure_untargeted_search_space(config=config, raw_file=raw_file)
+    except Exception as exc:
+        state_store.mark_in_progress(raw_file)
+        state_store.mark_failed(
+            raw_file, f"untargeted search space build failed: {exc}"
+        )
+        print(f"[failed] {raw_file.name} untargeted search space build: {exc}")
+        return 1
 
     _process_one(
         raw_file=raw_file,
