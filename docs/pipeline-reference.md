@@ -1,5 +1,16 @@
 # Pipeline Reference
 
+## Dependencies
+
+Runtime dependencies are declared in `pyproject.toml`. The pipeline requires **CoreMS 4.0.1** for:
+
+- Thermo `.raw` file reading (`ImportMassSpectraThermoMSFileReader`)
+- LC-MS parameter loading from TOML (`load_and_set_toml_parameters_lcms`)
+- Targeted mass-feature detection / integration / clustering
+- Untargeted peak picking used to bootstrap `untargeted_search_space.csv`
+
+Install with `pip install -e .` from the repository root. Thermo raw support also needs `pythonnet` (and Mono on macOS/Linux); see the main [README](../README.md#corems).
+
 ## Entrypoint
 
 ```bash

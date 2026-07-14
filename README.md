@@ -74,7 +74,23 @@ Dashboard caveat: the landing-page mass-accuracy and retention-time overview plo
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
 
-## CoreMS Version Note
+## Requirements
 
-This workflow currently depends on a CoreMS development commit:
-https://github.com/EMSL-Computing/CoreMS/commit/88f6d0021ed594b5d0a3efe6285f8379858fd039
+Install the package (and its dependencies) from the repository root:
+
+```bash
+pip install -e .
+```
+
+### CoreMS
+
+This workflow requires **[CoreMS 4.0.1](https://pypi.org/project/CoreMS/4.0.1/)** (declared in `pyproject.toml`). It is installed automatically with `pip install -e .`.
+
+CoreMS provides LC-MS peak picking, integration, and Thermo `.raw` file reading used by the single-file processor and untargeted bootstrap path.
+
+**Thermo `.raw` access:** CoreMS needs `pythonnet` for Thermo raw files.
+
+- Windows: `pip install pythonnet`
+- macOS / Linux: install Mono (`brew install mono` on macOS), then `pip install pythonnet`
+
+See the [CoreMS installation docs](https://github.com/EMSL-Computing/CoreMS#installation) for details.

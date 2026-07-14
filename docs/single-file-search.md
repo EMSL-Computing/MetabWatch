@@ -2,7 +2,7 @@
 
 Processor module: `src/targeted_search_for_standards.py`
 
-This module processes one Thermo `.raw` file at a time and writes:
+This module uses **CoreMS 4.0.1** to process one Thermo `.raw` file at a time and writes:
 
 - `<sample>_targeted_matches.csv`
 - `<sample>_ms1_traces.csv`

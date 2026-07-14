@@ -7,3 +7,14 @@ data/results*
 
 # Ignore all __pycache__ directories
 __pycache__/
+
+# Packaging / build artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Ignore example1/raw_positive and example1_results_hilic_pos folders
+example_hilic/raw_positive
+example_hilic/results_hilic_pos
