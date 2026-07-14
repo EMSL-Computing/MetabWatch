@@ -36,22 +36,22 @@ The watcher avoids duplicate processing by tracking file status in `pipeline_man
 One-pass watch cycle (useful for scheduled runs):
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json --once
+metabwatch --mode watch --config data/hilic_pipeline_config.json --once
 ```
 
 Force reprocessing of already completed files:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
+metabwatch --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
 ```
 
 Process one explicit raw file:
 
 ```bash
-python src/pipeline.py --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
+metabwatch --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
 ```
 
-### Local smoke tests (Makefile)
+### Local smoke tests (Makefile) for developers
 
 End-to-end regression checks against configs under `data/`: always `--once --force-reprocess`, then verify dashboard / exports exist.
 
@@ -87,17 +87,13 @@ In untargeted mode the first sample matching `watcher.sample_name_regex` is used
 3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
 4. All subsequent samples reuse the persisted CSV.
 
-To rebuild the search space, delete `<output_dir>/untargeted_search_space.csv` and rerun. `processor.standards_csv` is optional in untargeted mode.
-
 A ready-made example config lives at [data/hilic_pipeline_config_untargeted.json](data/hilic_pipeline_config_untargeted.json).
 
-Dashboard caveat: the landing-page mass-accuracy and retention-time overview plots no longer have a truth anchor in untargeted mode. Each feature is plotted relative to its **per-feature batch mean** observed mz/rt; the y-axis shows ppm/min deviation from that mean. The "Avg ppm" / "Avg RT Error" columns in the compound table still show error against the search-space-CSV value (which itself came from the bootstrap sample), not deviation from a known truth — the column tooltips spell this out.
 
 ## Technical Documentation
 
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
-- Naming and repository migration notes: [docs/naming-and-repository.md](docs/naming-and-repository.md)
 
 ## Requirements
 
@@ -111,7 +107,7 @@ This installs the `metabwatch` console command.
 
 ### CoreMS
 
-This workflow requires **[CoreMS 4.0.1](https://pypi.org/project/CoreMS/4.0.1/)** (declared in `pyproject.toml`). It is installed automatically with `pip install -e .`.
+This workflow requires **[CoreMS](https://pypi.org/project/CoreMS)** (declared in `pyproject.toml`). It is installed automatically with `pip install -e .`.
 
 CoreMS provides LC-MS peak picking, integration, and Thermo `.raw` file reading used by the single-file processor and untargeted bootstrap path.
 
@@ -119,5 +115,3 @@ CoreMS provides LC-MS peak picking, integration, and Thermo `.raw` file reading 
 
 - Windows: `pip install pythonnet`
 - macOS / Linux: install Mono (`brew install mono` on macOS), then `pip install pythonnet`
-
-See the [CoreMS installation docs](https://github.com/EMSL-Computing/CoreMS#installation) for details.
