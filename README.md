@@ -45,6 +45,24 @@ Process one explicit raw file:
 python src/pipeline.py --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
 ```
 
+### Local smoke tests (Makefile)
+
+End-to-end regression checks against configs under `data/`: always `--once --force-reprocess`, then verify dashboard / exports exist.
+
+Put Thermo `.raw` files in `data/raw_positive/` (gitignored), or use `make get-test-data` once a download URL is configured.
+
+```bash
+make test-workflow-targeted     # data/hilic_pipeline_config.json
+make test-workflow-untargeted   # data/hilic_pipeline_config_untargeted.json
+make test-workflow              # both
+make get-test-data              # download test .raw files when URL is set; else check local
+make help                       # list targets and override variables
+```
+
+```bash
+make test-workflow-targeted PYTHON=./venv/bin/python
+```
+
 ## Search-space modes
 
 By default the pipeline runs in `targeted` mode against `processor.standards_csv`. To run untargeted instead, add a `search_space` block to the JSON config:

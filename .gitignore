@@ -15,6 +15,9 @@ build/
 dist/
 *.egg
 
-# Ignore example1/raw_positive and example1_results_hilic_pos folders
-example_hilic/raw_positive
-example_hilic/results_hilic_pos
+# Local env overrides (optional)
+.env
+venv/
+
+# Optional downloaded test-data archives (see make get-test-data)
+test_data/
