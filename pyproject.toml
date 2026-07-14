@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68", "wheel", "setuptools-scm>=8"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "metab-qc"
-dynamic = ["version"]
+version = "0.1.0"
 description = "LCMS QC watcher workflow: process Thermo .raw files and refresh an HTML compound dashboard"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -61,9 +61,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 synthesis = ["templates/*"]
-
-# Version from git tags (e.g. git tag v0.1.0 → package version 0.1.0).
-# Between tags: 0.1.0.postN  |  No tags yet: 0.0.0
-[tool.setuptools_scm]
-version_scheme = "post-release"
-local_scheme = "no-local-version"
