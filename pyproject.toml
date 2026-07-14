@@ -3,15 +3,16 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "metab-qc"
+name = "metabwatch"
 version = "0.1.0"
-description = "LCMS QC watcher workflow: process Thermo .raw files and refresh an HTML compound dashboard"
+description = "MetabWatch: automated LC–MS metabolomics QC watcher for Thermo .raw files"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     { name = "kheal" },
 ]
 keywords = [
+    "metabwatch",
     "metabolomics",
     "lcms",
     "qc",
@@ -42,12 +43,16 @@ dev = [
     "build",
 ]
 
-[project.urls]
-Homepage = "https://github.com/kheal/Metab_QC"
-Repository = "https://github.com/kheal/Metab_QC"
-"Bug Tracker" = "https://github.com/kheal/Metab_QC/issues"
+# Repository URLs: set when the GitLab (or public) remote is finalized.
+# Former GitHub project: https://github.com/kheal/Metab_QC
+# [project.urls]
+# Homepage = "https://gitlab.example.com/group/MetabWatch"
+# Repository = "https://gitlab.example.com/group/MetabWatch"
+# "Bug Tracker" = "https://gitlab.example.com/group/MetabWatch/-/issues"
 
 [project.scripts]
+metabwatch = "pipeline:main"
+# Backwards-compatible alias from the former package name (metab-qc)
 metab-qc = "pipeline:main"
 
 [tool.setuptools.package-dir]

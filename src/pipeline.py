@@ -481,7 +481,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         Parsed arguments.
     """
 
-    parser = argparse.ArgumentParser(description="LCMS QC watcher/processor pipeline")
+    parser = argparse.ArgumentParser(
+        description="MetabWatch: LC–MS QC watcher/processor pipeline"
+    )
     parser.add_argument("--mode", choices=["watch", "process"], default="watch")
     parser.add_argument("--config", type=Path, required=True, help="Required JSON config path")
     parser.add_argument("--raw", type=Path, default=None, help="Raw file for process mode")

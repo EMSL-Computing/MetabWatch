@@ -1,5 +1,7 @@
 # Pipeline Reference
 
+**MetabWatch** package name: `metabwatch` (CLI: `metabwatch`).
+
 ## Dependencies
 
 Runtime dependencies are declared in `pyproject.toml`. The pipeline requires **CoreMS 4.0.1** for:
@@ -15,6 +17,8 @@ Install with `pip install -e .` from the repository root. Thermo raw support als
 
 ```bash
 python src/pipeline.py --mode watch --config <config.json>
+# or, after pip install -e .:
+metabwatch --mode watch --config <config.json>
 ```
 
 Modes:

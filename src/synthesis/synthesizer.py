@@ -785,7 +785,7 @@ class HTMLSynthesizer:
 <head>
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>LCMS QC Compound Index</title>
+  <title>MetabWatch Compound Index</title>
     <script src=\"https://cdn.plot.ly/plotly-2.35.2.min.js\"></script>
   <style>
     :root {{
@@ -821,7 +821,7 @@ class HTMLSynthesizer:
 </head>
 <body>
   <section class=\"card\">
-    <h1>LCMS QC Compound Index</h1>
+    <h1>MetabWatch Compound Index</h1>
     <p>Generated: {escape(generated_at)}</p>
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>

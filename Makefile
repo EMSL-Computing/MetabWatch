@@ -1,4 +1,4 @@
-# Metab QC — local workflow smoke tests
+# MetabWatch — local workflow smoke tests
 #
 # Primary targets:
 #   make test-workflow-targeted    Targeted search-space end-to-end run
@@ -41,7 +41,7 @@ TEST_DATA_ARCHIVE_URL ?=
 	verify-workflow-outputs
 
 help:
-	@echo "Metab QC workflow test targets"
+	@echo "MetabWatch workflow test targets"
 	@echo ""
 	@echo "  make test-workflow-targeted    Targeted mode (--once --force-reprocess)"
 	@echo "  make test-workflow-untargeted  Untargeted mode (--once --force-reprocess)"

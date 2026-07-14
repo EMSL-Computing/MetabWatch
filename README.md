@@ -1,6 +1,8 @@
-# LCMS QC (Watcher Workflow)
+# MetabWatch
 
-This project is designed to run in a "watcher" style for routine QC: point it at a raw-data folder, leave it running, and it will process each new stable `.raw` file and refresh an HTML dashboard.
+**MetabWatch** (package: `metabwatch`) is an automated LC–MS metabolomics quality-control workflow. Point it at a raw-data folder, leave it running, and it will process each new stable Thermo `.raw` file and refresh an HTML compound dashboard.
+
+Formerly known as **Metab_QC** / `metab-qc`.
 
 ## Quick Start (Non-Coder)
 
@@ -10,6 +12,12 @@ This project is designed to run in a "watcher" style for routine QC: point it at
 
 ```bash
 python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
+```
+
+Or, after `pip install -e .`:
+
+```bash
+metabwatch --mode watch --config data/hilic_pipeline_config.json
 ```
 
 3. Drop new `.raw` files into the configured raw directory.
@@ -91,6 +99,7 @@ Dashboard caveat: the landing-page mass-accuracy and retention-time overview plo
 
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
+- Naming and repository migration notes: [docs/naming-and-repository.md](docs/naming-and-repository.md)
 
 ## Requirements
 
@@ -99,6 +108,8 @@ Install the package (and its dependencies) from the repository root:
 ```bash
 pip install -e .
 ```
+
+This installs the `metabwatch` console command (and a temporary `metab-qc` alias for compatibility).
 
 ### CoreMS
 
