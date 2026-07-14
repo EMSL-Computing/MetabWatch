@@ -2,8 +2,6 @@
 
 **MetabWatch** (package: `metabwatch`) is an automated LC–MS metabolomics quality-control workflow. Point it at a raw-data folder, leave it running, and it will process each new stable Thermo `.raw` file and refresh an HTML compound dashboard.
 
-Formerly known as **Metab_QC** / `metab-qc`.
-
 ## Quick Start (Non-Coder)
 
 1. Choose a config file:
@@ -109,7 +107,7 @@ Install the package (and its dependencies) from the repository root:
 pip install -e .
 ```
 
-This installs the `metabwatch` console command (and a temporary `metab-qc` alias for compatibility).
+This installs the `metabwatch` console command.
 
 ### CoreMS
 

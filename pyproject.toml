@@ -43,17 +43,8 @@ dev = [
     "build",
 ]
 
-# Repository URLs: set when the GitLab (or public) remote is finalized.
-# Former GitHub project: https://github.com/kheal/Metab_QC
-# [project.urls]
-# Homepage = "https://gitlab.example.com/group/MetabWatch"
-# Repository = "https://gitlab.example.com/group/MetabWatch"
-# "Bug Tracker" = "https://gitlab.example.com/group/MetabWatch/-/issues"
-
 [project.scripts]
 metabwatch = "pipeline:main"
-# Backwards-compatible alias from the former package name (metab-qc)
-metab-qc = "pipeline:main"
 
 [tool.setuptools.package-dir]
 "" = "src"
