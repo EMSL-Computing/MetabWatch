@@ -35,6 +35,7 @@ class HTMLSynthesizer:
         self.untargeted_mode = untargeted_mode
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
+        self.last_export_paths: dict[str, Path] = {}
 
     @staticmethod
     def _slugify(name: str) -> str:
@@ -64,6 +65,14 @@ class HTMLSynthesizer:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         tmp_path.write_text(content, encoding="utf-8")
+        tmp_path.replace(path)
+
+    @staticmethod
+    def _write_atomic_csv(path: Path, df: pd.DataFrame) -> None:
+        """Write a DataFrame to CSV via a temporary file for atomic replace."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        df.to_csv(tmp_path, index=False)
         tmp_path.replace(path)
 
     def _collect_match_csvs(self) -> list[Path]:
@@ -1243,8 +1252,62 @@ class HTMLSynthesizer:
 </html>
 """
 
+    def _export_wide_csvs(
+        self,
+        samples: list[dict],
+        compounds: dict[str, dict],
+    ) -> dict[str, Path]:
+        """Write wide-style pivot CSVs (feature rows × sample columns).
+
+        Produces three files next to the dashboard:
+
+        - ``export_mz.csv`` — observed m/z per sample
+        - ``export_rt.csv`` — observed retention time (min) per sample
+        - ``export_height.csv`` — peak maximum intensity (height) per sample
+
+        Parameters
+        ----------
+        samples : list[dict]
+            Ordered sample records (columns follow this order).
+        compounds : dict[str, dict]
+            Compound records keyed by compound name.
+
+        Returns
+        -------
+        dict[str, Path]
+            Mapping of export label (``mz``, ``rt``, ``height``) to written path.
+        """
+        sample_names = [sample["sample"] for sample in samples]
+        metric_fields = {
+            "mz": "observed_mz",
+            "rt": "observed_rt",
+            "height": "intensity",
+        }
+        export_dir = self.html_output.parent
+        written: dict[str, Path] = {}
+
+        for label, field in metric_fields.items():
+            rows: list[dict] = []
+            for compound_name in sorted(compounds):
+                compound = compounds[compound_name]
+                by_sample = {
+                    row["sample"]: row.get(field) for row in compound["samples"]
+                }
+                row_out: dict = {"compound_name": compound_name}
+                for sample_name in sample_names:
+                    row_out[sample_name] = by_sample.get(sample_name)
+                rows.append(row_out)
+
+            columns = ["compound_name", *sample_names]
+            df = pd.DataFrame(rows, columns=columns)
+            out_path = export_dir / f"export_{label}.csv"
+            self._write_atomic_csv(out_path, df)
+            written[label] = out_path
+
+        return written
+
     def render(self) -> Path:
-        """Render landing index and per-compound pages atomically.
+        """Render landing index, per-compound pages, and wide CSV exports.
 
         Returns
         -------
@@ -1263,6 +1326,6 @@ class HTMLSynthesizer:
             page_html = self._render_compound_page(compound=compound, generated_at=generated_at)
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)
 
+        self.last_export_paths = self._export_wide_csvs(samples=samples, compounds=compounds)
         self.last_compound_pages = len(compounds)
-        _ = samples  # keeps sample build explicit for future diagnostics
         return self.html_output
