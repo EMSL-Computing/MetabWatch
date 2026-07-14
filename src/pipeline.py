@@ -156,6 +156,39 @@ def _ensure_untargeted_search_space(
     )
 
 
+def _run_synthesis(
+    synthesizer: HTMLSynthesizer,
+    output_tracker: OutputTracker,
+) -> Path:
+    """Rebuild dashboard HTML and wide pivot CSV exports, then clear the tracker.
+
+    Parameters
+    ----------
+    synthesizer : HTMLSynthesizer
+        Dashboard/export renderer.
+    output_tracker : OutputTracker
+        Debounce tracker to clear after a successful rebuild.
+
+    Returns
+    -------
+    Path
+        Path to the generated landing dashboard HTML.
+    """
+    html_path = synthesizer.render()
+    export_labels = ", ".join(sorted(synthesizer.last_export_paths))
+    print(
+        "[synthesized] Dashboard: "
+        f"{_clickable_path(html_path)} "
+        f"(compound pages: {synthesizer.last_compound_pages}, "
+        f"skipped samples: {synthesizer.last_skipped_samples}, "
+        f"exports: {export_labels or 'none'})"
+    )
+    for label, export_path in sorted(synthesizer.last_export_paths.items()):
+        print(f"[export] {label}: {_clickable_path(export_path)}")
+    output_tracker.clear()
+    return html_path
+
+
 def _process_one(
     raw_file: Path,
     orchestrator: ProcessorOrchestrator,
@@ -298,6 +331,7 @@ def run_watch_mode(
             batch.append(raw_file)
 
         total = len(batch)
+        synthesized_this_cycle = False
         for index, raw_file in enumerate(
             tqdm(batch, total=total, unit="file", desc="Processing raw files"),
             start=1,
@@ -324,28 +358,31 @@ def run_watch_mode(
                     f"[failed] {raw_file.name} untargeted search space build: {exc}"
                 )
                 continue
-            _process_one(
+            result = _process_one(
                 raw_file=raw_file,
                 orchestrator=orchestrator,
                 retry_policy=retry_policy,
                 state_store=state_store,
                 output_tracker=output_tracker,
             )
+            # Refresh HTML + wide CSV exports immediately after each completed
+            # sample (same artifacts the end-of-batch synthesizer would write).
+            if result.status == "completed":
+                _run_synthesis(synthesizer, output_tracker)
+                synthesized_this_cycle = True
 
-        should_synthesize = output_tracker.synthesis_due() or (once and total > 0)
+        # Debounced residual (e.g. late-settling events); also covers --once
+        # when no sample completed this pass but prior outputs still need a
+        # rebuild of dashboard/exports.
+        should_synthesize = output_tracker.synthesis_due() or (
+            once and total > 0 and not synthesized_this_cycle
+        )
         if should_synthesize:
-            html_path = synthesizer.render()
-            export_labels = ", ".join(sorted(synthesizer.last_export_paths))
-            print(
-                "[synthesized] Dashboard: "
-                f"{_clickable_path(html_path)} "
-                f"(compound pages: {synthesizer.last_compound_pages}, "
-                f"skipped samples: {synthesizer.last_skipped_samples}, "
-                f"exports: {export_labels or 'none'})"
-            )
-            output_tracker.clear()
-            if not once:
-                print("[watching] Waiting for new stable .raw files. Press Ctrl+C to exit.")
+            _run_synthesis(synthesizer, output_tracker)
+            synthesized_this_cycle = True
+
+        if synthesized_this_cycle and not once:
+            print("[watching] Waiting for new stable .raw files. Press Ctrl+C to exit.")
         elif not batch and not once:
             print("[watching] No new stable .raw files yet. Press Ctrl+C to exit.")
 
@@ -425,14 +462,8 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         output_tracker=output_tracker,
     )
 
-    html_path = synthesizer.render()
-    export_labels = ", ".join(sorted(synthesizer.last_export_paths))
-    print(
-        f"[synthesized] {html_path} "
-        f"(compound pages: {synthesizer.last_compound_pages}, "
-        f"skipped samples: {synthesizer.last_skipped_samples}, "
-        f"exports: {export_labels or 'none'})"
-    )
+    # Rebuild dashboard HTML and wide pivot CSVs after every process run.
+    _run_synthesis(synthesizer, output_tracker)
     return 0
 
 
