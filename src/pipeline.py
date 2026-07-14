@@ -335,11 +335,13 @@ def run_watch_mode(
         should_synthesize = output_tracker.synthesis_due() or (once and total > 0)
         if should_synthesize:
             html_path = synthesizer.render()
+            export_labels = ", ".join(sorted(synthesizer.last_export_paths))
             print(
                 "[synthesized] Dashboard: "
                 f"{_clickable_path(html_path)} "
                 f"(compound pages: {synthesizer.last_compound_pages}, "
-                f"skipped samples: {synthesizer.last_skipped_samples})"
+                f"skipped samples: {synthesizer.last_skipped_samples}, "
+                f"exports: {export_labels or 'none'})"
             )
             output_tracker.clear()
             if not once:
@@ -424,10 +426,12 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     )
 
     html_path = synthesizer.render()
+    export_labels = ", ".join(sorted(synthesizer.last_export_paths))
     print(
         f"[synthesized] {html_path} "
         f"(compound pages: {synthesizer.last_compound_pages}, "
-        f"skipped samples: {synthesizer.last_skipped_samples})"
+        f"skipped samples: {synthesizer.last_skipped_samples}, "
+        f"exports: {export_labels or 'none'})"
     )
     return 0
 

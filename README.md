@@ -23,6 +23,7 @@ The watcher avoids duplicate processing by tracking file status in `pipeline_man
 - A per-sample MS1 trace CSV (`*_ms1_traces.csv`)
 - A refreshed compound dashboard (`dashboard.html`)
 - Per-compound pages in `compounds/`
+- Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`
 
 ## Common Commands
 

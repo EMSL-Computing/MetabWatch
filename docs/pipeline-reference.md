@@ -104,6 +104,7 @@ The pipeline:
 - `*_ms1_traces.csv`
 - `dashboard.html`
 - `compounds/<compound-slug>.html`
+- `export_mz.csv`, `export_rt.csv`, `export_height.csv` (wide pivots: one row per mass feature, one column per sample)
 - `pipeline_manifest.json`
 - `untargeted_search_space.csv` (untargeted mode only — generated from the first matching sample, reused on subsequent runs)
 
