@@ -7,3 +7,17 @@ data/results*
 
 # Ignore all __pycache__ directories
 __pycache__/
+
+# Packaging / build artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Local env overrides (optional)
+.env
+venv/
+
+# Optional downloaded test-data archives (see make get-test-data)
+test_data/
