@@ -116,6 +116,20 @@ Derived automatically (never set in JSON):
 - `pipeline_manifest.json` and `dashboard.html` under `output_folder`
 - Untargeted search-space CSV at `<output_folder>/untargeted_search_space.csv`
 
+## Polarity policy
+
+MetabWatch does **not** allow mixed ionization polarities in one output folder:
+
+1. Polarity is read from CoreMS (`lcms_obj.polarity`) after opening each Thermo `.raw` file.
+2. On first successful completion, the polarity is stored in `pipeline_manifest.json` as top-level `"polarity"` (and on that sample’s entry).
+3. Later samples pass `expected_polarity` from the manifest into processing; a mismatch fails with a non-retryable `Polarity mismatch` error.
+4. In a multi-file batch (bootstrap / `--once` / force-reprocess), remaining files after the first mismatch are **hard-stopped**. With `--once`, the process exits non-zero.
+5. In continuous watch mode, a late opposite-polarity drop is rejected, but the watcher keeps running for matching-polarity files.
+6. The standards CSV may still list both polarities; only rows matching the sample’s polarity are searched.
+7. The dashboard shows **Polarity: …** from the match CSVs. Legacy mixed folders are labeled `mixed (...)` with a warning.
+
+Keep separate `input_folder` / `output_folder` pairs for positive and negative acquisitions.
+
 ## Search-Space Modes
 
 - **`targeted: true`** — match against the standards CSV at `qc_compounds`.
