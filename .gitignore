@@ -21,3 +21,6 @@ venv/
 
 # Optional downloaded test-data archives (see make get-test-data)
 test_data/
+
+# Venv
+.venv/.

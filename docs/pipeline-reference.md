@@ -52,25 +52,100 @@ Single-file process mode:
 python src/pipeline.py --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
 ```
 
-## Config Structure
+## Config Structure (Simplified — Preferred)
 
-Top-level sections:
+Configs use a flat JSON schema. Relative paths resolve against the repository root.
 
-- `processor`
-- `watcher`
-- `synthesizer`
-- `search_space` (optional; controls targeted vs. untargeted mode — see below)
-- retry settings (`max_retries`, `initial_backoff_sec`, `backoff_multiplier`)
-- stale-state setting (`stale_in_progress_sec`)
+### Required fields
 
-Important watcher fields:
+| Field | Description |
+|-------|-------------|
+| `input_folder` | Directory to poll for Thermo `.raw` files |
+| `output_folder` | Results directory (dashboard, manifest, exports) |
+| `corems_params` | Path to CoreMS TOML parameter file |
+| `targeted` | `true` for targeted matching; `false` for untargeted bootstrap |
+| `sample_name_regex` | Regex applied to the raw filename stem to decide processing |
+| `qc_compounds` | Path to standards CSV (**required when `targeted` is `true`**) |
 
-- `raw_dir`: input directory to poll
-- `poll_interval_sec`: poll period
-- `stability_wait_sec`: how long file must remain unchanged
-- `sample_name_regex` (optional): process only matching filename stems
+### Optional fields (defaults match the runtime loader)
 
-Example watcher section:
+| Field | Default | Description |
+|-------|---------|-------------|
+| `mz_tolerance_ppm` | `5.0` | m/z matching tolerance (ppm) |
+| `rt_tolerance` | `0.5` | Retention-time tolerance (minutes) |
+| `min_area` | `5000` | Minimum peak area |
+| `top_n` | `100` | Peaks kept when untargeted |
+| `plot_eics` / `plot_tic` | `false` / `true` | Plot flags |
+| `integrate_mass_features` / `cluster_mass_features` | `false` | CoreMS feature flags |
+| `poll_interval_sec` / `stability_wait_sec` | `10` / `20` | Watcher timing |
+| `debounce_sec` | `5.0` | Dashboard rebuild debounce |
+| `max_retries` / `initial_backoff_sec` / `backoff_multiplier` | `3` / `10` / `2` | Retry policy |
+| `stale_in_progress_sec` | `3600` | Stale in-progress threshold |
+
+### Targeted example
+
+```json
+{
+  "input_folder": "data/raw_positive",
+  "output_folder": "data/results_hilic_pos",
+  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "targeted": true,
+  "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+  "sample_name_regex": "QC_Metab_(.+)",
+  "mz_tolerance_ppm": 4.0,
+  "rt_tolerance": 0.8,
+  "min_area": 1000
+}
+```
+
+### Untargeted example
+
+```json
+{
+  "input_folder": "data/raw_positive",
+  "output_folder": "data/results_hilic_pos_untargeted",
+  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "targeted": false,
+  "sample_name_regex": "QC_Metab_(.+)",
+  "top_n": 100
+}
+```
+
+Derived automatically (never set in JSON):
+
+- `pipeline_manifest.json` and `dashboard.html` under `output_folder`
+- Untargeted search-space CSV at `<output_folder>/untargeted_search_space.csv`
+
+## Search-Space Modes
+
+- **`targeted: true`** — match against the standards CSV at `qc_compounds`.
+- **`targeted: false`** — bootstrap a search space from the first sample matching `sample_name_regex`.
+
+In untargeted mode:
+
+- The first matching sample triggers CoreMS untargeted peak picking + integration; the top `top_n` peaks (ranked by integrated area, descending) are written to `<output_folder>/untargeted_search_space.csv`.
+- The same sample is then processed against that CSV (so it shows up in the dashboard like every other sample).
+- All subsequent samples reuse the persisted CSV.
+- `qc_compounds` is not required in this mode.
+- Re-bootstrap is manual: delete `untargeted_search_space.csv` and rerun.
+- Bootstrap failures count toward `max_retries` (same cap as per-sample processing). After exhausting retries the file is marked failed and skipped on subsequent polls.
+
+## Legacy Nested Config (Still Supported)
+
+Older configs with nested `processor` / `watcher` / `synthesizer` / `search_space` blocks still load. Do not mix simplified and legacy keys in the same file.
+
+Legacy mapping:
+
+| Legacy key | Simplified key |
+|------------|----------------|
+| `watcher.raw_dir` | `input_folder` |
+| `processor.output_dir` | `output_folder` |
+| `processor.params_path` | `corems_params` |
+| `processor.standards_csv` | `qc_compounds` |
+| `search_space.mode` | `targeted` (`true`/`false`) |
+| `watcher.sample_name_regex` | `sample_name_regex` |
+
+Example legacy watcher section:
 
 ```json
 "watcher": {
@@ -80,28 +155,6 @@ Example watcher section:
   "sample_name_regex": "Pos-(02|03)_"
 }
 ```
-
-## Search-Space Modes
-
-By default the pipeline runs in `targeted` mode against `processor.standards_csv`. To run untargeted instead, add a `search_space` block:
-
-```json
-"search_space": {
-  "mode": "untargeted",
-  "top_n": 100
-}
-```
-
-In untargeted mode:
-
-- The first sample matching `watcher.sample_name_regex` triggers CoreMS untargeted peak picking + integration; the top `top_n` peaks (ranked by integrated area, descending) are written to `<output_dir>/untargeted_search_space.csv`.
-- The same sample is then processed against that CSV (so it shows up in the dashboard like every other sample).
-- All subsequent samples reuse the persisted CSV.
-- `processor.standards_csv` is optional in this mode.
-- Re-bootstrap is manual: delete `untargeted_search_space.csv` and rerun.
-- Bootstrap failures count toward `max_retries` (same cap as per-sample processing). After exhausting retries the file is marked failed and skipped on subsequent polls.
-
-When omitted, `search_space` defaults to `{"mode": "targeted", "top_n": 100}`.
 
 ## Runtime Behavior
 

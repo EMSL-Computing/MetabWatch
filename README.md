@@ -4,8 +4,24 @@
 
 ## Quick Start (Non-Coder)
 
-1. Choose a config file:
-   - `data/hilic_pipeline_config.json` for HILIC
+1. Choose or write a simplified config JSON. The HILIC example is `data/hilic_pipeline_config.json`:
+
+```json
+{
+  "input_folder": "data/raw_positive",
+  "output_folder": "data/results_hilic_pos",
+  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "targeted": true,
+  "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+  "sample_name_regex": "QC_Metab_(.+)",
+  "mz_tolerance_ppm": 4.0,
+  "rt_tolerance": 0.8,
+  "min_area": 1000
+}
+```
+
+Required fields: `input_folder`, `output_folder`, `corems_params`, `targeted`, `sample_name_regex`, and (when `targeted` is `true`) `qc_compounds`. Optional: `mz_tolerance_ppm`, `rt_tolerance`, `min_area`, and other advanced knobs (see [docs/pipeline-reference.md](docs/pipeline-reference.md)).
+
 2. Start the watcher:
 
 ```bash
@@ -18,7 +34,7 @@ Or, after `pip install -e .`:
 metabwatch --mode watch --config data/hilic_pipeline_config.json
 ```
 
-3. Drop new `.raw` files into the configured raw directory.
+3. Drop new `.raw` files into the configured raw directory (`input_folder`).
 4. Open the generated dashboard at the output path in your config (for the HILIC example: `data/results_hilic_pos/dashboard.html`).
 
 The watcher avoids duplicate processing by tracking file status in `pipeline_manifest.json`.
@@ -58,6 +74,7 @@ End-to-end regression checks against configs under `data/`: always `--once --for
 Put Thermo `.raw` files in `data/raw_positive/` (gitignored), or use `make get-test-data` once a download URL is configured.
 
 ```bash
+make test-unit                  # config loader unit tests (pytest)
 make test-workflow-targeted     # data/hilic_pipeline_config.json
 make test-workflow-untargeted   # data/hilic_pipeline_config_untargeted.json
 make test-workflow              # both
@@ -71,23 +88,29 @@ make test-workflow-targeted PYTHON=./venv/bin/python
 
 ## Search-space modes
 
-By default the pipeline runs in `targeted` mode against `processor.standards_csv`. To run untargeted instead, add a `search_space` block to the JSON config:
+Set `"targeted": true` (with `qc_compounds` pointing at a standards CSV) for targeted matching. For untargeted, set `"targeted": false`:
 
 ```json
-"search_space": {
-  "mode": "untargeted",
+{
+  "input_folder": "data/raw_positive",
+  "output_folder": "data/results_hilic_pos_untargeted",
+  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "targeted": false,
+  "sample_name_regex": "QC_Metab_(.+)",
   "top_n": 100
 }
 ```
 
-In untargeted mode the first sample matching `watcher.sample_name_regex` is used to seed the search space:
+In untargeted mode the first sample matching `sample_name_regex` is used to seed the search space:
 
 1. CoreMS untargeted peak picking + integration runs on that sample.
-2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_dir>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.
+2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_folder>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.
 3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
 4. All subsequent samples reuse the persisted CSV.
 
 A ready-made example config lives at [data/hilic_pipeline_config_untargeted.json](data/hilic_pipeline_config_untargeted.json).
+
+Legacy nested configs (`processor` / `watcher` / `search_space`) are still accepted by the loader for more advanced use cases.
 
 
 ## Technical Documentation

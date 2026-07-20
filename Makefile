@@ -37,12 +37,14 @@ TEST_DATA_ARCHIVE_URL ?=
 
 .PHONY: help \
 	check-test-data get-test-data \
+	test-unit \
 	test-workflow-targeted test-workflow-untargeted test-workflow \
 	verify-workflow-outputs
 
 help:
 	@echo "MetabWatch workflow test targets"
 	@echo ""
+	@echo "  make test-unit                 Config loader unit tests (pytest)"
 	@echo "  make test-workflow-targeted    Targeted mode (--once --force-reprocess)"
 	@echo "  make test-workflow-untargeted  Untargeted mode (--once --force-reprocess)"
 	@echo "  make test-workflow             Targeted, then untargeted"
@@ -61,9 +63,19 @@ help:
 	@echo "Workflow tests always pass --once --force-reprocess (full end-to-end from raw)."
 	@echo ""
 	@echo "Examples:"
+	@echo "  make test-unit"
 	@echo "  make test-workflow-targeted"
 	@echo "  make test-workflow-untargeted"
 	@echo "  make test-workflow PYTHON=./venv/bin/python"
+
+# ---------------------------------------------------------------------------
+# Unit tests
+# ---------------------------------------------------------------------------
+
+test-unit:
+	@echo "=== Config loader unit tests ==="
+	PYTHONPATH=src $(PYTHON) -m pytest tests/test_config.py -q
+	@echo "=== Unit tests PASSED ==="
 
 # ---------------------------------------------------------------------------
 # Test data
