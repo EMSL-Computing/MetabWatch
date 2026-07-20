@@ -36,11 +36,56 @@ class HTMLSynthesizer:
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
         self.last_export_paths: dict[str, Path] = {}
+        self.last_polarity_label: str = "unknown"
 
     @staticmethod
     def _slugify(name: str) -> str:
         slug = re.sub(r"[^0-9A-Za-z]+", "-", name).strip("-").lower()
         return slug or "compound"
+
+    @staticmethod
+    def format_run_polarity_label(polarities: set[str] | list[str]) -> str:
+        """Format polarities collected from match CSVs for dashboard display.
+
+        Parameters
+        ----------
+        polarities : set[str] | list[str]
+            Normalized polarity strings (e.g. ``positive``, ``negative``).
+
+        Returns
+        -------
+        str
+            Single polarity, ``unknown``, or ``mixed (...)`` when more than one.
+        """
+        cleaned = sorted(
+            {
+                str(p).strip().lower()
+                for p in polarities
+                if p is not None and str(p).strip()
+            }
+        )
+        if not cleaned:
+            return "unknown"
+        if len(cleaned) == 1:
+            return cleaned[0]
+        return f"mixed ({', '.join(cleaned)})"
+
+    @staticmethod
+    def _polarity_meta_html(polarity_label: str) -> str:
+        """Return HTML for the polarity metadata line on dashboard pages."""
+        is_mixed = polarity_label.startswith("mixed")
+        style = (
+            " style=\"color:#b42318;font-weight:700;\"" if is_mixed else ""
+        )
+        note = (
+            " <span style=\"color:#b42318;\">(mixed polarities are not supported)</span>"
+            if is_mixed
+            else ""
+        )
+        return (
+            f"<p class=\"meta-polarity\"{style}>"
+            f"<strong>Polarity:</strong> {escape(polarity_label)}{note}</p>"
+        )
 
     @staticmethod
     def _safe_trace_col(mf_id: int, compound_name: str) -> str:
@@ -101,11 +146,19 @@ class HTMLSynthesizer:
                     mapping[str(Path(out_csv).resolve())] = str(acq)
         return mapping
 
-    def _build_dataset(self) -> tuple[list[dict], dict[str, dict]]:
-        """Build sample and compound records from matches and traces CSV files."""
+    def _build_dataset(self) -> tuple[list[dict], dict[str, dict], set[str]]:
+        """Build sample and compound records from matches and traces CSV files.
+
+        Returns
+        -------
+        samples, compounds, polarities
+            Sample records, compound index, and the set of normalized polarity
+            values seen across match CSVs (for dashboard labeling).
+        """
         manifest_times = self._collect_manifest_acquisition_times()
         samples: list[dict] = []
         compounds: dict[str, dict] = {}
+        polarities: set[str] = set()
         self.last_skipped_samples = 0
 
         for match_csv in self._collect_match_csvs():
@@ -118,6 +171,12 @@ class HTMLSynthesizer:
             trace_csv = match_csv.with_name(f"{sample_name}_ms1_traces.csv")
             if not trace_csv.exists():
                 continue
+
+            if "polarity" in df.columns and not df.empty:
+                for value in df["polarity"].dropna().astype(str):
+                    normalized = value.strip().lower()
+                    if normalized:
+                        polarities.add(normalized)
 
             acq_value = None
             if "acquisition_time" in df.columns and not df.empty:
@@ -211,7 +270,7 @@ class HTMLSynthesizer:
                     }
                 )
 
-        return samples, compounds
+        return samples, compounds, polarities
 
     @staticmethod
     def _first_number(values: list[float | None]) -> float | None:
@@ -718,7 +777,13 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
-    def _render_index(self, samples: list[dict], compounds: dict[str, dict], generated_at: str) -> str:
+    def _render_index(
+        self,
+        samples: list[dict],
+        compounds: dict[str, dict],
+        generated_at: str,
+        polarity_label: str,
+    ) -> str:
         rows = []
         for compound_name in sorted(compounds):
             c = compounds[compound_name]
@@ -817,12 +882,14 @@ class HTMLSynthesizer:
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
         .section-title {{ margin: 22px 0 10px; }}
+        .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
   </style>
 </head>
 <body>
   <section class=\"card\">
     <h1>MetabWatch Compound Index</h1>
     <p>Generated: {escape(generated_at)}</p>
+    {self._polarity_meta_html(polarity_label)}
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>
@@ -868,7 +935,12 @@ class HTMLSynthesizer:
         shade = max(35, min(220, shade))
         return f"rgb({shade},{shade},{shade})"
 
-    def _render_compound_page(self, compound: dict, generated_at: str) -> str:
+    def _render_compound_page(
+        self,
+        compound: dict,
+        generated_at: str,
+        polarity_label: str,
+    ) -> str:
         series = compound["samples"]
         full_samples = [row["sample"] for row in series]
         samples = [self._acquisition_label(row["acquisition_time_iso"]) for row in series]
@@ -1224,6 +1296,7 @@ class HTMLSynthesizer:
       margin: 0 auto;
     }}
     .meta {{ margin-bottom: 14px; color: #47524d; }}
+    .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
     .section-title {{ margin: 20px 0 8px; }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
@@ -1234,6 +1307,7 @@ class HTMLSynthesizer:
     <p><a href=\"../dashboard.html\">Back to compound index</a></p>
     <h1>{escape(compound['name'])}</h1>
     <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    {self._polarity_meta_html(polarity_label)}
 
     <h2 class=\"section-title\">Across-sample metrics</h2>
     <div id=\"top-plot\"></div>
@@ -1315,15 +1389,26 @@ class HTMLSynthesizer:
             Path to the generated landing dashboard HTML.
         """
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        samples, compounds = self._build_dataset()
+        samples, compounds, polarities = self._build_dataset()
+        polarity_label = self.format_run_polarity_label(polarities)
+        self.last_polarity_label = polarity_label
 
-        index_html = self._render_index(samples=samples, compounds=compounds, generated_at=generated_at)
+        index_html = self._render_index(
+            samples=samples,
+            compounds=compounds,
+            generated_at=generated_at,
+            polarity_label=polarity_label,
+        )
         self._write_atomic(self.html_output, index_html)
 
         compounds_dir = self.html_output.parent / "compounds"
         for compound_name in sorted(compounds):
             compound = compounds[compound_name]
-            page_html = self._render_compound_page(compound=compound, generated_at=generated_at)
+            page_html = self._render_compound_page(
+                compound=compound,
+                generated_at=generated_at,
+                polarity_label=polarity_label,
+            )
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)
 
         self.last_export_paths = self._export_wide_csvs(samples=samples, compounds=compounds)

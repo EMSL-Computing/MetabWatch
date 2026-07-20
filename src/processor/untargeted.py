@@ -57,6 +57,7 @@ def build_untargeted_search_space(
     output_csv: Path,
     top_n: int,
     mz_tolerance_ppm: float,
+    expected_polarity: str | None = None,
 ) -> pd.DataFrame:
     """Run untargeted peak picking on `raw_file` and write a top-N search-space CSV.
 
@@ -75,12 +76,15 @@ def build_untargeted_search_space(
         Reserved for future use; validated > 0 for consistency with the
         targeted pipeline. Not currently consumed by CoreMS in the untargeted
         path, but accepted to keep the signature symmetric with downstream code.
+    expected_polarity : str | None
+        When set (from the pipeline manifest), CoreMS polarity must match.
 
     Returns
     -------
     pd.DataFrame
         The DataFrame written to disk plus the original `area` column for
         diagnostics. The CSV on disk contains only `SEARCH_SPACE_COLUMNS`.
+        ``attrs['polarity']`` holds the normalized CoreMS polarity string.
     """
     _validate_inputs(
         raw_file=raw_file,
@@ -108,6 +112,14 @@ def build_untargeted_search_space(
         ) from exc
 
     polarity = str(lcms_obj.polarity).strip().lower()
+    if expected_polarity is not None:
+        expected = str(expected_polarity).strip().lower()
+        if polarity != expected:
+            raise ValueError(
+                f"Polarity mismatch: file {raw_file.name} is '{polarity}' "
+                f"but this run is locked to '{expected}'. "
+                "MetabWatch does not allow mixed polarities in one input folder / run."
+            )
 
     # Override CoreMS settings on the lcms_obj for this run only. We don't
     # mutate the shared TOML — the targeted pipeline reads the same file and
@@ -163,4 +175,5 @@ def build_untargeted_search_space(
         f"[untargeted] wrote {output_csv} with {len(diagnostic_df)} features "
         f"(polarity={polarity})"
     )
+    diagnostic_df.attrs["polarity"] = polarity
     return diagnostic_df

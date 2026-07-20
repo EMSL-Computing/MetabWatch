@@ -251,6 +251,7 @@ def process_raw_to_observed_features_df(
     plot_tic: bool = True,
     integrate_mass_features: bool = False,
     cluster_mass_features: bool = False,
+    expected_polarity: str | None = None,
 ) -> pd.DataFrame:
     """Process a single `.raw` file and return matched observed features.
 
@@ -282,11 +283,14 @@ def process_raw_to_observed_features_df(
         Whether to run CoreMS integration on detected mass features.
     cluster_mass_features : bool
         Whether to run CoreMS clustering on detected mass features.
+    expected_polarity : str | None
+        When set (from the pipeline manifest), CoreMS polarity must match.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing matched observed features.
+        DataFrame containing matched observed features. ``attrs['polarity']``
+        holds the normalized CoreMS polarity string.
     """
     _validate_inputs(
         raw_file=raw_file,
@@ -326,6 +330,14 @@ def process_raw_to_observed_features_df(
         ) from exc
 
     raw_polarity = str(lcms_obj.polarity).strip().lower()
+    if expected_polarity is not None:
+        expected = str(expected_polarity).strip().lower()
+        if raw_polarity != expected:
+            raise ValueError(
+                f"Polarity mismatch: file {raw_file.name} is '{raw_polarity}' "
+                f"but this run is locked to '{expected}'. "
+                "MetabWatch does not allow mixed polarities in one input folder / run."
+            )
     target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
     if target_df.empty:
         raise ValueError(
@@ -414,6 +426,7 @@ def process_raw_to_observed_features_df(
 
     results_df["acquisition_time"] = acquisition_time
     results_df.attrs["acquisition_time"] = acquisition_time
+    results_df.attrs["polarity"] = raw_polarity
 
     if plot_eics and not results_df.empty:
         plot_pdf.parent.mkdir(parents=True, exist_ok=True)

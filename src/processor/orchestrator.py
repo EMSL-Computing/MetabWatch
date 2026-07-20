@@ -47,6 +47,8 @@ class ProcessResult:
         Whether the failure is considered retryable.
     acquisition_time : str | None
         Acquisition timestamp extracted from CoreMS metadata.
+    polarity : str | None
+        CoreMS ionization polarity when known (``positive`` / ``negative``).
     """
 
     raw_file: Path
@@ -57,6 +59,7 @@ class ProcessResult:
     error: str | None = None
     retryable: bool = False
     acquisition_time: str | None = None
+    polarity: str | None = None
 
 
 class ProcessorOrchestrator:
@@ -107,16 +110,25 @@ class ProcessorOrchestrator:
             True if the message contains retry hints.
         """
         text = str(exc).lower()
+        if "polarity mismatch" in text:
+            return False
         retry_hints = ("temporar", "locked", "timeout", "i/o", "resource busy")
         return any(hint in text for hint in retry_hints)
 
-    def process_single_raw(self, raw_file: Path) -> ProcessResult:
+    def process_single_raw(
+        self,
+        raw_file: Path,
+        *,
+        expected_polarity: str | None = None,
+    ) -> ProcessResult:
         """Process a single raw file and return a ProcessResult.
 
         Parameters
         ----------
         raw_file : Path
             Path to the `.raw` file to process.
+        expected_polarity : str | None
+            When set (from the pipeline manifest), the sample must match.
 
         Returns
         -------
@@ -136,11 +148,15 @@ class ProcessorOrchestrator:
                 plot_tic=self.plot_tic,
                 integrate_mass_features=self.integrate_mass_features,
                 cluster_mass_features=self.cluster_mass_features,
+                expected_polarity=expected_polarity,
             )
             stem = raw_file.stem
             acquisition_time = results_df.attrs.get("acquisition_time")
             if "acquisition_time" in results_df.columns and not results_df.empty:
                 acquisition_time = str(results_df["acquisition_time"].iloc[0])
+            polarity = results_df.attrs.get("polarity")
+            if polarity is not None:
+                polarity = str(polarity).strip().lower()
             return ProcessResult(
                 raw_file=raw_file,
                 status="completed",
@@ -149,6 +165,7 @@ class ProcessorOrchestrator:
                 rows=len(results_df),
                 retryable=False,
                 acquisition_time=acquisition_time,
+                polarity=polarity,
             )
         except Exception as exc:
             retryable = self._is_retryable(exc)
