@@ -22,16 +22,17 @@
 
 Required fields: `input_folder`, `output_folder`, `corems_params`, `targeted`, `sample_name_regex`, and (when `targeted` is `true`) `qc_compounds`. Optional: `mz_tolerance_ppm`, `rt_tolerance`, `min_area`, and other advanced knobs (see [docs/pipeline-reference.md](docs/pipeline-reference.md)).
 
-2. Start the watcher:
+2. Install (editable) and start the watcher:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
+pip install -e .
+metabwatch --mode watch --config data/hilic_pipeline_config.json
 ```
 
-Or, after `pip install -e .`:
+Or as a module:
 
 ```bash
-metabwatch --mode watch --config data/hilic_pipeline_config.json
+python -m metabwatch.pipeline --mode watch --config data/hilic_pipeline_config.json
 ```
 
 3. Drop new `.raw` files into the configured raw directory (`input_folder`).

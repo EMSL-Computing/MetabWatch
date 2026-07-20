@@ -7,10 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from config import load_pipeline_config
-
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from metabwatch.config import load_pipeline_config
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -18,7 +15,9 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
-def test_simplified_targeted_loads_paths_and_mode(tmp_path: Path) -> None:
+def test_simplified_targeted_loads_paths_and_mode(
+    tmp_path: Path, project_root: Path
+) -> None:
     config_path = _write_json(
         tmp_path / "targeted.json",
         {
@@ -34,15 +33,15 @@ def test_simplified_targeted_loads_paths_and_mode(tmp_path: Path) -> None:
         },
     )
 
-    cfg = load_pipeline_config(config_path, REPO_ROOT)
+    cfg = load_pipeline_config(config_path, project_root)
 
-    assert cfg.watcher.raw_dir == REPO_ROOT / "data/raw_positive"
-    assert cfg.processor.output_dir == REPO_ROOT / "data/results_hilic_pos"
+    assert cfg.watcher.raw_dir == project_root / "data/raw_positive"
+    assert cfg.processor.output_dir == project_root / "data/results_hilic_pos"
     assert cfg.processor.params_path == (
-        REPO_ROOT / "data/corems_params/monet_hilic_corems_lcms_params.toml"
+        project_root / "data/corems_params/monet_hilic_corems_lcms_params.toml"
     )
     assert cfg.processor.standards_csv == (
-        REPO_ROOT / "data/qc_search_space/hilic_qc_search.csv"
+        project_root / "data/qc_search_space/hilic_qc_search.csv"
     )
     assert cfg.search_space.mode == "targeted"
     assert cfg.search_space.csv_path == cfg.processor.standards_csv
@@ -53,14 +52,16 @@ def test_simplified_targeted_loads_paths_and_mode(tmp_path: Path) -> None:
     assert cfg.synthesizer.mz_tolerance_ppm == 4.0
     assert cfg.synthesizer.rt_tolerance == 0.8
     assert cfg.synthesizer.html_output == (
-        REPO_ROOT / "data/results_hilic_pos/dashboard.html"
+        project_root / "data/results_hilic_pos/dashboard.html"
     )
     assert cfg.state.pipeline_manifest == (
-        REPO_ROOT / "data/results_hilic_pos/pipeline_manifest.json"
+        project_root / "data/results_hilic_pos/pipeline_manifest.json"
     )
 
 
-def test_simplified_untargeted_without_qc_compounds(tmp_path: Path) -> None:
+def test_simplified_untargeted_without_qc_compounds(
+    tmp_path: Path, project_root: Path
+) -> None:
     config_path = _write_json(
         tmp_path / "untargeted.json",
         {
@@ -73,12 +74,13 @@ def test_simplified_untargeted_without_qc_compounds(tmp_path: Path) -> None:
         },
     )
 
-    cfg = load_pipeline_config(config_path, REPO_ROOT)
+    cfg = load_pipeline_config(config_path, project_root)
 
     assert cfg.search_space.mode == "untargeted"
     assert cfg.search_space.top_n == 50
     expected_csv = (
-        REPO_ROOT / "data/results_hilic_pos_untargeted/untargeted_search_space.csv"
+        project_root
+        / "data/results_hilic_pos_untargeted/untargeted_search_space.csv"
     )
     assert cfg.search_space.csv_path == expected_csv
     assert cfg.processor.standards_csv == expected_csv
@@ -91,7 +93,9 @@ def test_simplified_untargeted_without_qc_compounds(tmp_path: Path) -> None:
     assert cfg.watcher.poll_interval_sec == 10.0
 
 
-def test_simplified_targeted_missing_qc_compounds_raises(tmp_path: Path) -> None:
+def test_simplified_targeted_missing_qc_compounds_raises(
+    tmp_path: Path, project_root: Path
+) -> None:
     config_path = _write_json(
         tmp_path / "bad.json",
         {
@@ -104,10 +108,12 @@ def test_simplified_targeted_missing_qc_compounds_raises(tmp_path: Path) -> None
     )
 
     with pytest.raises(ValueError, match="qc_compounds"):
-        load_pipeline_config(config_path, REPO_ROOT)
+        load_pipeline_config(config_path, project_root)
 
 
-def test_simplified_missing_sample_name_regex_raises(tmp_path: Path) -> None:
+def test_simplified_missing_sample_name_regex_raises(
+    tmp_path: Path, project_root: Path
+) -> None:
     config_path = _write_json(
         tmp_path / "no_regex.json",
         {
@@ -119,10 +125,10 @@ def test_simplified_missing_sample_name_regex_raises(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="sample_name_regex"):
-        load_pipeline_config(config_path, REPO_ROOT)
+        load_pipeline_config(config_path, project_root)
 
 
-def test_legacy_nested_still_loads(tmp_path: Path) -> None:
+def test_legacy_nested_still_loads(tmp_path: Path, project_root: Path) -> None:
     config_path = _write_json(
         tmp_path / "legacy.json",
         {
@@ -142,19 +148,21 @@ def test_legacy_nested_still_loads(tmp_path: Path) -> None:
         },
     )
 
-    cfg = load_pipeline_config(config_path, REPO_ROOT)
+    cfg = load_pipeline_config(config_path, project_root)
 
     assert cfg.search_space.mode == "targeted"
-    assert cfg.watcher.raw_dir == REPO_ROOT / "data/raw_positive"
-    assert cfg.processor.output_dir == REPO_ROOT / "data/results_hilic_pos"
+    assert cfg.watcher.raw_dir == project_root / "data/raw_positive"
+    assert cfg.processor.output_dir == project_root / "data/results_hilic_pos"
     assert cfg.processor.standards_csv == (
-        REPO_ROOT / "data/qc_search_space/hilic_qc_search.csv"
+        project_root / "data/qc_search_space/hilic_qc_search.csv"
     )
     assert cfg.watcher.sample_name_regex == "QC_Metab_(.+)"
     assert cfg.processor.mz_tolerance_ppm == 4.0
 
 
-def test_legacy_untargeted_still_loads(tmp_path: Path) -> None:
+def test_legacy_untargeted_still_loads(
+    tmp_path: Path, project_root: Path
+) -> None:
     config_path = _write_json(
         tmp_path / "legacy_untargeted.json",
         {
@@ -167,17 +175,17 @@ def test_legacy_untargeted_still_loads(tmp_path: Path) -> None:
         },
     )
 
-    cfg = load_pipeline_config(config_path, REPO_ROOT)
+    cfg = load_pipeline_config(config_path, project_root)
 
     assert cfg.search_space.mode == "untargeted"
     assert cfg.search_space.top_n == 25
     assert cfg.search_space.csv_path == (
-        REPO_ROOT / "data/results_out/untargeted_search_space.csv"
+        project_root / "data/results_out/untargeted_search_space.csv"
     )
     assert cfg.watcher.sample_name_regex is None
 
 
-def test_mixed_formats_rejected(tmp_path: Path) -> None:
+def test_mixed_formats_rejected(tmp_path: Path, project_root: Path) -> None:
     config_path = _write_json(
         tmp_path / "mixed.json",
         {
@@ -192,16 +200,17 @@ def test_mixed_formats_rejected(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="mixes simplified and legacy"):
-        load_pipeline_config(config_path, REPO_ROOT)
+        load_pipeline_config(config_path, project_root)
 
 
-def test_example_configs_load() -> None:
+def test_example_configs_load(project_root: Path) -> None:
     """Smoke-load the shipped example configs from data/."""
     targeted = load_pipeline_config(
-        REPO_ROOT / "data/hilic_pipeline_config.json", REPO_ROOT
+        project_root / "data/hilic_pipeline_config.json", project_root
     )
     untargeted = load_pipeline_config(
-        REPO_ROOT / "data/hilic_pipeline_config_untargeted.json", REPO_ROOT
+        project_root / "data/hilic_pipeline_config_untargeted.json",
+        project_root,
     )
 
     assert targeted.search_space.mode == "targeted"
@@ -210,7 +219,7 @@ def test_example_configs_load() -> None:
     assert untargeted.search_space.top_n == 100
 
 
-def test_absolute_paths_preserved(tmp_path: Path) -> None:
+def test_absolute_paths_preserved(tmp_path: Path, project_root: Path) -> None:
     abs_input = tmp_path / "raws"
     abs_output = tmp_path / "out"
     abs_params = tmp_path / "params.toml"
@@ -227,7 +236,7 @@ def test_absolute_paths_preserved(tmp_path: Path) -> None:
         },
     )
 
-    cfg = load_pipeline_config(config_path, REPO_ROOT)
+    cfg = load_pipeline_config(config_path, project_root)
 
     assert cfg.watcher.raw_dir == abs_input
     assert cfg.processor.output_dir == abs_output

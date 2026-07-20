@@ -1,4 +1,4 @@
-from corems_runtime import ensure_dotnet_runtime
+from metabwatch.corems_runtime import ensure_dotnet_runtime
 
 ensure_dotnet_runtime()
 

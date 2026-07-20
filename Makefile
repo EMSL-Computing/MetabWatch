@@ -82,7 +82,7 @@ help:
 
 test-unit:
 	@echo "=== Unit tests (Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')) ==="
-	PYTHONPATH=src $(PYTHON) -m pytest tests/test_config.py tests/test_polarity.py -q
+	$(PYTHON) -m pytest tests/test_config.py tests/test_polarity.py -q
 	@echo "=== Unit tests PASSED ==="
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ test-workflow-targeted: check-test-data
 	@echo "=== Targeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "Config: $(TARGETED_CONFIG)  (--once --force-reprocess)"
-	$(PYTHON) src/pipeline.py --mode watch --config $(TARGETED_CONFIG) --once --force-reprocess
+	$(PYTHON) -m metabwatch.pipeline --mode watch --config $(TARGETED_CONFIG) --once --force-reprocess
 	@$(MAKE) verify-workflow-outputs RESULTS_DIR="$(TARGETED_RESULTS_DIR)"
 	@echo "=== Targeted workflow test PASSED ==="
 
@@ -164,7 +164,7 @@ test-workflow-untargeted: check-test-data
 	@echo "=== Untargeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "Config: $(UNTARGETED_CONFIG)  (--once --force-reprocess)"
-	$(PYTHON) src/pipeline.py --mode watch --config $(UNTARGETED_CONFIG) --once --force-reprocess
+	$(PYTHON) -m metabwatch.pipeline --mode watch --config $(UNTARGETED_CONFIG) --once --force-reprocess
 	@$(MAKE) verify-workflow-outputs RESULTS_DIR="$(UNTARGETED_RESULTS_DIR)"
 	@echo "=== Untargeted workflow test PASSED ==="
 

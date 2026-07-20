@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC = REPO_ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+import pytest
 
-from corems_runtime import ensure_dotnet_runtime  # noqa: E402
+from metabwatch.corems_runtime import ensure_dotnet_runtime
 
 # Configure Mono before any test module imports CoreMS via the processor package.
 ensure_dotnet_runtime()
+
+
+@pytest.fixture
+def project_root(pytestconfig) -> Path:
+    """Pytest project root (directory containing pyproject.toml)."""
+    return Path(pytestconfig.rootpath)

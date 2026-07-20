@@ -3,20 +3,14 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC = REPO_ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from processor.orchestrator import ProcessResult, ProcessorOrchestrator  # noqa: E402
-from state.manifest_store import ManifestStateStore  # noqa: E402
-from synthesis.synthesizer import HTMLSynthesizer  # noqa: E402
+from metabwatch.processor.orchestrator import ProcessResult, ProcessorOrchestrator
+from metabwatch.state.manifest_store import ManifestStateStore
+from metabwatch.synthesis.synthesizer import HTMLSynthesizer
 
 
 def test_manifest_sets_run_polarity_on_first_complete(tmp_path):
@@ -108,7 +102,7 @@ def test_orchestrator_polarity_mismatch_not_retryable(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        "processor.orchestrator.process_raw_to_observed_features_df",
+        "metabwatch.processor.orchestrator.process_raw_to_observed_features_df",
         _raise_mismatch,
     )
     orch = ProcessorOrchestrator(
@@ -140,7 +134,7 @@ def test_orchestrator_returns_polarity_on_success(monkeypatch, tmp_path):
         return df
 
     monkeypatch.setattr(
-        "processor.orchestrator.process_raw_to_observed_features_df",
+        "metabwatch.processor.orchestrator.process_raw_to_observed_features_df",
         _fake_process,
     )
     orch = ProcessorOrchestrator(

@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from targeted_search_for_standards import process_raw_to_observed_features_df
+from metabwatch.targeted_search_for_standards import (
+    process_raw_to_observed_features_df,
+)
 
 
 @dataclass(frozen=True)

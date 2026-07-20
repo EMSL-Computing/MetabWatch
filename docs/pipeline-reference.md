@@ -15,10 +15,12 @@ Install with `pip install -e .` from the repository root. Thermo raw support als
 
 ## Entrypoint
 
+After `pip install -e .`:
+
 ```bash
-python src/pipeline.py --mode watch --config <config.json>
-# or, after pip install -e .:
 metabwatch --mode watch --config <config.json>
+# or:
+python -m metabwatch.pipeline --mode watch --config <config.json>
 ```
 
 Modes:
@@ -31,30 +33,30 @@ Modes:
 Watch mode:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
+metabwatch --mode watch --config data/hilic_pipeline_config.json
 ```
 
 One-shot watch loop:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json --once
+metabwatch --mode watch --config data/hilic_pipeline_config.json --once
 ```
 
 Force reprocess:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
+metabwatch --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
 ```
 
 Single-file process mode:
 
 ```bash
-python src/pipeline.py --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
+metabwatch --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
 ```
 
 ## Config Structure (Simplified — Preferred)
 
-Configs use a flat JSON schema. Relative paths resolve against the repository root.
+Configs use a flat JSON schema. Relative paths resolve against the process working directory (override via ``base_dir`` when loading programmatically).
 
 ### Required fields
 

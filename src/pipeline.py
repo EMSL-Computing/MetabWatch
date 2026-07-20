@@ -8,22 +8,22 @@ from pathlib import Path
 from urllib.parse import quote
 
 # Must run before any CoreMS / pythonnet import (processor → targeted_search).
-from corems_runtime import ensure_dotnet_runtime
+from metabwatch.corems_runtime import ensure_dotnet_runtime
 
 ensure_dotnet_runtime()
 
-from config import PipelineConfig, load_pipeline_config
-from output import OutputTracker
-from pipeline_queue import ProcessingQueue
-from processor import (
+from metabwatch.config import PipelineConfig, load_pipeline_config
+from metabwatch.output import OutputTracker
+from metabwatch.pipeline_queue import ProcessingQueue
+from metabwatch.processor import (
     ProcessResult,
     ProcessorOrchestrator,
     RetryPolicy,
     build_untargeted_search_space,
 )
-from state import ManifestStateStore
-from synthesis import HTMLSynthesizer
-from watcher import RawFileWatcher
+from metabwatch.state import ManifestStateStore
+from metabwatch.synthesis import HTMLSynthesizer
+from metabwatch.watcher import RawFileWatcher
 
 try:
     from tqdm import tqdm
@@ -598,8 +598,7 @@ def main(argv: list[str] | None = None) -> int:
     """
 
     args = parse_args(argv or sys.argv[1:])
-    repo_root = Path(__file__).resolve().parent.parent
-    config = load_pipeline_config(args.config, repo_root=repo_root)
+    config = load_pipeline_config(args.config)
 
     if args.mode == "process":
         if args.raw is None:
