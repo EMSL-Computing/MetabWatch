@@ -8,7 +8,7 @@
 #   make test-workflow             Both targeted and untargeted
 #
 # Prerequisites:
-#   - Active Python env with package deps installed (`pip install -e .`)
+#   - Repo .venv with package deps installed (`pip install -e .`), or set PYTHON=
 #   - Raw files under $(RAW_DIR) (default: data/raw_positive/)
 #
 # Large .raw files are not in git. Place them under data/raw_positive/
@@ -16,7 +16,14 @@
 
 SHELL := /bin/bash
 
-PYTHON ?= python
+# Prefer the repo virtualenv; override with e.g. PYTHON=python3 on the CLI.
+ifeq ($(origin PYTHON),undefined)
+  ifneq ($(wildcard .venv/bin/python),)
+    PYTHON := .venv/bin/python
+  else
+    PYTHON := python
+  endif
+endif
 
 # Shared raw input for HILIC QC test runs
 RAW_DIR ?= data/raw_positive
@@ -66,15 +73,16 @@ help:
 	@echo "  make test-unit"
 	@echo "  make test-workflow-targeted"
 	@echo "  make test-workflow-untargeted"
-	@echo "  make test-workflow PYTHON=./venv/bin/python"
+	@echo "  make test-workflow"
+	@echo "  make test-workflow PYTHON=python3   # override default .venv"
 
 # ---------------------------------------------------------------------------
 # Unit tests
 # ---------------------------------------------------------------------------
 
 test-unit:
-	@echo "=== Config loader unit tests ==="
-	PYTHONPATH=src $(PYTHON) -m pytest tests/test_config.py -q
+	@echo "=== Unit tests (Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')) ==="
+	PYTHONPATH=src $(PYTHON) -m pytest tests/test_config.py tests/test_polarity.py -q
 	@echo "=== Unit tests PASSED ==="
 
 # ---------------------------------------------------------------------------
@@ -131,6 +139,11 @@ test-workflow-targeted: check-test-data
 		echo "Error: targeted config missing: $(TARGETED_CONFIG)"; \
 		exit 1; \
 	fi
+	@if [ ! -x "$(PYTHON)" ] && ! command -v "$(PYTHON)" >/dev/null 2>&1; then \
+		echo "Error: Python not found: $(PYTHON)"; \
+		echo "Create the repo venv (.venv) or set PYTHON=..."; \
+		exit 1; \
+	fi
 	@echo "=== Targeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "Config: $(TARGETED_CONFIG)  (--once --force-reprocess)"
@@ -141,6 +154,11 @@ test-workflow-targeted: check-test-data
 test-workflow-untargeted: check-test-data
 	@if [ ! -f "$(UNTARGETED_CONFIG)" ]; then \
 		echo "Error: untargeted config missing: $(UNTARGETED_CONFIG)"; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(PYTHON)" ] && ! command -v "$(PYTHON)" >/dev/null 2>&1; then \
+		echo "Error: Python not found: $(PYTHON)"; \
+		echo "Create the repo venv (.venv) or set PYTHON=..."; \
 		exit 1; \
 	fi
 	@echo "=== Untargeted workflow test ==="
