@@ -45,16 +45,26 @@ dev = [
 ]
 
 [project.scripts]
-metabwatch = "pipeline:main"
+metabwatch = "metabwatch.pipeline:main"
 
+# Map import name `metabwatch` → on-disk tree `src/` (no nested src/metabwatch/).
+# So `from metabwatch.processor import ...` loads src/processor/, etc.
 [tool.setuptools.package-dir]
-"" = "src"
+metabwatch = "src"
 
 [tool.setuptools]
-py-modules = ["config", "pipeline", "targeted_search_for_standards"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
+packages = [
+    "metabwatch",
+    "metabwatch.output",
+    "metabwatch.pipeline_queue",
+    "metabwatch.processor",
+    "metabwatch.state",
+    "metabwatch.synthesis",
+    "metabwatch.watcher",
+]
 
 [tool.setuptools.package-data]
-synthesis = ["templates/*"]
+"metabwatch.synthesis" = ["templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

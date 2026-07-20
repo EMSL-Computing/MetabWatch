@@ -192,16 +192,16 @@ _LEGACY_MARKERS = frozenset({
 })
 
 
-def _resolve_path(repo_root: Path, value: str | Path) -> Path:
-    """Resolve a path string against the repository root.
+def _resolve_path(base_dir: Path, value: str | Path) -> Path:
+    """Resolve a path string against ``base_dir``.
 
     Absolute paths are returned as-is (after ``Path`` conversion). Relative
-    paths are joined to ``repo_root``.
+    paths are joined to ``base_dir``.
     """
     path = Path(value)
     if path.is_absolute():
         return path
-    return repo_root / path
+    return base_dir / path
 
 
 def _require_str(payload: dict[str, Any], key: str, *, context: str) -> str:
@@ -439,25 +439,25 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
 
 def _build_pipeline_config(
     normalized: _NormalizedConfig,
-    repo_root: Path,
+    base_dir: Path,
 ) -> PipelineConfig:
     """Build the runtime :class:`PipelineConfig` from normalized fields."""
-    output_dir = _resolve_path(repo_root, normalized.output_dir)
-    params_path = _resolve_path(repo_root, normalized.params_path)
-    raw_dir = _resolve_path(repo_root, normalized.raw_dir)
+    output_dir = _resolve_path(base_dir, normalized.output_dir)
+    params_path = _resolve_path(base_dir, normalized.params_path)
+    raw_dir = _resolve_path(base_dir, normalized.raw_dir)
 
     if normalized.mode == "untargeted":
         search_space_csv = output_dir / "untargeted_search_space.csv"
         if normalized.standards_csv is None:
             standards_csv_path = search_space_csv
         else:
-            standards_csv_path = _resolve_path(repo_root, normalized.standards_csv)
+            standards_csv_path = _resolve_path(base_dir, normalized.standards_csv)
     else:
         if normalized.standards_csv is None:
             raise ValueError(
                 "standards CSV path is required when mode is 'targeted'"
             )
-        standards_csv_path = _resolve_path(repo_root, normalized.standards_csv)
+        standards_csv_path = _resolve_path(base_dir, normalized.standards_csv)
         search_space_csv = standards_csv_path
 
     return PipelineConfig(
@@ -501,18 +501,23 @@ def _build_pipeline_config(
     )
 
 
-def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
+def load_pipeline_config(
+    config_path: Path,
+    base_dir: Path | None = None,
+) -> PipelineConfig:
     """Load pipeline configuration from a JSON file.
 
     Accepts either the simplified flat schema or the legacy nested schema.
-    Relative paths in the JSON are resolved against ``repo_root``.
+    Relative paths in the JSON are resolved against ``base_dir`` (default:
+    the process current working directory).
 
     Parameters
     ----------
     config_path : Path
         Path to the JSON configuration file.
-    repo_root : Path
-        Repository root used to resolve relative paths present in the JSON.
+    base_dir : Path | None
+        Directory used to resolve relative paths present in the JSON.
+        Defaults to ``Path.cwd()``.
 
     Returns
     -------
@@ -525,10 +530,12 @@ def load_pipeline_config(config_path: Path, repo_root: Path) -> PipelineConfig:
     if not isinstance(payload, dict):
         raise ValueError("Config JSON root must be an object")
 
+    root = Path.cwd() if base_dir is None else base_dir
+
     fmt = _detect_config_format(payload)
     if fmt == "simplified":
         normalized = _normalize_simplified(payload)
     else:
         normalized = _normalize_legacy(payload)
 
-    return _build_pipeline_config(normalized, repo_root)
+    return _build_pipeline_config(normalized, root)

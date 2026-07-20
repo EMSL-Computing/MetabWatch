@@ -22,16 +22,17 @@
 
 Required fields: `input_folder`, `output_folder`, `corems_params`, `targeted`, `sample_name_regex`, and (when `targeted` is `true`) `qc_compounds`. Optional: `mz_tolerance_ppm`, `rt_tolerance`, `min_area`, and other advanced knobs (see [docs/pipeline-reference.md](docs/pipeline-reference.md)).
 
-2. Start the watcher:
+2. Install (editable) and start the watcher:
 
 ```bash
-python src/pipeline.py --mode watch --config data/hilic_pipeline_config.json
+pip install -e .
+metabwatch --mode watch --config data/hilic_pipeline_config.json
 ```
 
-Or, after `pip install -e .`:
+Or as a module:
 
 ```bash
-metabwatch --mode watch --config data/hilic_pipeline_config.json
+python -m metabwatch.pipeline --mode watch --config data/hilic_pipeline_config.json
 ```
 
 3. Drop new `.raw` files into the configured raw directory (`input_folder`).
@@ -39,11 +40,17 @@ metabwatch --mode watch --config data/hilic_pipeline_config.json
 
 The watcher avoids duplicate processing by tracking file status in `pipeline_manifest.json`.
 
+### One polarity per run
+
+Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). The first successfully processed sample writes that polarity into `pipeline_manifest.json`; later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
+
+The dashboard header shows the run polarity (and warns if legacy mixed outputs are present).
+
 ## What You Get
 
 - A per-sample matches CSV (`*_targeted_matches.csv`)
 - A per-sample MS1 trace CSV (`*_ms1_traces.csv`)
-- A refreshed compound dashboard (`dashboard.html`)
+- A refreshed compound dashboard (`dashboard.html`) with polarity labeled
 - Per-compound pages in `compounds/`
 - Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`
 
