@@ -65,6 +65,9 @@ class ProcessorConfig:
     cluster_mass_features: bool = False
 
 
+DISCOVERY_MODES = frozenset({"hybrid", "watchdog", "poll"})
+
+
 @dataclass(frozen=True)
 class WatcherConfig:
     """Configuration for the raw-file watcher.
@@ -72,18 +75,25 @@ class WatcherConfig:
     Parameters
     ----------
     raw_dir : Path
-        Directory to poll for incoming ``.raw`` files.
+        Directory to watch for incoming ``.raw`` files.
     poll_interval_sec : float
-        Seconds between poll cycles.
+        Seconds between poll cycles (full-directory scan interval in
+        ``poll`` / ``hybrid`` modes; unused for full scans in pure
+        ``watchdog`` mode).
     stability_wait_sec : float
         Number of seconds a file must remain unchanged to be treated as stable.
     sample_name_regex : str | None
         Optional regex applied to raw filename stem to decide processing.
+    discovery_mode : str
+        How new files are discovered: ``hybrid`` (watchdog + fallback poll,
+        default), ``watchdog`` (FS events + startup scan only), or ``poll``
+        (periodic directory scan only).
     """
     raw_dir: Path
     poll_interval_sec: float = 10.0
     stability_wait_sec: float = 20.0
     sample_name_regex: str | None = None
+    discovery_mode: str = "hybrid"
 
 
 @dataclass(frozen=True)
@@ -279,6 +289,19 @@ def _optional_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
     return bool(payload[key])
 
 
+def _normalize_discovery_mode(value: Any, *, context: str) -> str:
+    """Return a validated discovery mode string."""
+    if value is None:
+        return "hybrid"
+    mode = str(value).strip().lower()
+    if mode not in DISCOVERY_MODES:
+        allowed = ", ".join(sorted(DISCOVERY_MODES))
+        raise ValueError(
+            f"{context}: discovery_mode must be one of {{{allowed}}}, got {value!r}"
+        )
+    return mode
+
+
 @dataclass(frozen=True)
 class _NormalizedConfig:
     """Intermediate field bag shared by simplified and legacy loaders."""
@@ -299,6 +322,7 @@ class _NormalizedConfig:
     cluster_mass_features: bool
     poll_interval_sec: float
     stability_wait_sec: float
+    discovery_mode: str
     debounce_sec: float
     stale_in_progress_sec: int
     max_retries: int
@@ -356,6 +380,9 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         ),
         poll_interval_sec=_optional_float(payload, "poll_interval_sec", 10.0),
         stability_wait_sec=_optional_float(payload, "stability_wait_sec", 20.0),
+        discovery_mode=_normalize_discovery_mode(
+            payload.get("discovery_mode"), context=context
+        ),
         debounce_sec=_optional_float(payload, "debounce_sec", 5.0),
         stale_in_progress_sec=_optional_int(payload, "stale_in_progress_sec", 3600),
         max_retries=_optional_int(payload, "max_retries", 3),
@@ -429,6 +456,9 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
         ),
         poll_interval_sec=float(watcher.get("poll_interval_sec", 10.0)),
         stability_wait_sec=float(watcher.get("stability_wait_sec", 20.0)),
+        discovery_mode=_normalize_discovery_mode(
+            watcher.get("discovery_mode"), context="legacy config watcher"
+        ),
         debounce_sec=float(synthesizer.get("debounce_sec", 5.0)),
         stale_in_progress_sec=int(payload.get("stale_in_progress_sec", 3600)),
         max_retries=int(payload.get("max_retries", 3)),
@@ -478,6 +508,7 @@ def _build_pipeline_config(
             poll_interval_sec=normalized.poll_interval_sec,
             stability_wait_sec=normalized.stability_wait_sec,
             sample_name_regex=normalized.sample_name_regex,
+            discovery_mode=normalized.discovery_mode,
         ),
         state=StateConfig(
             pipeline_manifest=output_dir / "pipeline_manifest.json",

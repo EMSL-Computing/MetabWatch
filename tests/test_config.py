@@ -91,6 +91,63 @@ def test_simplified_untargeted_without_qc_compounds(
     assert cfg.processor.min_area == 5e3
     assert cfg.processor.plot_tic is True
     assert cfg.watcher.poll_interval_sec == 10.0
+    assert cfg.watcher.discovery_mode == "hybrid"
+
+
+def test_discovery_mode_explicit_poll(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "poll_mode.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "discovery_mode": "poll",
+        },
+    )
+
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.watcher.discovery_mode == "poll"
+
+
+def test_discovery_mode_invalid_raises(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "bad_mode.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "discovery_mode": "notify",
+        },
+    )
+
+    with pytest.raises(ValueError, match="discovery_mode"):
+        load_pipeline_config(config_path, project_root)
+
+
+def test_legacy_discovery_mode(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "legacy_watchdog.json",
+        {
+            "processor": {
+                "standards_csv": "data/qc_search_space/hilic_qc_search.csv",
+                "params_path": "data/corems_params/params.toml",
+                "output_dir": "data/results_hilic_pos",
+            },
+            "watcher": {
+                "raw_dir": "data/raw_positive",
+                "discovery_mode": "WATCHDOG",
+            },
+        },
+    )
+
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.watcher.discovery_mode == "watchdog"
 
 
 def test_simplified_targeted_missing_qc_compounds_raises(

@@ -38,7 +38,7 @@ python -m metabwatch.pipeline --mode watch --config data/hilic_pipeline_config.j
 3. Drop new `.raw` files into the configured raw directory (`input_folder`).
 4. Open the generated dashboard at the output path in your config (for the HILIC example: `data/results_hilic_pos/dashboard.html`).
 
-The watcher avoids duplicate processing by tracking file status in `pipeline_manifest.json`.
+The watcher detects new files via filesystem notifications (`watchdog`) with a periodic directory-scan fallback (`discovery_mode`: `hybrid` by default). Files are processed only after they remain unchanged for `stability_wait_sec` (Thermo creation events fire before writing finishes). Duplicate processing is avoided via `pipeline_manifest.json`. Use `"discovery_mode": "poll"` to restore pure polling, or `"watchdog"` for events-only after startup reconciliation.
 
 ### One polarity per run
 
