@@ -212,6 +212,7 @@ class HTMLSynthesizer:
                     observed_mz = pd.to_numeric(row.get("observed_mz"), errors="coerce")
                     observed_rt = pd.to_numeric(row.get("observed_rt"), errors="coerce")
                     intensity = pd.to_numeric(row.get("intensity"), errors="coerce")
+                    area = pd.to_numeric(row.get("area"), errors="coerce")
                     target_mz = pd.to_numeric(row.get("target_mz"), errors="coerce")
                     target_rt = pd.to_numeric(row.get("target_rt"), errors="coerce")
                     mz_error_ppm = pd.to_numeric(row.get("mz_error_ppm"), errors="coerce")
@@ -226,6 +227,7 @@ class HTMLSynthesizer:
                         "observed_mz": float(observed_mz) if not pd.isna(observed_mz) else None,
                         "observed_rt": float(observed_rt) if not pd.isna(observed_rt) else None,
                         "intensity": float(intensity) if not pd.isna(intensity) else None,
+                        "area": float(area) if not pd.isna(area) else None,
                         "target_mz": float(target_mz) if not pd.isna(target_mz) else None,
                         "target_rt": float(target_rt) if not pd.isna(target_rt) else None,
                         "mz_error_ppm": float(mz_error_ppm) if not pd.isna(mz_error_ppm) else None,
@@ -260,6 +262,7 @@ class HTMLSynthesizer:
                         "observed_mz": metric["observed_mz"] if metric else None,
                         "observed_rt": metric["observed_rt"] if metric else None,
                         "intensity": metric["intensity"] if metric else None,
+                        "area": metric["area"] if metric else None,
                         "target_mz": metric["target_mz"] if metric else None,
                         "target_rt": metric["target_rt"] if metric else None,
                         "mz_error_ppm": metric["mz_error_ppm"] if metric else None,
@@ -791,10 +794,12 @@ class HTMLSynthesizer:
             ppm_values = [row.get("mz_error_ppm") for row in series]
             rt_error_values = [row.get("rt_error") for row in series]
             intensity_values = [row.get("intensity") for row in series]
+            area_values = [row.get("area") for row in series]
 
             avg_ppm, _ = self._mean_cv(ppm_values)
             avg_rt_error, _ = self._mean_cv(rt_error_values)
             _, intensity_cv = self._mean_cv(intensity_values)
+            _, area_cv = self._mean_cv(area_values)
 
             target_mz = self._first_number([row.get("target_mz") for row in series])
             target_rt = self._first_number([row.get("target_rt") for row in series])
@@ -805,6 +810,8 @@ class HTMLSynthesizer:
             avg_rt_error_text = f"{avg_rt_error:.4f}" if avg_rt_error is not None else "n/a"
             intensity_cv_text = f"{intensity_cv:.2f}%" if intensity_cv is not None else "n/a"
             intensity_cv_style = " style='color:#b42318;font-weight:700;'" if intensity_cv is not None and intensity_cv > 30.0 else ""
+            area_cv_text = f"{area_cv:.2f}%" if area_cv is not None else "n/a"
+            area_cv_style = " style='color:#b42318;font-weight:700;'" if area_cv is not None and area_cv > 30.0 else ""
 
             rows.append(
                 "<tr>"
@@ -815,10 +822,11 @@ class HTMLSynthesizer:
                 f"<td>{avg_ppm_text}</td>"
                 f"<td>{avg_rt_error_text}</td>"
                 f"<td{intensity_cv_style}>{intensity_cv_text}</td>"
+                f"<td{area_cv_style}>{area_cv_text}</td>"
                 "</tr>"
             )
 
-        table_rows = "\n".join(rows) if rows else "<tr><td colspan='7'>No compounds detected yet.</td></tr>"
+        table_rows = "\n".join(rows) if rows else "<tr><td colspan='8'>No compounds detected yet.</td></tr>"
         if self.untargeted_mode:
             mz_plot, rt_plot = self._build_landing_qc_plots_untargeted(
                 samples=samples, compounds=compounds
@@ -908,6 +916,7 @@ class HTMLSynthesizer:
                     <th title="{escape(_avg_ppm_tooltip)}">Avg ppm</th>
                     <th title="{escape(_avg_rt_tooltip)}">Avg RT Error (min)</th>
                     <th>Intensity CV</th>
+                    <th>Area CV</th>
                 </tr>
       </thead>
       <tbody>
@@ -948,6 +957,7 @@ class HTMLSynthesizer:
         rt_values = [row["observed_rt"] for row in series]
         rt_error_values = [row.get("rt_error") for row in series]
         intensity_values = [row["intensity"] for row in series]
+        area_values = [row.get("area") for row in series]
 
         target_rt_values = [row.get("target_rt") for row in series if row.get("target_rt") is not None]
         target_rt = target_rt_values[0] if target_rt_values else None
@@ -1047,6 +1057,7 @@ class HTMLSynthesizer:
         ppm_mean, ppm_cv = self._mean_cv(ppm_values)
         rt_mean, rt_cv = self._mean_cv(rt_values)
         intensity_mean, intensity_cv = self._mean_cv(intensity_values)
+        area_mean, area_cv = self._mean_cv(area_values)
 
         ppm_summary = (
             f"Avg ppm: {ppm_mean:.3f}<br>PPM CV: {ppm_cv:.2f}%"
@@ -1062,6 +1073,11 @@ class HTMLSynthesizer:
             f"Avg intensity: {intensity_mean:.4g}<br>Intensity CV: {intensity_cv:.2f}%"
             if intensity_mean is not None and intensity_cv is not None
             else "Avg intensity: n/a<br>Intensity CV: n/a"
+        )
+        area_summary = (
+            f"Avg area: {area_mean:.4g}<br>Area CV: {area_cv:.2f}%"
+            if area_mean is not None and area_cv is not None
+            else "Avg area: n/a<br>Area CV: n/a"
         )
 
         shapes = [
@@ -1130,7 +1146,7 @@ class HTMLSynthesizer:
                 "bgcolor": "rgba(255,255,255,0.82)",
                 "bordercolor": "#dde3dc",
                 "borderwidth": 1,
-                "text": intensity_summary,
+                "text": intensity_summary + "<br>" + area_summary,
                 "font": {"size": 11},
             },
         ]
@@ -1333,11 +1349,12 @@ class HTMLSynthesizer:
     ) -> dict[str, Path]:
         """Write wide-style pivot CSVs (feature rows × sample columns).
 
-        Produces three files next to the dashboard:
+        Produces four files next to the dashboard:
 
         - ``export_mz.csv`` — observed m/z per sample
         - ``export_rt.csv`` — observed retention time (min) per sample
         - ``export_height.csv`` — peak maximum intensity (height) per sample
+        - ``export_area.csv`` — integrated peak area per sample
 
         Parameters
         ----------
@@ -1349,13 +1366,14 @@ class HTMLSynthesizer:
         Returns
         -------
         dict[str, Path]
-            Mapping of export label (``mz``, ``rt``, ``height``) to written path.
+            Mapping of export label (``mz``, ``rt``, ``height``, ``area``) to written path.
         """
         sample_names = [sample["sample"] for sample in samples]
         metric_fields = {
             "mz": "observed_mz",
             "rt": "observed_rt",
             "height": "intensity",
+            "area": "area",
         }
         export_dir = self.html_output.parent
         written: dict[str, Path] = {}

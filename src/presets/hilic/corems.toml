@@ -1,7 +1,7 @@
 [LiquidChromatograph]
 scans = [ -1, -1,]
 eic_tolerance_ppm = 5.0
-smooth_window = 12
+smooth_window = 9
 smooth_method = "savgol"
 implemented_smooth_method = [ "savgol", "hanning", "blackman", "bartlett", "flat", "boxcar",]
 savgol_pol_order = 2
@@ -9,7 +9,7 @@ consecutive_scan_min = 5
 peak_height_max_percent = 10.0
 peak_max_prominence_percent = 1.0
 peak_derivative_threshold = 0.0005
-min_peak_datapoints = 5.0
+min_peak_datapoints = 2.0
 noise_threshold_method = "manual_relative_abundance"
 noise_threshold_methods_implemented = [ "auto_relative_abundance", "manual_relative_abundance", "second_derivative",]
 peak_height_min_percent = 0.1

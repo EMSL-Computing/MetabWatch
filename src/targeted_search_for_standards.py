@@ -249,7 +249,7 @@ def process_raw_to_observed_features_df(
     min_area: float = 1e4,
     plot_eics: bool = True,
     plot_tic: bool = True,
-    integrate_mass_features: bool = False,
+    integrate_mass_features: bool = True,
     cluster_mass_features: bool = False,
     expected_polarity: str | None = None,
 ) -> pd.DataFrame:
@@ -355,10 +355,15 @@ def process_raw_to_observed_features_df(
 
     lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
     if integrate_mass_features:
-        lcms_obj.integrate_mass_features()
+        # Keep the full feature set: do not drop failed/duplicate peaks so
+        # intensity-based match selection stays stable vs pre-integration runs.
+        lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
     lcms_obj.add_associated_ms1()
     if cluster_mass_features:
         lcms_obj.cluster_mass_features()
+        # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
+        if integrate_mass_features:
+            lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     required_mf_columns = {"mz", "scan_time"}

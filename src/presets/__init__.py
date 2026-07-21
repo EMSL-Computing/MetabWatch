@@ -108,7 +108,7 @@ def build_pipeline_config(
         min_area=thr["min_area"],
         plot_eics=False,
         plot_tic=True,
-        integrate_mass_features=False,
+        integrate_mass_features=True,
         cluster_mass_features=False,
         poll_interval_sec=10.0,
         stability_wait_sec=20.0,
