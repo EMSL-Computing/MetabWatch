@@ -79,7 +79,8 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 | `top_n` | `100` | Peaks kept when untargeted |
 | `plot_eics` / `plot_tic` | `false` / `true` | Plot flags |
 | `integrate_mass_features` / `cluster_mass_features` | `false` | CoreMS feature flags |
-| `poll_interval_sec` / `stability_wait_sec` | `10` / `20` | Watcher timing |
+| `poll_interval_sec` / `stability_wait_sec` | `10` / `20` | Watcher timing (poll interval / file stability window) |
+| `discovery_mode` | `hybrid` | How new `.raw` files are found: `hybrid` (watchdog FS events + periodic full scan), `watchdog` (events + startup scan only), or `poll` (directory scan only) |
 | `debounce_sec` | `5.0` | Dashboard rebuild debounce |
 | `max_retries` / `initial_backoff_sec` / `backoff_multiplier` | `3` / `10` / `2` | Retry policy |
 | `stale_in_progress_sec` | `3600` | Stale in-progress threshold |
@@ -168,15 +169,30 @@ Example legacy watcher section:
   "raw_dir": "data/raw_positive",
   "poll_interval_sec": 10.0,
   "stability_wait_sec": 20.0,
+  "discovery_mode": "hybrid",
   "sample_name_regex": "Pos-(02|03)_"
 }
 ```
+
+### Discovery modes
+
+| Mode | Behavior |
+|------|----------|
+| `hybrid` (default) | `watchdog` filesystem notifications for immediate detection, plus a full directory scan every `poll_interval_sec` as a safety net (useful on NFS/SMB where events can be missed). |
+| `watchdog` | FS create/move events only after a **startup reconciliation** scan. No periodic full scan. Stability re-checks on a short tick. |
+| `poll` | Legacy behavior: full directory scan each `poll_interval_sec` (no observer). |
+
+In all modes:
+
+- A **startup reconciliation** scan registers `.raw` files that appeared while MetabWatch was not running.
+- **Stability** (`stability_wait_sec`) still applies: creation events fire before Thermo has necessarily finished writing the file. Size/mtime must stay unchanged for the stability window before processing.
+- `--once` always uses a single full scan and does **not** start the filesystem observer (deterministic smoke runs).
 
 ## Runtime Behavior
 
 The pipeline:
 
-1. Discovers stable new `.raw` files.
+1. Discovers new `.raw` candidates (FS events and/or directory scan), then waits until each is **stable**.
 2. Queues work with deduplication.
 3. Processes each file with retry/backoff.
 4. Writes/updates `pipeline_manifest.json` for idempotency.

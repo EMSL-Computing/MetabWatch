@@ -23,7 +23,7 @@ from metabwatch.processor import (
 )
 from metabwatch.state import ManifestStateStore
 from metabwatch.synthesis import HTMLSynthesizer
-from metabwatch.watcher import RawFileWatcher
+from metabwatch.watcher import RawDirectoryObserver, RawFileWatcher
 
 try:
     from tqdm import tqdm
@@ -286,6 +286,17 @@ def _process_one(
         backoff = backoff * retry_policy.backoff_multiplier
 
 
+def _discovery_mode_description(discovery_mode: str, poll_interval_sec: float) -> str:
+    if discovery_mode == "hybrid":
+        return (
+            f"discovery_mode=hybrid (watchdog + fallback poll every "
+            f"{poll_interval_sec}s)"
+        )
+    if discovery_mode == "watchdog":
+        return "discovery_mode=watchdog (FS events + startup scan)"
+    return f"discovery_mode=poll (directory scan every {poll_interval_sec}s)"
+
+
 def run_watch_mode(
     config: PipelineConfig,
     once: bool = False,
@@ -321,153 +332,198 @@ def run_watch_mode(
         print(f"Invalid watcher.sample_name_regex: {exc}")
         return 2
 
-    print(
-        "[watching] Monitoring for stable .raw files "
-        f"in {config.watcher.raw_dir}. Press Ctrl+C to exit."
-    )
+    discovery_mode = config.watcher.discovery_mode
+    # --once uses a full scan only (deterministic smoke tests; no observer).
+    use_observer = (not once) and discovery_mode in {"hybrid", "watchdog"}
+    # Full directory scan each cycle for poll/hybrid; pure watchdog relies on
+    # registered candidates after the startup reconcile below.
+    scan_each_cycle = once or discovery_mode in {"poll", "hybrid"}
 
-    if state_store.get_run_polarity():
-        print(f"[polarity] run locked to {state_store.get_run_polarity()} (from manifest)")
+    observer: RawDirectoryObserver | None = None
+    if use_observer:
+        observer = RawDirectoryObserver(recursive=False)
+        observer.start(config.watcher.raw_dir)
 
-    polarity_hard_stop_once = False
-    forced_enqueued: set[Path] = set()
+    try:
+        print(
+            "[watching] Monitoring for stable .raw files "
+            f"in {config.watcher.raw_dir} "
+            f"({_discovery_mode_description(discovery_mode, config.watcher.poll_interval_sec)}). "
+            "Press Ctrl+C to exit."
+        )
 
-    if force_reprocess or not state_store.has_entries():
-        bootstrap_files = watcher.list_current_raw_files()
-        if bootstrap_files:
-            if force_reprocess:
-                print(f"[bootstrap] force-reprocess enabled; enqueueing {len(bootstrap_files)} existing raw files")
-            else:
-                print(f"[bootstrap] first run detected; enqueueing {len(bootstrap_files)} existing raw files")
-        for raw_file in bootstrap_files:
-            if not _sample_allowed(raw_file, sample_regex):
-                print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
-                continue
-            if force_reprocess or state_store.should_process(raw_file):
-                queue.enqueue(raw_file)
-                forced_enqueued.add(raw_file)
-
-    state_store.recover_stale_in_progress()
-
-    while True:
-        for raw_file in watcher.get_stable_new_files():
-            if not _sample_allowed(raw_file, sample_regex):
-                print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
-                continue
-            if force_reprocess and raw_file in forced_enqueued:
-                continue
-            if not state_store.should_process(raw_file):
-                if force_reprocess:
-                    continue
-                continue
-            queue.enqueue(raw_file)
-            if force_reprocess:
-                forced_enqueued.add(raw_file)
-
-        batch: list[Path] = []
-        while queue.has_pending():
-            raw_file = queue.dequeue()
-            if raw_file is None:
-                break
-            batch.append(raw_file)
-
-        total = len(batch)
-        synthesized_this_cycle = False
-        mismatch_in_batch = False
-        for index, raw_file in enumerate(
-            tqdm(batch, total=total, unit="file", desc="Processing raw files"),
-            start=1,
-        ):
-            if mismatch_in_batch:
-                remaining = total - index + 1
-                print(
-                    f"[polarity] hard-stop: skipping {remaining} remaining "
-                    "file(s) in this batch due to mixed polarity"
-                )
-                for skipped in batch[index - 1 :]:
-                    print(
-                        f"[skipped] {skipped.name} (polarity hard-stop after mixed polarity)"
-                    )
-                break
-
-            print(f"[processing {index}/{total}] {raw_file.name}")
-            if (
-                config.search_space.mode == "untargeted"
-                and not config.search_space.csv_path.exists()
-                and state_store.get_attempts(raw_file) > retry_policy.max_retries
-            ):
-                print(
-                    f"[skipped] {raw_file.name} exceeded max_retries "
-                    f"({retry_policy.max_retries}) on untargeted search space build"
-                )
-                continue
-            try:
-                bootstrap_polarity = _ensure_untargeted_search_space(
-                    config=config,
-                    raw_file=raw_file,
-                    expected_polarity=state_store.get_run_polarity(),
-                )
-            except Exception as exc:
-                state_store.mark_in_progress(raw_file)
-                state_store.mark_failed(
-                    raw_file, f"untargeted search space build failed: {exc}"
-                )
-                print(
-                    f"[failed] {raw_file.name} untargeted search space build: {exc}"
-                )
-                if _is_polarity_mismatch(str(exc)):
-                    mismatch_in_batch = True
-                    polarity_hard_stop_once = True
-                continue
-
-            if bootstrap_polarity and state_store.get_run_polarity() is None:
-                state_store.set_run_polarity(bootstrap_polarity)
-                print(
-                    f"[polarity] run locked to {state_store.get_run_polarity()} "
-                    f"(from {raw_file.name})"
-                )
-
-            result = _process_one(
-                raw_file=raw_file,
-                orchestrator=orchestrator,
-                retry_policy=retry_policy,
-                state_store=state_store,
-                output_tracker=output_tracker,
+        if state_store.get_run_polarity():
+            print(
+                f"[polarity] run locked to {state_store.get_run_polarity()} (from manifest)"
             )
 
-            if result.status != "completed" and _is_polarity_mismatch(result.error):
-                mismatch_in_batch = True
-                polarity_hard_stop_once = True
+        polarity_hard_stop_once = False
+        forced_enqueued: set[Path] = set()
 
-            # Refresh HTML + wide CSV exports immediately after each completed
-            # sample (same artifacts the end-of-batch synthesizer would write).
-            if result.status == "completed":
+        # Startup reconciliation: files written while MetabWatch was offline.
+        reconcile_files = watcher.list_current_raw_files()
+        watcher.register_many(reconcile_files)
+
+        if force_reprocess or not state_store.has_entries():
+            bootstrap_files = reconcile_files
+            if bootstrap_files:
+                if force_reprocess:
+                    print(
+                        f"[bootstrap] force-reprocess enabled; enqueueing "
+                        f"{len(bootstrap_files)} existing raw files"
+                    )
+                else:
+                    print(
+                        f"[bootstrap] first run detected; enqueueing "
+                        f"{len(bootstrap_files)} existing raw files"
+                    )
+            for raw_file in bootstrap_files:
+                if not _sample_allowed(raw_file, sample_regex):
+                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                    continue
+                if force_reprocess or state_store.should_process(raw_file):
+                    queue.enqueue(raw_file)
+                    forced_enqueued.add(raw_file)
+
+        state_store.recover_stale_in_progress()
+
+        while True:
+            if observer is not None:
+                watcher.register_many(observer.drain())
+
+            for raw_file in watcher.get_stable_new_files(
+                scan_directory=scan_each_cycle
+            ):
+                if not _sample_allowed(raw_file, sample_regex):
+                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                    continue
+                if force_reprocess and raw_file in forced_enqueued:
+                    continue
+                if not state_store.should_process(raw_file):
+                    if force_reprocess:
+                        continue
+                    continue
+                queue.enqueue(raw_file)
+                if force_reprocess:
+                    forced_enqueued.add(raw_file)
+
+            batch: list[Path] = []
+            while queue.has_pending():
+                raw_file = queue.dequeue()
+                if raw_file is None:
+                    break
+                batch.append(raw_file)
+
+            total = len(batch)
+            synthesized_this_cycle = False
+            mismatch_in_batch = False
+            for index, raw_file in enumerate(
+                tqdm(batch, total=total, unit="file", desc="Processing raw files"),
+                start=1,
+            ):
+                if mismatch_in_batch:
+                    remaining = total - index + 1
+                    print(
+                        f"[polarity] hard-stop: skipping {remaining} remaining "
+                        "file(s) in this batch due to mixed polarity"
+                    )
+                    for skipped in batch[index - 1 :]:
+                        print(
+                            f"[skipped] {skipped.name} "
+                            "(polarity hard-stop after mixed polarity)"
+                        )
+                    break
+
+                print(f"[processing {index}/{total}] {raw_file.name}")
+                if (
+                    config.search_space.mode == "untargeted"
+                    and not config.search_space.csv_path.exists()
+                    and state_store.get_attempts(raw_file) > retry_policy.max_retries
+                ):
+                    print(
+                        f"[skipped] {raw_file.name} exceeded max_retries "
+                        f"({retry_policy.max_retries}) on untargeted search space build"
+                    )
+                    continue
+                try:
+                    bootstrap_polarity = _ensure_untargeted_search_space(
+                        config=config,
+                        raw_file=raw_file,
+                        expected_polarity=state_store.get_run_polarity(),
+                    )
+                except Exception as exc:
+                    state_store.mark_in_progress(raw_file)
+                    state_store.mark_failed(
+                        raw_file, f"untargeted search space build failed: {exc}"
+                    )
+                    print(
+                        f"[failed] {raw_file.name} untargeted search space build: {exc}"
+                    )
+                    if _is_polarity_mismatch(str(exc)):
+                        mismatch_in_batch = True
+                        polarity_hard_stop_once = True
+                    continue
+
+                if bootstrap_polarity and state_store.get_run_polarity() is None:
+                    state_store.set_run_polarity(bootstrap_polarity)
+                    print(
+                        f"[polarity] run locked to {state_store.get_run_polarity()} "
+                        f"(from {raw_file.name})"
+                    )
+
+                result = _process_one(
+                    raw_file=raw_file,
+                    orchestrator=orchestrator,
+                    retry_policy=retry_policy,
+                    state_store=state_store,
+                    output_tracker=output_tracker,
+                )
+
+                if result.status != "completed" and _is_polarity_mismatch(result.error):
+                    mismatch_in_batch = True
+                    polarity_hard_stop_once = True
+
+                # Refresh HTML + wide CSV exports immediately after each completed
+                # sample (same artifacts the end-of-batch synthesizer would write).
+                if result.status == "completed":
+                    _run_synthesis(synthesizer, output_tracker)
+                    synthesized_this_cycle = True
+
+            # Debounced residual (e.g. late-settling events); also covers --once
+            # when no sample completed this pass but prior outputs still need a
+            # rebuild of dashboard/exports.
+            should_synthesize = output_tracker.synthesis_due() or (
+                once and total > 0 and not synthesized_this_cycle
+            )
+            if should_synthesize:
                 _run_synthesis(synthesizer, output_tracker)
                 synthesized_this_cycle = True
 
-        # Debounced residual (e.g. late-settling events); also covers --once
-        # when no sample completed this pass but prior outputs still need a
-        # rebuild of dashboard/exports.
-        should_synthesize = output_tracker.synthesis_due() or (
-            once and total > 0 and not synthesized_this_cycle
-        )
-        if should_synthesize:
-            _run_synthesis(synthesizer, output_tracker)
-            synthesized_this_cycle = True
+            if synthesized_this_cycle and not once:
+                print(
+                    "[watching] Waiting for new stable .raw files. Press Ctrl+C to exit."
+                )
+            elif not batch and not once:
+                print(
+                    "[watching] No new stable .raw files yet. Press Ctrl+C to exit."
+                )
 
-        if synthesized_this_cycle and not once:
-            print("[watching] Waiting for new stable .raw files. Press Ctrl+C to exit.")
-        elif not batch and not once:
-            print("[watching] No new stable .raw files yet. Press Ctrl+C to exit.")
+            if once:
+                break
 
-        if once:
-            break
+            if discovery_mode == "watchdog" and observer is not None:
+                # Wake early when FS events arrive; still tick for stability.
+                observer.event.wait(timeout=1.0)
+                observer.event.clear()
+            else:
+                time.sleep(config.watcher.poll_interval_sec)
 
-        time.sleep(config.watcher.poll_interval_sec)
-
-    if once and polarity_hard_stop_once:
-        return 1
-    return 0
+        if once and polarity_hard_stop_once:
+            return 1
+        return 0
+    finally:
+        if observer is not None:
+            observer.stop()
 
 
 def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
