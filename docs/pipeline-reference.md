@@ -121,7 +121,8 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 | `min_area` | `5000` | Minimum peak area |
 | `top_n` | `100` | Peaks kept when untargeted |
 | `plot_eics` / `plot_tic` | `false` / `true` | Plot flags |
-| `integrate_mass_features` / `cluster_mass_features` | `false` | CoreMS feature flags |
+| `integrate_mass_features` | `true` | Run CoreMS peak integration (required for area / Area CV; re-integrates after clustering when both are on) |
+| `cluster_mass_features` | `false` | Run CoreMS mass-feature clustering |
 | `poll_interval_sec` / `stability_wait_sec` | `10` / `20` | Watcher timing (poll interval / file stability window) |
 | `discovery_mode` | `hybrid` | How new `.raw` files are found: `hybrid` (watchdog FS events + periodic full scan), `watchdog` (events + startup scan only), or `poll` (directory scan only) |
 | `debounce_sec` | `5.0` | Dashboard rebuild debounce |
@@ -247,7 +248,7 @@ The pipeline:
 - `*_ms1_traces.csv`
 - `dashboard.html`
 - `compounds/<compound-slug>.html`
-- `export_mz.csv`, `export_rt.csv`, `export_height.csv` (wide pivots: one row per mass feature, one column per sample)
+- `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv` (wide pivots: one row per mass feature, one column per sample; area requires `integrate_mass_features`)
 - `pipeline_manifest.json`
 - `untargeted_search_space.csv` (untargeted mode only — generated from the first matching sample, reused on subsequent runs)
 

@@ -133,8 +133,11 @@ def build_untargeted_search_space(
     lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
 
     lcms_obj.find_mass_features()
-    lcms_obj.integrate_mass_features()
+    # Keep the full feature set: do not drop failed/duplicate peaks during integration.
+    lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
     lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
+    # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
+    lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     required = {"mz", "scan_time", "area"}

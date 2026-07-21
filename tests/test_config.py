@@ -90,6 +90,7 @@ def test_simplified_untargeted_without_qc_compounds(
     assert cfg.processor.rt_tolerance == 0.5
     assert cfg.processor.min_area == 5e3
     assert cfg.processor.plot_tic is True
+    assert cfg.processor.integrate_mass_features is True
     assert cfg.watcher.poll_interval_sec == 10.0
     assert cfg.watcher.discovery_mode == "hybrid"
 

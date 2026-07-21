@@ -61,7 +61,7 @@ class ProcessorConfig:
     min_area: float = 5e3
     plot_eics: bool = False
     plot_tic: bool = True
-    integrate_mass_features: bool = False
+    integrate_mass_features: bool = True
     cluster_mass_features: bool = False
 
 
@@ -373,7 +373,7 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         plot_eics=_optional_bool(payload, "plot_eics", False),
         plot_tic=_optional_bool(payload, "plot_tic", True),
         integrate_mass_features=_optional_bool(
-            payload, "integrate_mass_features", False
+            payload, "integrate_mass_features", True
         ),
         cluster_mass_features=_optional_bool(
             payload, "cluster_mass_features", False
@@ -449,7 +449,7 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
         plot_eics=bool(processor.get("plot_eics", False)),
         plot_tic=bool(processor.get("plot_tic", True)),
         integrate_mass_features=bool(
-            processor.get("integrate_mass_features", False)
+            processor.get("integrate_mass_features", True)
         ),
         cluster_mass_features=bool(
             processor.get("cluster_mass_features", False)

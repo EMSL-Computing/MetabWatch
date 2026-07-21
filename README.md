@@ -56,7 +56,7 @@ The dashboard header shows the run polarity (and warns if legacy mixed outputs a
 - A per-sample MS1 trace CSV (`*_ms1_traces.csv`)
 - A refreshed compound dashboard (`dashboard.html`) with polarity labeled
 - Per-compound pages in `compounds/`
-- Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`
+- Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv`
 
 ## Common Commands
 
