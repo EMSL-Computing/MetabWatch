@@ -1,11 +1,11 @@
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos",
-  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "corems_params": "src/presets/hilic/corems.toml",
   "targeted": true,
-  "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+  "qc_compounds": "src/presets/hilic/qc_compounds.csv",
   "sample_name_regex": "QC_Metab_(.+)",
-  "mz_tolerance_ppm": 4.0,
+  "mz_tolerance_ppm": 5.0,
   "rt_tolerance": 0.8,
   "min_area": 1000
 }

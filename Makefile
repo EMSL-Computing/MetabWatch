@@ -28,11 +28,12 @@ endif
 # Shared raw input for HILIC QC test runs
 RAW_DIR ?= data/raw_positive
 
-# Targeted defaults (data/)
-TARGETED_CONFIG      ?= data/hilic_pipeline_config.json
+# Targeted: built-in preset CLI (method + search + folders)
+METHOD ?= hilic
 TARGETED_RESULTS_DIR ?= data/results_hilic_pos
 
-# Untargeted defaults (data/)
+# Untargeted smoke: advanced JSON so fixtures named QC_Metab_* still match
+# (preset untargeted filter is "Pooled"; local smoke data uses QC_Metab_ stems).
 UNTARGETED_CONFIG      ?= data/hilic_pipeline_config_untargeted.json
 UNTARGETED_RESULTS_DIR ?= data/results_hilic_pos_untargeted
 
@@ -62,12 +63,14 @@ help:
 	@echo "Variables (override on the command line):"
 	@echo "  PYTHON=$(PYTHON)"
 	@echo "  RAW_DIR=$(RAW_DIR)"
-	@echo "  TARGETED_CONFIG=$(TARGETED_CONFIG)"
+	@echo "  METHOD=$(METHOD)   # hilic or rp (targeted smoke uses preset CLI)"
 	@echo "  TARGETED_RESULTS_DIR=$(TARGETED_RESULTS_DIR)"
-	@echo "  UNTARGETED_CONFIG=$(UNTARGETED_CONFIG)"
+	@echo "  UNTARGETED_CONFIG=$(UNTARGETED_CONFIG)  # advanced JSON for QC_Metab fixtures"
 	@echo "  UNTARGETED_RESULTS_DIR=$(UNTARGETED_RESULTS_DIR)"
 	@echo ""
 	@echo "Workflow tests always pass --once --force-reprocess (full end-to-end from raw)."
+	@echo "Targeted uses: metabwatch --method \$$METHOD --search targeted -i -o"
+	@echo "Untargeted smoke keeps --config (sample filter QC_Metab_*, not Pooled)."
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-unit"
@@ -82,7 +85,7 @@ help:
 
 test-unit:
 	@echo "=== Unit tests (Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')) ==="
-	$(PYTHON) -m pytest tests/test_config.py tests/test_polarity.py -q
+	$(PYTHON) -m pytest tests/test_config.py tests/test_presets.py tests/test_cli_presets.py tests/test_polarity.py -q
 	@echo "=== Unit tests PASSED ==="
 
 # ---------------------------------------------------------------------------
@@ -135,10 +138,6 @@ get-test-data:
 # ---------------------------------------------------------------------------
 
 test-workflow-targeted: check-test-data
-	@if [ ! -f "$(TARGETED_CONFIG)" ]; then \
-		echo "Error: targeted config missing: $(TARGETED_CONFIG)"; \
-		exit 1; \
-	fi
 	@if [ ! -x "$(PYTHON)" ] && ! command -v "$(PYTHON)" >/dev/null 2>&1; then \
 		echo "Error: Python not found: $(PYTHON)"; \
 		echo "Create the repo venv (.venv) or set PYTHON=..."; \
@@ -146,8 +145,11 @@ test-workflow-targeted: check-test-data
 	fi
 	@echo "=== Targeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
-	@echo "Config: $(TARGETED_CONFIG)  (--once --force-reprocess)"
-	$(PYTHON) -m metabwatch.pipeline --mode watch --config $(TARGETED_CONFIG) --once --force-reprocess
+	@echo "Preset: --method $(METHOD) --search targeted  (--once --force-reprocess)"
+	$(PYTHON) -m metabwatch.pipeline --mode watch \
+		--method $(METHOD) --search targeted \
+		--input $(RAW_DIR) --output $(TARGETED_RESULTS_DIR) \
+		--once --force-reprocess
 	@$(MAKE) verify-workflow-outputs RESULTS_DIR="$(TARGETED_RESULTS_DIR)"
 	@echo "=== Targeted workflow test PASSED ==="
 
@@ -172,7 +174,7 @@ test-workflow: test-workflow-targeted test-workflow-untargeted
 	@echo ""
 	@echo "========================================"
 	@echo " test-workflow: ALL CHECKS PASSED"
-	@echo "  targeted:   $(TARGETED_CONFIG) -> $(TARGETED_RESULTS_DIR)"
+	@echo "  targeted:   --method $(METHOD) --search targeted -> $(TARGETED_RESULTS_DIR)"
 	@echo "  untargeted: $(UNTARGETED_CONFIG) -> $(UNTARGETED_RESULTS_DIR)"
 	@echo "========================================"
 

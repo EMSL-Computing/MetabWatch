@@ -15,6 +15,7 @@ ensure_dotnet_runtime()
 from metabwatch.config import PipelineConfig, load_pipeline_config
 from metabwatch.output import OutputTracker
 from metabwatch.pipeline_queue import ProcessingQueue
+from metabwatch.presets import build_pipeline_config
 from metabwatch.processor import (
     ProcessResult,
     ProcessorOrchestrator,
@@ -625,10 +626,45 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     """
 
     parser = argparse.ArgumentParser(
-        description="MetabWatch: LC–MS QC watcher/processor pipeline"
+        description=(
+            "MetabWatch: LC–MS QC watcher/processor pipeline. "
+            "Prefer --method/--search/--input/--output for standard runs; "
+            "use --config for advanced JSON."
+        )
     )
     parser.add_argument("--mode", choices=["watch", "process"], default="watch")
-    parser.add_argument("--config", type=Path, required=True, help="Required JSON config path")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Advanced JSON config path (simplified or legacy nested)",
+    )
+    parser.add_argument(
+        "--method",
+        choices=["rp", "hilic"],
+        default=None,
+        help="Chromatography method for a standard preset run",
+    )
+    parser.add_argument(
+        "--search",
+        choices=["targeted", "untargeted"],
+        default=None,
+        help="Search mode for a standard preset run",
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        type=Path,
+        default=None,
+        help="Input folder of Thermo .raw files (preset path)",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=None,
+        help="Output folder for results (preset path)",
+    )
     parser.add_argument("--raw", type=Path, default=None, help="Raw file for process mode")
     parser.add_argument("--once", action="store_true", help="Run one watch iteration and exit")
     parser.add_argument(
@@ -637,6 +673,52 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Reprocess existing files even when manifest marks them completed (watch mode)",
     )
     return parser.parse_args(argv)
+
+
+def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
+    """Build a PipelineConfig from either preset flags or --config.
+
+    Raises
+    ------
+    ValueError
+        If flags are missing, mixed, or otherwise invalid.
+    """
+    preset_fields = [args.method, args.search, args.input, args.output]
+    using_preset = any(value is not None for value in preset_fields)
+    using_config = args.config is not None
+
+    if using_preset and using_config:
+        raise ValueError(
+            "Use either --config OR (--method --search --input --output), not both."
+        )
+    if using_config:
+        return load_pipeline_config(args.config)
+    if using_preset:
+        missing = [
+            name
+            for name, val in (
+                ("--method", args.method),
+                ("--search", args.search),
+                ("--input", args.input),
+                ("--output", args.output),
+            )
+            if val is None
+        ]
+        if missing:
+            raise ValueError(
+                "Preset mode requires --method, --search, --input, and --output. "
+                f"Missing: {', '.join(missing)}"
+            )
+        return build_pipeline_config(
+            args.method,
+            args.search,
+            args.input,
+            args.output,
+        )
+    raise ValueError(
+        "Provide --method/--search/--input/--output for a standard run, "
+        "or --config path.json for an advanced config."
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -654,7 +736,11 @@ def main(argv: list[str] | None = None) -> int:
     """
 
     args = parse_args(argv or sys.argv[1:])
-    config = load_pipeline_config(args.config)
+    try:
+        config = resolve_config_from_args(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     if args.mode == "process":
         if args.raw is None:

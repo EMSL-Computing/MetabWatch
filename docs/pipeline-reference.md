@@ -17,44 +17,87 @@ Install with `pip install -e .` from the repository root. Thermo raw support als
 
 After `pip install -e .`:
 
+### Standard path (presets)
+
 ```bash
-metabwatch --mode watch --config <config.json>
-# or:
-python -m metabwatch.pipeline --mode watch --config <config.json>
+metabwatch --method hilic --search targeted \
+  --input /path/to/raw --output /path/to/results
+# or short aliases:
+metabwatch --method rp --search untargeted -i RAW -o OUT
 ```
 
-Modes:
+| Flag | Values | Meaning |
+|------|--------|---------|
+| `--method` | `rp`, `hilic` | Chromatography method (selects CoreMS + QC assets) |
+| `--search` | `targeted`, `untargeted` | Search-space mode |
+| `--input` / `-i` | path | Folder of Thermo `.raw` files |
+| `--output` / `-o` | path | Results folder |
 
-- `watch`: poll for stable `.raw` files and process continuously
+Do **not** combine preset flags with `--config`.
+
+Runtime modes:
+
+- `watch` (default): discover stable `.raw` files and process continuously
 - `process`: process one explicit file via `--raw`
+
+### Advanced path (JSON config)
+
+```bash
+metabwatch --config <config.json>
+# or:
+python -m metabwatch.pipeline --config <config.json>
+```
+
+Simplified flat JSON and legacy nested schemas are both supported (see below).
+
+## Built-in presets
+
+Assets ship with the package under `metabwatch.presets` (`src/presets/`):
+
+| method | search | CoreMS | QC CSV | sample_name_regex | mz ppm | RT min | min_area |
+|--------|--------|--------|--------|-------------------|--------|--------|----------|
+| hilic | targeted | `hilic/corems.toml` | `hilic/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.8 | 1000 |
+| hilic | untargeted | `hilic/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.8 | 1000 |
+| rp | targeted | `rp/corems.toml` | `rp/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.4 | 20000 |
+| rp | untargeted | `rp/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.4 | 20000 |
+
 
 ## Example Commands
 
-Watch mode:
+Watch mode (preset):
 
 ```bash
-metabwatch --mode watch --config data/hilic_pipeline_config.json
+metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos
 ```
 
 One-shot watch loop:
 
 ```bash
-metabwatch --mode watch --config data/hilic_pipeline_config.json --once
+metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos --once
 ```
 
 Force reprocess:
+Allows reprocessing of previously processed files (overwrites existing results):
 
 ```bash
-metabwatch --mode watch --config data/hilic_pipeline_config.json --once --force-reprocess
+metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos \
+  --once --force-reprocess
 ```
 
 Single-file process mode:
 
 ```bash
-metabwatch --mode process --config data/hilic_pipeline_config.json --raw data/raw_positive/your_file.raw
+metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos \
+  --mode process --raw data/raw_positive/your_file.raw
 ```
 
-## Config Structure (Simplified — Preferred)
+Advanced JSON:
+
+```bash
+metabwatch --config data/hilic_pipeline_config.json
+```
+
+## Config Structure (Simplified — Advanced)
 
 Configs use a flat JSON schema. Relative paths resolve against the process working directory (override via ``base_dir`` when loading programmatically).
 
@@ -91,11 +134,11 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos",
-  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "corems_params": "src/presets/hilic/corems.toml",
   "targeted": true,
-  "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+  "qc_compounds": "src/presets/hilic/qc_compounds.csv",
   "sample_name_regex": "QC_Metab_(.+)",
-  "mz_tolerance_ppm": 4.0,
+  "mz_tolerance_ppm": 5.0,
   "rt_tolerance": 0.8,
   "min_area": 1000
 }
@@ -107,7 +150,7 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos_untargeted",
-  "corems_params": "data/corems_params/monet_hilic_corems_lcms_params.toml",
+  "corems_params": "src/presets/hilic/corems.toml",
   "targeted": false,
   "sample_name_regex": "QC_Metab_(.+)",
   "top_n": 100
