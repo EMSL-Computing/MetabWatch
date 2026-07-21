@@ -780,6 +780,101 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
+    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
+        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+
+        Uses the same ``_mean_cv`` definition as the compound index table.
+        Compounds missing area values contribute only to the intensity series.
+        """
+        intensity_cvs: list[float] = []
+        area_cvs: list[float] = []
+
+        for compound_name in sorted(compounds):
+            series = compounds[compound_name]["samples"]
+            if not series:
+                continue
+            _, intensity_cv = self._mean_cv([row.get("intensity") for row in series])
+            _, area_cv = self._mean_cv([row.get("area") for row in series])
+            if intensity_cv is not None:
+                intensity_cvs.append(float(intensity_cv))
+            if area_cv is not None:
+                area_cvs.append(float(area_cv))
+
+        all_cvs = intensity_cvs + area_cvs
+        bin_size = 5.0
+        if all_cvs:
+            x_max = max(all_cvs)
+            # Pad to the next bin boundary so the largest value is fully inside.
+            x_end = max(bin_size, (int(x_max / bin_size) + 1) * bin_size)
+        else:
+            x_end = 50.0
+
+        xbins = {"start": 0.0, "end": float(x_end), "size": bin_size}
+        data: list[dict] = [
+            {
+                "type": "histogram",
+                "name": "Intensity CV",
+                "x": intensity_cvs,
+                "opacity": 0.55,
+                "marker": {"color": "#8a3d2b"},
+                "xbins": xbins,
+                "hovertemplate": "Intensity CV bin: %{x}<br>Count: %{y}<extra></extra>",
+            },
+            {
+                "type": "histogram",
+                "name": "Area CV",
+                "x": area_cvs,
+                "opacity": 0.55,
+                "marker": {"color": "#2c7f6d"},
+                "xbins": xbins,
+                "hovertemplate": "Area CV bin: %{x}<br>Count: %{y}<extra></extra>",
+            },
+        ]
+
+        return {
+            "data": data,
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "barmode": "overlay",
+                "showlegend": True,
+                "title": {"text": "Reproducibility overview (CV)"},
+                "xaxis": {
+                    "title": "CV (%)",
+                    "range": [0, float(x_end)],
+                },
+                "yaxis": {"title": "Number of compounds"},
+                "shapes": [
+                    {
+                        "type": "line",
+                        "x0": 30,
+                        "x1": 30,
+                        "y0": 0,
+                        "y1": 1,
+                        "yref": "paper",
+                        "line": {
+                            "color": "#b42318",
+                            "width": 1.5,
+                            "dash": "dash",
+                        },
+                    }
+                ],
+                "annotations": [
+                    {
+                        "x": 30,
+                        "y": 1,
+                        "yref": "paper",
+                        "text": "30% threshold",
+                        "showarrow": False,
+                        "xanchor": "left",
+                        "yanchor": "bottom",
+                        "font": {"size": 11, "color": "#b42318"},
+                        "xshift": 4,
+                    }
+                ],
+            },
+        }
+
     def _render_index(
         self,
         samples: list[dict],
@@ -835,6 +930,8 @@ class HTMLSynthesizer:
             mz_plot, rt_plot = self._build_landing_qc_plots(
                 samples=samples, compounds=compounds
             )
+        cv_plot = self._build_landing_cv_histogram(compounds)
+        cv_json = json.dumps(cv_plot)
         mz_json = json.dumps(mz_plot)
         rt_json = json.dumps(rt_plot)
 
@@ -899,6 +996,9 @@ class HTMLSynthesizer:
     <p>Generated: {escape(generated_at)}</p>
     {self._polarity_meta_html(polarity_label)}
 
+        <h2 class=\"section-title\">Reproducibility overview (CV)</h2>
+        <div id=\"landing-cv\"></div>
+
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>
 
@@ -925,8 +1025,10 @@ class HTMLSynthesizer:
     </table>
   </section>
     <script>
+        const cvPlot = {cv_json};
         const mzPlot = {mz_json};
         const rtPlot = {rt_json};
+        Plotly.newPlot('landing-cv', cvPlot.data, cvPlot.layout, {{responsive: true}});
         Plotly.newPlot('landing-mz', mzPlot.data, mzPlot.layout, {{responsive: true}});
         Plotly.newPlot('landing-rt', rtPlot.data, rtPlot.layout, {{responsive: true}});
     </script>
