@@ -24,7 +24,7 @@ class MetabWatchApp(ttk.Frame):
         self.runner = PipelineRunner()
 
         self.source_var = tk.StringVar(value="preset")
-        self.method_var = tk.StringVar(value="hilic")
+        self.method_var = tk.StringVar(value="hilic_metab_pnnl")
         self.search_var = tk.StringVar(value="targeted")
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
@@ -94,20 +94,20 @@ class MetabWatchApp(ttk.Frame):
         method_frame.grid(row=prow, column=1, sticky="w", pady=2)
         self.method_hilic = ttk.Radiobutton(
             method_frame,
-            text="HILIC",
+            text="PNNL Standard HILIC Metabolomics Method",
             variable=self.method_var,
-            value="hilic",
+            value="hilic_metab_pnnl",
             command=self._update_summary,
         )
-        self.method_hilic.pack(side=tk.LEFT, padx=(0, 12))
+        self.method_hilic.pack(side=tk.TOP, anchor="w")
         self.method_rp = ttk.Radiobutton(
             method_frame,
-            text="RP",
+            text="PNNL Standard RP Metabolomics Method",
             variable=self.method_var,
-            value="rp",
+            value="rp_metab_pnnl",
             command=self._update_summary,
         )
-        self.method_rp.pack(side=tk.LEFT)
+        self.method_rp.pack(side=tk.TOP, anchor="w")
         prow += 1
 
         ttk.Label(self.preset_frame, text="Search").grid(

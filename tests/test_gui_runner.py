@@ -17,7 +17,7 @@ def _preset_request(tmp_path: Path, *, once: bool = True) -> GuiRunRequest:
     raw.mkdir(exist_ok=True)
     return GuiRunRequest(
         source="preset",
-        method="hilic",
+        method="hilic_metab_pnnl",
         search="targeted",
         input_folder=str(raw),
         output_folder=str(tmp_path / "out"),
@@ -113,13 +113,13 @@ def test_resolve_matches_preset_api(tmp_path: Path) -> None:
     raw = tmp_path / "raw"
     raw.mkdir()
     out = tmp_path / "out"
-    direct = build_pipeline_config("hilic", "targeted", raw, out)
+    direct = build_pipeline_config("hilic_metab_pnnl", "targeted", raw, out)
     from metabwatch.gui.validation import resolve_config
 
     via_gui = resolve_config(
         GuiRunRequest(
             source="preset",
-            method="hilic",
+            method="hilic_metab_pnnl",
             search="targeted",
             input_folder=str(raw),
             output_folder=str(out),

@@ -17,12 +17,12 @@ ConfigSource = Literal["preset", "json"]
 
 # Read-only preset summary for the GUI (mirrors presets._THRESHOLDS / regex).
 PRESET_SUMMARIES: dict[str, dict[str, str]] = {
-    "hilic": {
+    "hilic_metab_pnnl": {
         "mz_tolerance_ppm": "5",
         "rt_tolerance": "0.8",
         "min_area": "1000",
     },
-    "rp": {
+    "rp_metab_pnnl": {
         "mz_tolerance_ppm": "5",
         "rt_tolerance": "0.4",
         "min_area": "20000",
@@ -51,7 +51,7 @@ class GuiRunRequest:
 
 def preset_summary_text(method: str, search: str) -> str:
     """Return a one-line description of built-in preset defaults."""
-    thr = PRESET_SUMMARIES.get(method.lower(), PRESET_SUMMARIES["hilic"])
+    thr = PRESET_SUMMARIES.get(method.lower(), PRESET_SUMMARIES["hilic_metab_pnnl"])
     filt = SAMPLE_FILTER_LABELS.get(search.lower(), SAMPLE_FILTER_LABELS["targeted"])
     return (
         f"Defaults: m/z {thr['mz_tolerance_ppm']} ppm · "
@@ -64,8 +64,8 @@ def preset_summary_text(method: str, search: str) -> str:
 def validate_request(req: GuiRunRequest) -> str | None:
     """Return an error message if the request is invalid, else None."""
     if req.source == "preset":
-        if not req.method or req.method not in {"hilic", "rp"}:
-            return "Select a method (HILIC or RP)."
+        if not req.method or req.method not in {"hilic_metab_pnnl", "rp_metab_pnnl"}:
+            return "Select a method (PNNL Standard HILIC or RP Metabolomics)."
         if not req.search or req.search not in {"targeted", "untargeted"}:
             return "Select a search mode (Targeted or Untargeted)."
         input_text = (req.input_folder or "").strip()

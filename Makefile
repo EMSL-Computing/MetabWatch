@@ -29,7 +29,7 @@ endif
 RAW_DIR ?= data/raw_positive
 
 # Targeted: built-in preset CLI (method + search + folders)
-METHOD ?= hilic
+METHOD ?= hilic_metab_pnnl
 TARGETED_RESULTS_DIR ?= data/results_hilic_pos
 
 # Untargeted smoke: advanced JSON so fixtures named QC_Metab_* still match
@@ -63,7 +63,7 @@ help:
 	@echo "Variables (override on the command line):"
 	@echo "  PYTHON=$(PYTHON)"
 	@echo "  RAW_DIR=$(RAW_DIR)"
-	@echo "  METHOD=$(METHOD)   # hilic or rp (targeted smoke uses preset CLI)"
+	@echo "  METHOD=$(METHOD)   # hilic_metab_pnnl or rp_metab_pnnl (targeted smoke uses preset CLI)"
 	@echo "  TARGETED_RESULTS_DIR=$(TARGETED_RESULTS_DIR)"
 	@echo "  UNTARGETED_CONFIG=$(UNTARGETED_CONFIG)  # advanced JSON for QC_Metab fixtures"
 	@echo "  UNTARGETED_RESULTS_DIR=$(UNTARGETED_RESULTS_DIR)"

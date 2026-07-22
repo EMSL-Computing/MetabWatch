@@ -13,29 +13,29 @@ pip install -e .
 2. Start a standard run with **method**, **search mode**, **input folder**, and **output folder** only:
 
 ```bash
-metabwatch --method hilic --search targeted \
+metabwatch --method hilic_metab_pnnl --search targeted \
   --input /path/to/raw_folder \
   --output /path/to/results
 ```
 
-| `--method` | `--search` | What it uses |
-|------------|------------|--------------|
-| `hilic` | `targeted` | HILIC CoreMS params + HILIC QC compounds |
-| `hilic` | `untargeted` | HILIC CoreMS params (bootstrap search space) |
-| `rp` | `targeted` | RP CoreMS params + RP QC compounds |
-| `rp` | `untargeted` | RP CoreMS params (bootstrap search space) |
+| `--method` | Display name | `--search` | What it uses |
+|------------|--------------|------------|--------------|
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `targeted` | HILIC CoreMS params + HILIC QC compounds |
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `untargeted` | HILIC CoreMS params (bootstrap search space) |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `targeted` | RP CoreMS params + RP QC compounds |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `untargeted` | RP CoreMS params (bootstrap search space) |
 
 Built-in defaults (no extra flags needed):
 
 | Method | m/z ppm | RT (min) | min area | Sample name filter |
 |--------|---------|----------|----------|--------------------|
-| HILIC | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pooled` (case-insensitive) |
-| RP | 5 | 0.4 | 20000 | same filters as above |
+| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pooled` (case-insensitive) |
+| PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
 
 Or as a module:
 
 ```bash
-python -m metabwatch.pipeline --method hilic --search targeted \
+python -m metabwatch.pipeline --method hilic_metab_pnnl --search targeted \
   -i /path/to/raw_folder -o /path/to/results
 ```
 
@@ -56,7 +56,7 @@ python -m metabwatch.gui
 
 The window provides:
 
-- **Preset shortcuts** — HILIC or RP × targeted or untargeted, plus input/output folder pickers
+- **Preset shortcuts** — PNNL Standard HILIC / RP Metabolomics methods × targeted or untargeted, plus input/output folder pickers
 - **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`)
 - **Watch continuously** or **Process once**, optional force reprocess
 - **Start / Stop** (stop finishes the current file, then exits the watch loop)
@@ -87,19 +87,19 @@ The dashboard header shows the run polarity (and warns if legacy mixed outputs a
 One-pass watch cycle (useful for scheduled runs):
 
 ```bash
-metabwatch --method hilic --search targeted -i RAW -o OUT --once
+metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT --once
 ```
 
 Force reprocessing of already completed files:
 
 ```bash
-metabwatch --method hilic --search targeted -i RAW -o OUT --once --force-reprocess
+metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT --once --force-reprocess
 ```
 
 Process one explicit raw file:
 
 ```bash
-metabwatch --method hilic --search targeted -i RAW -o OUT \
+metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT \
   --mode process --raw /path/to/file.raw
 ```
 
@@ -121,7 +121,7 @@ Put Thermo `.raw` files in `data/raw_positive/` (gitignored), or use `make get-t
 
 ```bash
 make test-unit                  # unit tests (pytest)
-make test-workflow-targeted     # HILIC targeted via preset CLI
+make test-workflow-targeted     # PNNL HILIC targeted via preset CLI
 make test-workflow-untargeted   # advanced JSON (QC_Metab fixtures)
 make test-workflow              # both
 make get-test-data              # download test .raw files when URL is set; else check local
@@ -143,7 +143,7 @@ make test-workflow-targeted PYTHON=./venv/bin/python
 3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
 4. All subsequent samples reuse the persisted CSV.
 
-Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic,rp}/` (installed with the package).
+Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic_metab_pnnl,rp_metab_pnnl}/` (installed with the package).
 
 ## Technical Documentation
 

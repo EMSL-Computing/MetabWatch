@@ -13,7 +13,7 @@ def test_parse_preset_args() -> None:
     ns = parse_args(
         [
             "--method",
-            "hilic",
+            "hilic_metab_pnnl",
             "--search",
             "targeted",
             "--input",
@@ -22,7 +22,7 @@ def test_parse_preset_args() -> None:
             "out",
         ]
     )
-    assert ns.method == "hilic"
+    assert ns.method == "hilic_metab_pnnl"
     assert ns.search == "targeted"
     assert ns.input == Path("raw")
     assert ns.output == Path("out")
@@ -33,7 +33,7 @@ def test_parse_short_input_output_aliases() -> None:
     ns = parse_args(
         [
             "--method",
-            "rp",
+            "rp_metab_pnnl",
             "--search",
             "untargeted",
             "-i",
@@ -56,7 +56,7 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     ns = parse_args(
         [
             "--method",
-            "hilic",
+            "hilic_metab_pnnl",
             "--search",
             "targeted",
             "--input",
@@ -77,7 +77,7 @@ def test_resolve_rejects_mixed_args(tmp_path: Path) -> None:
             "--config",
             str(tmp_path / "c.json"),
             "--method",
-            "hilic",
+            "hilic_metab_pnnl",
             "--search",
             "targeted",
             "--input",
@@ -91,7 +91,7 @@ def test_resolve_rejects_mixed_args(tmp_path: Path) -> None:
 
 
 def test_resolve_rejects_incomplete_preset() -> None:
-    ns = parse_args(["--method", "hilic", "--search", "targeted"])
+    ns = parse_args(["--method", "hilic_metab_pnnl", "--search", "targeted"])
     with pytest.raises(ValueError, match="Missing"):
         resolve_config_from_args(ns)
 
@@ -108,7 +108,7 @@ def test_main_rejects_mixed_args(tmp_path: Path, capsys: pytest.CaptureFixture[s
             "--config",
             str(tmp_path / "c.json"),
             "--method",
-            "hilic",
+            "hilic_metab_pnnl",
             "--search",
             "targeted",
             "--input",
