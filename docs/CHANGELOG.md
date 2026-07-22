@@ -7,9 +7,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-07-22
+## [0.2.0] - 2026-07-22
 
-First tagged release of the work accumulated on `dev` since `main`.
+Minor release of the work accumulated on `dev` since `main` (package was still labeled 0.1.0 during development).
 
 ### Added
 
@@ -32,3 +32,7 @@ First tagged release of the work accumulated on `dev` since `main`.
 ### Fixed
 
 - Restored the GUI path without Windows exe packaging complexity.
+
+## [0.1.0]
+
+Prior package version on `main` before the 0.2.0 release. No formal changelog was maintained for that line.

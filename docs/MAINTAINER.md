@@ -44,7 +44,7 @@ Create **one desktop shortcut per MetabWatch release**. Always include the **ver
 **Name the shortcut after the package version**, for example:
 
 ```text
-MetabWatch 0.1.0
+MetabWatch 0.2.0
 ```
 
 Use the version from `pyproject.toml` (also shown in the GUI window title). When you ship a new release, create a **new** shortcut for that version (and retire or replace the old one as appropriate).
@@ -59,13 +59,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\your\MetabWa
 ```
 
 3. Click **Next**.
-4. Name it using the version, e.g. **`MetabWatch 0.1.0`**.
+4. Name it using the version, e.g. **`MetabWatch 0.2.0`**.
 5. Click **Finish**.
 6. Right-click the new shortcut → **Properties**.
 7. Set **Start in** to the repo root, e.g. `C:\path\to\your\MetabWatch`.
 8. Click **OK**.
 
-Double-click **MetabWatch 0.1.0** (or the current version name). The GUI should open. Generators pick method, folders, and press **Start** in the window.
+Double-click **MetabWatch 0.2.0** (or the current version name). The GUI should open. Generators pick method, folders, and press **Start** in the window.
 
 ## What the launcher does
 
