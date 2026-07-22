@@ -9,8 +9,6 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] - 2026-07-22
 
-Minor release of the work accumulated on `dev` since `main` (package was still labeled 0.1.0 during development).
-
 ### Added
 
 - Desktop GUI (`metabwatch-gui`) with preset shortcuts for PNNL Standard HILIC / RP methods × targeted or untargeted search, custom JSON mode, watch/once controls, and live log.
@@ -28,10 +26,6 @@ Minor release of the work accumulated on `dev` since `main` (package was still l
 - README and docs aligned with one polarity per run and current CLI/GUI entry points.
 - Paths and project naming standardized on MetabWatch / `metabwatch`.
 - Makefile and `.gitignore` updated for a repo-local `.venv`.
-
-### Fixed
-
-- Restored the GUI path without Windows exe packaging complexity.
 
 ## [0.1.0]
 
