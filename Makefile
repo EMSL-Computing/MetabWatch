@@ -47,7 +47,8 @@ TEST_DATA_ARCHIVE_URL ?=
 	check-test-data get-test-data \
 	test-unit \
 	test-workflow-targeted test-workflow-untargeted test-workflow \
-	verify-workflow-outputs
+	verify-workflow-outputs \
+	changelog-draft
 
 help:
 	@echo "MetabWatch workflow test targets"
@@ -59,6 +60,7 @@ help:
 	@echo "  make check-test-data           Verify local raw test data is present"
 	@echo "  make get-test-data             Download test data (when URL configured) or check local"
 	@echo "  make verify-workflow-outputs   Check expected result files (set RESULTS_DIR=...)"
+	@echo "  make changelog-draft           Print origin/main..HEAD subjects for docs/CHANGELOG.md"
 	@echo ""
 	@echo "Variables (override on the command line):"
 	@echo "  PYTHON=$(PYTHON)"
@@ -78,6 +80,19 @@ help:
 	@echo "  make test-workflow-untargeted"
 	@echo "  make test-workflow"
 	@echo "  make test-workflow PYTHON=python3   # override default .venv"
+	@echo "  make changelog-draft"
+
+# ---------------------------------------------------------------------------
+# Release helpers
+# ---------------------------------------------------------------------------
+
+# Print commit subjects since origin/main for hand-editing into docs/CHANGELOG.md.
+# Does not modify any files. See docs/RELEASING.md.
+changelog-draft:
+	@git fetch origin main --quiet 2>/dev/null || true
+	@echo "=== Commits origin/main..HEAD (no merges) — draft into docs/CHANGELOG.md ==="
+	@git log origin/main..HEAD --oneline --no-merges
+	@echo "=== End draft list ==="
 
 # ---------------------------------------------------------------------------
 # Unit tests

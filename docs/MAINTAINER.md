@@ -87,7 +87,14 @@ Raw and output folders are chosen in the GUI (or via Custom JSON in the form). T
 | GUI opens but Thermo `.raw` fails | `pip install pythonnet` in the same `.venv` |
 | Wrong code after an update | `git pull`, reinstall if needed (`pip install -e .`), keep shortcut **Start in** and `-File` path on this clone |
 
+## Releases
+
+Versioned releases are cut from `dev` into `main` on internal GitLab (version bump + [CHANGELOG.md](CHANGELOG.md) in one merge request). Full checklist: [RELEASING.md](RELEASING.md).
+
+After a release, create a **new** desktop shortcut named with that version (see above) so generators launch the intended install.
+
 ## Related
 
 - User-facing package overview: [README.md](../README.md)
+- Release process and changelog: [RELEASING.md](RELEASING.md), [CHANGELOG.md](CHANGELOG.md)
 - Pipeline config reference: [pipeline-reference.md](pipeline-reference.md)

@@ -150,6 +150,8 @@ Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic_metab_pnnl,rp_me
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
 - Windows lab setup and desktop shortcut: [docs/MAINTAINER.md](docs/MAINTAINER.md)
+- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- Cutting a release (maintainers): [docs/RELEASING.md](docs/RELEASING.md)
 
 ## Requirements
 
