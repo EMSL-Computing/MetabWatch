@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import quote
@@ -298,10 +299,28 @@ def _discovery_mode_description(discovery_mode: str, poll_interval_sec: float) -
     return f"discovery_mode=poll (directory scan every {poll_interval_sec}s)"
 
 
+def _wait_for_poll(
+    poll_interval_sec: float,
+    stop_event: threading.Event | None,
+) -> bool:
+    """Sleep for the poll interval, or until stop is requested.
+
+    Returns
+    -------
+    bool
+        True when a stop was requested; False when the full wait completed.
+    """
+    if stop_event is None:
+        time.sleep(poll_interval_sec)
+        return False
+    return stop_event.wait(timeout=poll_interval_sec)
+
+
 def run_watch_mode(
     config: PipelineConfig,
     once: bool = False,
     force_reprocess: bool = False,
+    stop_event: threading.Event | None = None,
 ) -> int:
     """Run the watch loop: discover, enqueue, process, and synthesize.
 
@@ -311,6 +330,11 @@ def run_watch_mode(
         Resolved pipeline configuration.
     once : bool, optional
         If True, performs a single iteration and exits.
+    force_reprocess : bool, optional
+        If True, reprocess files even when the manifest marks them completed.
+    stop_event : threading.Event | None, optional
+        When set, exit the watch loop after the current cycle (cooperative
+        stop for GUI). ``None`` keeps CLI behavior (Ctrl+C only).
 
     Returns
     -------
@@ -346,11 +370,16 @@ def run_watch_mode(
         observer.start(config.watcher.raw_dir)
 
     try:
+        stop_hint = (
+            "Use Stop in the GUI to exit."
+            if stop_event is not None
+            else "Press Ctrl+C to exit."
+        )
         print(
             "[watching] Monitoring for stable .raw files "
             f"in {config.watcher.raw_dir} "
             f"({_discovery_mode_description(discovery_mode, config.watcher.poll_interval_sec)}). "
-            "Press Ctrl+C to exit."
+            f"{stop_hint}"
         )
 
         if state_store.get_run_polarity():
@@ -389,6 +418,10 @@ def run_watch_mode(
         state_store.recover_stale_in_progress()
 
         while True:
+            if stop_event is not None and stop_event.is_set():
+                print("[stopped] Stop requested.")
+                return 0
+
             if observer is not None:
                 watcher.register_many(observer.drain())
 
@@ -422,6 +455,13 @@ def run_watch_mode(
                 tqdm(batch, total=total, unit="file", desc="Processing raw files"),
                 start=1,
             ):
+                if stop_event is not None and stop_event.is_set():
+                    print(
+                        f"[stopped] Stop requested; "
+                        f"skipping {total - index + 1} remaining file(s) in batch."
+                    )
+                    break
+
                 if mismatch_in_batch:
                     remaining = total - index + 1
                     print(
@@ -500,13 +540,17 @@ def run_watch_mode(
                 _run_synthesis(synthesizer, output_tracker)
                 synthesized_this_cycle = True
 
+            if stop_event is not None and stop_event.is_set():
+                print("[stopped] Stop requested.")
+                return 0
+
             if synthesized_this_cycle and not once:
                 print(
-                    "[watching] Waiting for new stable .raw files. Press Ctrl+C to exit."
+                    f"[watching] Waiting for new stable .raw files. {stop_hint}"
                 )
             elif not batch and not once:
                 print(
-                    "[watching] No new stable .raw files yet. Press Ctrl+C to exit."
+                    f"[watching] No new stable .raw files yet. {stop_hint}"
                 )
 
             if once:
@@ -516,8 +560,13 @@ def run_watch_mode(
                 # Wake early when FS events arrive; still tick for stability.
                 observer.event.wait(timeout=1.0)
                 observer.event.clear()
+                if stop_event is not None and stop_event.is_set():
+                    print("[stopped] Stop requested.")
+                    return 0
             else:
-                time.sleep(config.watcher.poll_interval_sec)
+                if _wait_for_poll(config.watcher.poll_interval_sec, stop_event):
+                    print("[stopped] Stop requested.")
+                    return 0
 
         if once and polarity_hard_stop_once:
             return 1

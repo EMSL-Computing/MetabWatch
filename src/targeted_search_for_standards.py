@@ -12,6 +12,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+# Non-interactive backend required for CLI and GUI worker threads. The default
+# macOS backend (MacOSX) can freeze or black-screen the Tk GUI when figures are
+# created off the main thread after the first sample finishes plotting.
+import matplotlib
+
+matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms

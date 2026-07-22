@@ -47,6 +47,7 @@ dev = [
 
 [project.scripts]
 metabwatch = "metabwatch.pipeline:main"
+metabwatch-gui = "metabwatch.gui:main"
 
 # Map import name `metabwatch` → on-disk tree `src/` (no nested src/metabwatch/).
 # So `from metabwatch.processor import ...` loads src/processor/, etc.
@@ -56,6 +57,7 @@ metabwatch = "src"
 [tool.setuptools]
 packages = [
     "metabwatch",
+    "metabwatch.gui",
     "metabwatch.output",
     "metabwatch.pipeline_queue",
     "metabwatch.presets",
