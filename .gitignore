@@ -1,5 +1,4 @@
-data/raw_negative
-data/raw_positive
+data/raw*
 data/results*
 .vscode/
 .DS_Store
@@ -21,3 +20,6 @@ venv/
 
 # Optional downloaded test-data archives (see make get-test-data)
 test_data/
+
+# Venv
+.venv/

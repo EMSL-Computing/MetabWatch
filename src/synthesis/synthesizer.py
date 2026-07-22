@@ -36,11 +36,56 @@ class HTMLSynthesizer:
         self.last_compound_pages: int = 0
         self.last_skipped_samples: int = 0
         self.last_export_paths: dict[str, Path] = {}
+        self.last_polarity_label: str = "unknown"
 
     @staticmethod
     def _slugify(name: str) -> str:
         slug = re.sub(r"[^0-9A-Za-z]+", "-", name).strip("-").lower()
         return slug or "compound"
+
+    @staticmethod
+    def format_run_polarity_label(polarities: set[str] | list[str]) -> str:
+        """Format polarities collected from match CSVs for dashboard display.
+
+        Parameters
+        ----------
+        polarities : set[str] | list[str]
+            Normalized polarity strings (e.g. ``positive``, ``negative``).
+
+        Returns
+        -------
+        str
+            Single polarity, ``unknown``, or ``mixed (...)`` when more than one.
+        """
+        cleaned = sorted(
+            {
+                str(p).strip().lower()
+                for p in polarities
+                if p is not None and str(p).strip()
+            }
+        )
+        if not cleaned:
+            return "unknown"
+        if len(cleaned) == 1:
+            return cleaned[0]
+        return f"mixed ({', '.join(cleaned)})"
+
+    @staticmethod
+    def _polarity_meta_html(polarity_label: str) -> str:
+        """Return HTML for the polarity metadata line on dashboard pages."""
+        is_mixed = polarity_label.startswith("mixed")
+        style = (
+            " style=\"color:#b42318;font-weight:700;\"" if is_mixed else ""
+        )
+        note = (
+            " <span style=\"color:#b42318;\">(mixed polarities are not supported)</span>"
+            if is_mixed
+            else ""
+        )
+        return (
+            f"<p class=\"meta-polarity\"{style}>"
+            f"<strong>Polarity:</strong> {escape(polarity_label)}{note}</p>"
+        )
 
     @staticmethod
     def _safe_trace_col(mf_id: int, compound_name: str) -> str:
@@ -101,11 +146,19 @@ class HTMLSynthesizer:
                     mapping[str(Path(out_csv).resolve())] = str(acq)
         return mapping
 
-    def _build_dataset(self) -> tuple[list[dict], dict[str, dict]]:
-        """Build sample and compound records from matches and traces CSV files."""
+    def _build_dataset(self) -> tuple[list[dict], dict[str, dict], set[str]]:
+        """Build sample and compound records from matches and traces CSV files.
+
+        Returns
+        -------
+        samples, compounds, polarities
+            Sample records, compound index, and the set of normalized polarity
+            values seen across match CSVs (for dashboard labeling).
+        """
         manifest_times = self._collect_manifest_acquisition_times()
         samples: list[dict] = []
         compounds: dict[str, dict] = {}
+        polarities: set[str] = set()
         self.last_skipped_samples = 0
 
         for match_csv in self._collect_match_csvs():
@@ -118,6 +171,12 @@ class HTMLSynthesizer:
             trace_csv = match_csv.with_name(f"{sample_name}_ms1_traces.csv")
             if not trace_csv.exists():
                 continue
+
+            if "polarity" in df.columns and not df.empty:
+                for value in df["polarity"].dropna().astype(str):
+                    normalized = value.strip().lower()
+                    if normalized:
+                        polarities.add(normalized)
 
             acq_value = None
             if "acquisition_time" in df.columns and not df.empty:
@@ -153,6 +212,7 @@ class HTMLSynthesizer:
                     observed_mz = pd.to_numeric(row.get("observed_mz"), errors="coerce")
                     observed_rt = pd.to_numeric(row.get("observed_rt"), errors="coerce")
                     intensity = pd.to_numeric(row.get("intensity"), errors="coerce")
+                    area = pd.to_numeric(row.get("area"), errors="coerce")
                     target_mz = pd.to_numeric(row.get("target_mz"), errors="coerce")
                     target_rt = pd.to_numeric(row.get("target_rt"), errors="coerce")
                     mz_error_ppm = pd.to_numeric(row.get("mz_error_ppm"), errors="coerce")
@@ -167,6 +227,7 @@ class HTMLSynthesizer:
                         "observed_mz": float(observed_mz) if not pd.isna(observed_mz) else None,
                         "observed_rt": float(observed_rt) if not pd.isna(observed_rt) else None,
                         "intensity": float(intensity) if not pd.isna(intensity) else None,
+                        "area": float(area) if not pd.isna(area) else None,
                         "target_mz": float(target_mz) if not pd.isna(target_mz) else None,
                         "target_rt": float(target_rt) if not pd.isna(target_rt) else None,
                         "mz_error_ppm": float(mz_error_ppm) if not pd.isna(mz_error_ppm) else None,
@@ -201,6 +262,7 @@ class HTMLSynthesizer:
                         "observed_mz": metric["observed_mz"] if metric else None,
                         "observed_rt": metric["observed_rt"] if metric else None,
                         "intensity": metric["intensity"] if metric else None,
+                        "area": metric["area"] if metric else None,
                         "target_mz": metric["target_mz"] if metric else None,
                         "target_rt": metric["target_rt"] if metric else None,
                         "mz_error_ppm": metric["mz_error_ppm"] if metric else None,
@@ -211,7 +273,7 @@ class HTMLSynthesizer:
                     }
                 )
 
-        return samples, compounds
+        return samples, compounds, polarities
 
     @staticmethod
     def _first_number(values: list[float | None]) -> float | None:
@@ -718,7 +780,108 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
-    def _render_index(self, samples: list[dict], compounds: dict[str, dict], generated_at: str) -> str:
+    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
+        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+
+        Uses the same ``_mean_cv`` definition as the compound index table.
+        Compounds missing area values contribute only to the intensity series.
+        """
+        intensity_cvs: list[float] = []
+        area_cvs: list[float] = []
+
+        for compound_name in sorted(compounds):
+            series = compounds[compound_name]["samples"]
+            if not series:
+                continue
+            _, intensity_cv = self._mean_cv([row.get("intensity") for row in series])
+            _, area_cv = self._mean_cv([row.get("area") for row in series])
+            if intensity_cv is not None:
+                intensity_cvs.append(float(intensity_cv))
+            if area_cv is not None:
+                area_cvs.append(float(area_cv))
+
+        all_cvs = intensity_cvs + area_cvs
+        bin_size = 5.0
+        if all_cvs:
+            x_max = max(all_cvs)
+            # Pad to the next bin boundary so the largest value is fully inside.
+            x_end = max(bin_size, (int(x_max / bin_size) + 1) * bin_size)
+        else:
+            x_end = 50.0
+
+        xbins = {"start": 0.0, "end": float(x_end), "size": bin_size}
+        data: list[dict] = [
+            {
+                "type": "histogram",
+                "name": "Intensity CV",
+                "x": intensity_cvs,
+                "opacity": 0.55,
+                "marker": {"color": "#8a3d2b"},
+                "xbins": xbins,
+                "hovertemplate": "Intensity CV bin: %{x}<br>Count: %{y}<extra></extra>",
+            },
+            {
+                "type": "histogram",
+                "name": "Area CV",
+                "x": area_cvs,
+                "opacity": 0.55,
+                "marker": {"color": "#2c7f6d"},
+                "xbins": xbins,
+                "hovertemplate": "Area CV bin: %{x}<br>Count: %{y}<extra></extra>",
+            },
+        ]
+
+        return {
+            "data": data,
+            "layout": {
+                "height": 380,
+                "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
+                "barmode": "overlay",
+                "showlegend": True,
+                "title": {"text": "Reproducibility overview (CV)"},
+                "xaxis": {
+                    "title": "CV (%)",
+                    "range": [0, float(x_end)],
+                },
+                "yaxis": {"title": "Number of compounds"},
+                "shapes": [
+                    {
+                        "type": "line",
+                        "x0": 30,
+                        "x1": 30,
+                        "y0": 0,
+                        "y1": 1,
+                        "yref": "paper",
+                        "line": {
+                            "color": "#b42318",
+                            "width": 1.5,
+                            "dash": "dash",
+                        },
+                    }
+                ],
+                "annotations": [
+                    {
+                        "x": 30,
+                        "y": 1,
+                        "yref": "paper",
+                        "text": "30% threshold",
+                        "showarrow": False,
+                        "xanchor": "left",
+                        "yanchor": "bottom",
+                        "font": {"size": 11, "color": "#b42318"},
+                        "xshift": 4,
+                    }
+                ],
+            },
+        }
+
+    def _render_index(
+        self,
+        samples: list[dict],
+        compounds: dict[str, dict],
+        generated_at: str,
+        polarity_label: str,
+    ) -> str:
         rows = []
         for compound_name in sorted(compounds):
             c = compounds[compound_name]
@@ -726,10 +889,12 @@ class HTMLSynthesizer:
             ppm_values = [row.get("mz_error_ppm") for row in series]
             rt_error_values = [row.get("rt_error") for row in series]
             intensity_values = [row.get("intensity") for row in series]
+            area_values = [row.get("area") for row in series]
 
             avg_ppm, _ = self._mean_cv(ppm_values)
             avg_rt_error, _ = self._mean_cv(rt_error_values)
             _, intensity_cv = self._mean_cv(intensity_values)
+            _, area_cv = self._mean_cv(area_values)
 
             target_mz = self._first_number([row.get("target_mz") for row in series])
             target_rt = self._first_number([row.get("target_rt") for row in series])
@@ -740,6 +905,8 @@ class HTMLSynthesizer:
             avg_rt_error_text = f"{avg_rt_error:.4f}" if avg_rt_error is not None else "n/a"
             intensity_cv_text = f"{intensity_cv:.2f}%" if intensity_cv is not None else "n/a"
             intensity_cv_style = " style='color:#b42318;font-weight:700;'" if intensity_cv is not None and intensity_cv > 30.0 else ""
+            area_cv_text = f"{area_cv:.2f}%" if area_cv is not None else "n/a"
+            area_cv_style = " style='color:#b42318;font-weight:700;'" if area_cv is not None and area_cv > 30.0 else ""
 
             rows.append(
                 "<tr>"
@@ -750,10 +917,11 @@ class HTMLSynthesizer:
                 f"<td>{avg_ppm_text}</td>"
                 f"<td>{avg_rt_error_text}</td>"
                 f"<td{intensity_cv_style}>{intensity_cv_text}</td>"
+                f"<td{area_cv_style}>{area_cv_text}</td>"
                 "</tr>"
             )
 
-        table_rows = "\n".join(rows) if rows else "<tr><td colspan='7'>No compounds detected yet.</td></tr>"
+        table_rows = "\n".join(rows) if rows else "<tr><td colspan='8'>No compounds detected yet.</td></tr>"
         if self.untargeted_mode:
             mz_plot, rt_plot = self._build_landing_qc_plots_untargeted(
                 samples=samples, compounds=compounds
@@ -762,6 +930,8 @@ class HTMLSynthesizer:
             mz_plot, rt_plot = self._build_landing_qc_plots(
                 samples=samples, compounds=compounds
             )
+        cv_plot = self._build_landing_cv_histogram(compounds)
+        cv_json = json.dumps(cv_plot)
         mz_json = json.dumps(mz_plot)
         rt_json = json.dumps(rt_plot)
 
@@ -817,12 +987,17 @@ class HTMLSynthesizer:
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
         .section-title {{ margin: 22px 0 10px; }}
+        .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
   </style>
 </head>
 <body>
   <section class=\"card\">
     <h1>MetabWatch Compound Index</h1>
     <p>Generated: {escape(generated_at)}</p>
+    {self._polarity_meta_html(polarity_label)}
+
+        <h2 class=\"section-title\">Reproducibility overview (CV)</h2>
+        <div id=\"landing-cv\"></div>
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>
@@ -841,6 +1016,7 @@ class HTMLSynthesizer:
                     <th title="{escape(_avg_ppm_tooltip)}">Avg ppm</th>
                     <th title="{escape(_avg_rt_tooltip)}">Avg RT Error (min)</th>
                     <th>Intensity CV</th>
+                    <th>Area CV</th>
                 </tr>
       </thead>
       <tbody>
@@ -849,8 +1025,10 @@ class HTMLSynthesizer:
     </table>
   </section>
     <script>
+        const cvPlot = {cv_json};
         const mzPlot = {mz_json};
         const rtPlot = {rt_json};
+        Plotly.newPlot('landing-cv', cvPlot.data, cvPlot.layout, {{responsive: true}});
         Plotly.newPlot('landing-mz', mzPlot.data, mzPlot.layout, {{responsive: true}});
         Plotly.newPlot('landing-rt', rtPlot.data, rtPlot.layout, {{responsive: true}});
     </script>
@@ -868,7 +1046,12 @@ class HTMLSynthesizer:
         shade = max(35, min(220, shade))
         return f"rgb({shade},{shade},{shade})"
 
-    def _render_compound_page(self, compound: dict, generated_at: str) -> str:
+    def _render_compound_page(
+        self,
+        compound: dict,
+        generated_at: str,
+        polarity_label: str,
+    ) -> str:
         series = compound["samples"]
         full_samples = [row["sample"] for row in series]
         samples = [self._acquisition_label(row["acquisition_time_iso"]) for row in series]
@@ -876,6 +1059,7 @@ class HTMLSynthesizer:
         rt_values = [row["observed_rt"] for row in series]
         rt_error_values = [row.get("rt_error") for row in series]
         intensity_values = [row["intensity"] for row in series]
+        area_values = [row.get("area") for row in series]
 
         target_rt_values = [row.get("target_rt") for row in series if row.get("target_rt") is not None]
         target_rt = target_rt_values[0] if target_rt_values else None
@@ -975,6 +1159,7 @@ class HTMLSynthesizer:
         ppm_mean, ppm_cv = self._mean_cv(ppm_values)
         rt_mean, rt_cv = self._mean_cv(rt_values)
         intensity_mean, intensity_cv = self._mean_cv(intensity_values)
+        area_mean, area_cv = self._mean_cv(area_values)
 
         ppm_summary = (
             f"Avg ppm: {ppm_mean:.3f}<br>PPM CV: {ppm_cv:.2f}%"
@@ -990,6 +1175,11 @@ class HTMLSynthesizer:
             f"Avg intensity: {intensity_mean:.4g}<br>Intensity CV: {intensity_cv:.2f}%"
             if intensity_mean is not None and intensity_cv is not None
             else "Avg intensity: n/a<br>Intensity CV: n/a"
+        )
+        area_summary = (
+            f"Avg area: {area_mean:.4g}<br>Area CV: {area_cv:.2f}%"
+            if area_mean is not None and area_cv is not None
+            else "Avg area: n/a<br>Area CV: n/a"
         )
 
         shapes = [
@@ -1058,7 +1248,7 @@ class HTMLSynthesizer:
                 "bgcolor": "rgba(255,255,255,0.82)",
                 "bordercolor": "#dde3dc",
                 "borderwidth": 1,
-                "text": intensity_summary,
+                "text": intensity_summary + "<br>" + area_summary,
                 "font": {"size": 11},
             },
         ]
@@ -1224,6 +1414,7 @@ class HTMLSynthesizer:
       margin: 0 auto;
     }}
     .meta {{ margin-bottom: 14px; color: #47524d; }}
+    .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
     .section-title {{ margin: 20px 0 8px; }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
@@ -1234,6 +1425,7 @@ class HTMLSynthesizer:
     <p><a href=\"../dashboard.html\">Back to compound index</a></p>
     <h1>{escape(compound['name'])}</h1>
     <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    {self._polarity_meta_html(polarity_label)}
 
     <h2 class=\"section-title\">Across-sample metrics</h2>
     <div id=\"top-plot\"></div>
@@ -1259,11 +1451,12 @@ class HTMLSynthesizer:
     ) -> dict[str, Path]:
         """Write wide-style pivot CSVs (feature rows × sample columns).
 
-        Produces three files next to the dashboard:
+        Produces four files next to the dashboard:
 
         - ``export_mz.csv`` — observed m/z per sample
         - ``export_rt.csv`` — observed retention time (min) per sample
         - ``export_height.csv`` — peak maximum intensity (height) per sample
+        - ``export_area.csv`` — integrated peak area per sample
 
         Parameters
         ----------
@@ -1275,13 +1468,14 @@ class HTMLSynthesizer:
         Returns
         -------
         dict[str, Path]
-            Mapping of export label (``mz``, ``rt``, ``height``) to written path.
+            Mapping of export label (``mz``, ``rt``, ``height``, ``area``) to written path.
         """
         sample_names = [sample["sample"] for sample in samples]
         metric_fields = {
             "mz": "observed_mz",
             "rt": "observed_rt",
             "height": "intensity",
+            "area": "area",
         }
         export_dir = self.html_output.parent
         written: dict[str, Path] = {}
@@ -1315,15 +1509,26 @@ class HTMLSynthesizer:
             Path to the generated landing dashboard HTML.
         """
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        samples, compounds = self._build_dataset()
+        samples, compounds, polarities = self._build_dataset()
+        polarity_label = self.format_run_polarity_label(polarities)
+        self.last_polarity_label = polarity_label
 
-        index_html = self._render_index(samples=samples, compounds=compounds, generated_at=generated_at)
+        index_html = self._render_index(
+            samples=samples,
+            compounds=compounds,
+            generated_at=generated_at,
+            polarity_label=polarity_label,
+        )
         self._write_atomic(self.html_output, index_html)
 
         compounds_dir = self.html_output.parent / "compounds"
         for compound_name in sorted(compounds):
             compound = compounds[compound_name]
-            page_html = self._render_compound_page(compound=compound, generated_at=generated_at)
+            page_html = self._render_compound_page(
+                compound=compound,
+                generated_at=generated_at,
+                polarity_label=polarity_label,
+            )
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)
 
         self.last_export_paths = self._export_wide_csvs(samples=samples, compounds=compounds)

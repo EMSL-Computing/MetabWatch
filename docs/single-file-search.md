@@ -1,6 +1,6 @@
 # Single-File Targeted Search
 
-Processor module: `src/targeted_search_for_standards.py`
+Processor module: `metabwatch.targeted_search_for_standards` (`src/targeted_search_for_standards.py`)
 
 This module uses **CoreMS 4.0.1** to process one Thermo `.raw` file at a time and writes:
 
@@ -33,7 +33,7 @@ MS1 trace output is written automatically. The table includes:
 The module includes a `__main__` block for local runs:
 
 ```bash
-python src/targeted_search_for_standards.py
+python -m metabwatch.targeted_search_for_standards
 ```
 
 Edit paths and thresholds in the `__main__` block before executing.

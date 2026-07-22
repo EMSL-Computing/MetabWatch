@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
@@ -35,6 +36,7 @@ dependencies = [
     "matplotlib",
     "tqdm",
     "CoreMS==4.0.1",
+    "watchdog>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -44,16 +46,33 @@ dev = [
 ]
 
 [project.scripts]
-metabwatch = "pipeline:main"
+metabwatch = "metabwatch.pipeline:main"
+metabwatch-gui = "metabwatch.gui:main"
 
+# Map import name `metabwatch` → on-disk tree `src/` (no nested src/metabwatch/).
+# So `from metabwatch.processor import ...` loads src/processor/, etc.
 [tool.setuptools.package-dir]
-"" = "src"
+metabwatch = "src"
 
 [tool.setuptools]
-py-modules = ["config", "pipeline", "targeted_search_for_standards"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
+packages = [
+    "metabwatch",
+    "metabwatch.gui",
+    "metabwatch.output",
+    "metabwatch.pipeline_queue",
+    "metabwatch.presets",
+    "metabwatch.presets.hilic_metab_pnnl",
+    "metabwatch.presets.rp_metab_pnnl",
+    "metabwatch.processor",
+    "metabwatch.state",
+    "metabwatch.synthesis",
+    "metabwatch.watcher",
+]
 
 [tool.setuptools.package-data]
-synthesis = ["templates/*"]
+"metabwatch.presets.hilic_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.presets.rp_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.synthesis" = ["templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

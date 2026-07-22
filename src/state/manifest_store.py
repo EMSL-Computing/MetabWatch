@@ -13,6 +13,10 @@ This module provides `ManifestStateStore` which persists simple metadata
 about processed `.raw` files (fingerprint, status, attempts, artifact paths)
 to a JSON file. The store performs atomic writes and exposes helpers for
 recovering stale `in_progress` entries.
+
+The manifest also records a single run-level ``polarity`` (``positive`` /
+``negative``) once the first sample completes. Later samples must match that
+polarity; mixed polarities are not allowed in one output folder.
 """
 
 
@@ -44,6 +48,8 @@ class ManifestEntry:
         Truncated error message for failures.
     acquisition_time : str | None
         Sample acquisition time in UTC ISO8601 when available.
+    polarity : str | None
+        CoreMS ionization polarity when known (``positive`` / ``negative``).
     """
     raw_file: str
     fingerprint: str
@@ -56,6 +62,7 @@ class ManifestEntry:
     trace_csv: str | None = None
     error: str | None = None
     acquisition_time: str | None = None
+    polarity: str | None = None
 
 
 class ManifestStateStore:
@@ -79,12 +86,17 @@ class ManifestStateStore:
         self.stale_in_progress_sec = stale_in_progress_sec
         self.manifest_json.parent.mkdir(parents=True, exist_ok=True)
         self._entries: dict[str, ManifestEntry] = {}
+        self._run_polarity: str | None = None
         self._load()
 
     @staticmethod
     def _now_iso() -> str:
         """Return current UTC time as ISO8601 string."""
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _normalize_polarity(polarity: str) -> str:
+        return str(polarity).strip().lower()
 
     @staticmethod
     def fingerprint(raw_file: Path) -> tuple[str, int, float]:
@@ -105,9 +117,21 @@ class ManifestStateStore:
             return
         with self.manifest_json.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
+        run_polarity = payload.get("polarity")
+        if run_polarity is not None and str(run_polarity).strip():
+            self._run_polarity = self._normalize_polarity(str(run_polarity))
         for row in payload.get("entries", []):
-            entry = ManifestEntry(**row)
+            # Older manifests may omit polarity; dataclass default handles it.
+            known = {f.name for f in ManifestEntry.__dataclass_fields__.values()}
+            filtered = {k: v for k, v in row.items() if k in known}
+            entry = ManifestEntry(**filtered)
             self._entries[entry.raw_file] = entry
+        # Infer run polarity from completed entries if top-level field is missing.
+        if self._run_polarity is None:
+            for entry in self._entries.values():
+                if entry.status == "completed" and entry.polarity:
+                    self._run_polarity = self._normalize_polarity(entry.polarity)
+                    break
 
     def _flush(self) -> None:
         """Atomically flush in-memory entries to the manifest JSON.
@@ -118,11 +142,47 @@ class ManifestStateStore:
         tmp_path = self.manifest_json.with_suffix(self.manifest_json.suffix + ".tmp")
         payload = {
             "updated_at": self._now_iso(),
+            "polarity": self._run_polarity,
             "entries": [asdict(entry) for entry in self._entries.values()],
         }
         with tmp_path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
         tmp_path.replace(self.manifest_json)
+
+    def get_run_polarity(self) -> str | None:
+        """Return the locked run polarity, or ``None`` if not yet set."""
+        return self._run_polarity
+
+    def set_run_polarity(self, polarity: str) -> str:
+        """Lock the run to ``polarity`` if unset; return the locked value.
+
+        Parameters
+        ----------
+        polarity : str
+            CoreMS polarity for the sample that should lock the run.
+
+        Returns
+        -------
+        str
+            The run polarity after this call (always normalized).
+
+        Raises
+        ------
+        ValueError
+            If the run is already locked to a different polarity.
+        """
+        normalized = self._normalize_polarity(polarity)
+        if self._run_polarity is None:
+            self._run_polarity = normalized
+            self._flush()
+            return normalized
+        if self._run_polarity != normalized:
+            raise ValueError(
+                f"Polarity mismatch: sample is '{normalized}' but this run is "
+                f"locked to '{self._run_polarity}' in {self.manifest_json.name}. "
+                "MetabWatch does not allow mixed polarities in one input folder / run."
+            )
+        return self._run_polarity
 
     def recover_stale_in_progress(self) -> None:
         """Mark entries that have been `in_progress` for too long as failed.
@@ -180,6 +240,7 @@ class ManifestStateStore:
             trace_csv=previous.trace_csv if previous else None,
             error=None,
             acquisition_time=previous.acquisition_time if previous else None,
+            polarity=previous.polarity if previous else None,
         )
         self._entries[key] = entry
         self._flush()
@@ -191,8 +252,13 @@ class ManifestStateStore:
         output_csv: Path,
         trace_csv: Path,
         acquisition_time: str | None = None,
+        polarity: str | None = None,
     ) -> None:
-        """Mark an entry completed and persist artifact paths."""
+        """Mark an entry completed and persist artifact paths.
+
+        When ``polarity`` is provided, it is stored on the entry and used to
+        lock the run polarity on first success.
+        """
         key = str(raw_file.resolve())
         if key not in self._entries:
             self.mark_in_progress(raw_file)
@@ -203,6 +269,17 @@ class ManifestStateStore:
         entry.acquisition_time = acquisition_time
         entry.error = None
         entry.updated_at = self._now_iso()
+        if polarity is not None and str(polarity).strip():
+            normalized = self._normalize_polarity(polarity)
+            entry.polarity = normalized
+            if self._run_polarity is None:
+                self._run_polarity = normalized
+            elif self._run_polarity != normalized:
+                raise ValueError(
+                    f"Polarity mismatch: sample is '{normalized}' but this run is "
+                    f"locked to '{self._run_polarity}' in {self.manifest_json.name}. "
+                    "MetabWatch does not allow mixed polarities in one input folder / run."
+                )
         self._flush()
 
     def mark_failed(self, raw_file: Path, error: str) -> None:

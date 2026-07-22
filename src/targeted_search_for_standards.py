@@ -12,6 +12,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+# Non-interactive backend required for CLI and GUI worker threads. The default
+# macOS backend (MacOSX) can freeze or black-screen the Tk GUI when figures are
+# created off the main thread after the first sample finishes plotting.
+import matplotlib
+
+matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
@@ -249,8 +256,9 @@ def process_raw_to_observed_features_df(
     min_area: float = 1e4,
     plot_eics: bool = True,
     plot_tic: bool = True,
-    integrate_mass_features: bool = False,
+    integrate_mass_features: bool = True,
     cluster_mass_features: bool = False,
+    expected_polarity: str | None = None,
 ) -> pd.DataFrame:
     """Process a single `.raw` file and return matched observed features.
 
@@ -282,11 +290,14 @@ def process_raw_to_observed_features_df(
         Whether to run CoreMS integration on detected mass features.
     cluster_mass_features : bool
         Whether to run CoreMS clustering on detected mass features.
+    expected_polarity : str | None
+        When set (from the pipeline manifest), CoreMS polarity must match.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing matched observed features.
+        DataFrame containing matched observed features. ``attrs['polarity']``
+        holds the normalized CoreMS polarity string.
     """
     _validate_inputs(
         raw_file=raw_file,
@@ -326,6 +337,14 @@ def process_raw_to_observed_features_df(
         ) from exc
 
     raw_polarity = str(lcms_obj.polarity).strip().lower()
+    if expected_polarity is not None:
+        expected = str(expected_polarity).strip().lower()
+        if raw_polarity != expected:
+            raise ValueError(
+                f"Polarity mismatch: file {raw_file.name} is '{raw_polarity}' "
+                f"but this run is locked to '{expected}'. "
+                "MetabWatch does not allow mixed polarities in one input folder / run."
+            )
     target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
     if target_df.empty:
         raise ValueError(
@@ -343,10 +362,15 @@ def process_raw_to_observed_features_df(
 
     lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
     if integrate_mass_features:
-        lcms_obj.integrate_mass_features()
+        # Keep the full feature set: do not drop failed/duplicate peaks so
+        # intensity-based match selection stays stable vs pre-integration runs.
+        lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
     lcms_obj.add_associated_ms1()
     if cluster_mass_features:
         lcms_obj.cluster_mass_features()
+        # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
+        if integrate_mass_features:
+            lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     required_mf_columns = {"mz", "scan_time"}
@@ -414,6 +438,7 @@ def process_raw_to_observed_features_df(
 
     results_df["acquisition_time"] = acquisition_time
     results_df.attrs["acquisition_time"] = acquisition_time
+    results_df.attrs["polarity"] = raw_polarity
 
     if plot_eics and not results_df.empty:
         plot_pdf.parent.mkdir(parents=True, exist_ok=True)

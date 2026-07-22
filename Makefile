@@ -8,7 +8,7 @@
 #   make test-workflow             Both targeted and untargeted
 #
 # Prerequisites:
-#   - Active Python env with package deps installed (`pip install -e .`)
+#   - Repo .venv with package deps installed (`pip install -e .`), or set PYTHON=
 #   - Raw files under $(RAW_DIR) (default: data/raw_positive/)
 #
 # Large .raw files are not in git. Place them under data/raw_positive/
@@ -16,16 +16,24 @@
 
 SHELL := /bin/bash
 
-PYTHON ?= python
+# Prefer the repo virtualenv; override with e.g. PYTHON=python3 on the CLI.
+ifeq ($(origin PYTHON),undefined)
+  ifneq ($(wildcard .venv/bin/python),)
+    PYTHON := .venv/bin/python
+  else
+    PYTHON := python
+  endif
+endif
 
 # Shared raw input for HILIC QC test runs
 RAW_DIR ?= data/raw_positive
 
-# Targeted defaults (data/)
-TARGETED_CONFIG      ?= data/hilic_pipeline_config.json
+# Targeted: built-in preset CLI (method + search + folders)
+METHOD ?= hilic_metab_pnnl
 TARGETED_RESULTS_DIR ?= data/results_hilic_pos
 
-# Untargeted defaults (data/)
+# Untargeted smoke: advanced JSON so fixtures named QC_Metab_* still match
+# (preset untargeted filter is "Pooled"; local smoke data uses QC_Metab_ stems).
 UNTARGETED_CONFIG      ?= data/hilic_pipeline_config_untargeted.json
 UNTARGETED_RESULTS_DIR ?= data/results_hilic_pos_untargeted
 
@@ -37,33 +45,63 @@ TEST_DATA_ARCHIVE_URL ?=
 
 .PHONY: help \
 	check-test-data get-test-data \
+	test-unit \
 	test-workflow-targeted test-workflow-untargeted test-workflow \
-	verify-workflow-outputs
+	verify-workflow-outputs \
+	changelog-draft
 
 help:
 	@echo "MetabWatch workflow test targets"
 	@echo ""
+	@echo "  make test-unit                 Config loader unit tests (pytest)"
 	@echo "  make test-workflow-targeted    Targeted mode (--once --force-reprocess)"
 	@echo "  make test-workflow-untargeted  Untargeted mode (--once --force-reprocess)"
 	@echo "  make test-workflow             Targeted, then untargeted"
 	@echo "  make check-test-data           Verify local raw test data is present"
 	@echo "  make get-test-data             Download test data (when URL configured) or check local"
 	@echo "  make verify-workflow-outputs   Check expected result files (set RESULTS_DIR=...)"
+	@echo "  make changelog-draft           Print origin/main..HEAD subjects for docs/CHANGELOG.md"
 	@echo ""
 	@echo "Variables (override on the command line):"
 	@echo "  PYTHON=$(PYTHON)"
 	@echo "  RAW_DIR=$(RAW_DIR)"
-	@echo "  TARGETED_CONFIG=$(TARGETED_CONFIG)"
+	@echo "  METHOD=$(METHOD)   # hilic_metab_pnnl or rp_metab_pnnl (targeted smoke uses preset CLI)"
 	@echo "  TARGETED_RESULTS_DIR=$(TARGETED_RESULTS_DIR)"
-	@echo "  UNTARGETED_CONFIG=$(UNTARGETED_CONFIG)"
+	@echo "  UNTARGETED_CONFIG=$(UNTARGETED_CONFIG)  # advanced JSON for QC_Metab fixtures"
 	@echo "  UNTARGETED_RESULTS_DIR=$(UNTARGETED_RESULTS_DIR)"
 	@echo ""
 	@echo "Workflow tests always pass --once --force-reprocess (full end-to-end from raw)."
+	@echo "Targeted uses: metabwatch --method \$$METHOD --search targeted -i -o"
+	@echo "Untargeted smoke keeps --config (sample filter QC_Metab_*, not Pooled)."
 	@echo ""
 	@echo "Examples:"
+	@echo "  make test-unit"
 	@echo "  make test-workflow-targeted"
 	@echo "  make test-workflow-untargeted"
-	@echo "  make test-workflow PYTHON=./venv/bin/python"
+	@echo "  make test-workflow"
+	@echo "  make test-workflow PYTHON=python3   # override default .venv"
+	@echo "  make changelog-draft"
+
+# ---------------------------------------------------------------------------
+# Release helpers
+# ---------------------------------------------------------------------------
+
+# Print commit subjects since origin/main for hand-editing into docs/CHANGELOG.md.
+# Does not modify any files. See docs/RELEASING.md.
+changelog-draft:
+	@git fetch origin main --quiet 2>/dev/null || true
+	@echo "=== Commits origin/main..HEAD (no merges) — draft into docs/CHANGELOG.md ==="
+	@git log origin/main..HEAD --oneline --no-merges
+	@echo "=== End draft list ==="
+
+# ---------------------------------------------------------------------------
+# Unit tests
+# ---------------------------------------------------------------------------
+
+test-unit:
+	@echo "=== Unit tests (Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')) ==="
+	$(PYTHON) -m pytest tests/test_config.py tests/test_presets.py tests/test_cli_presets.py tests/test_polarity.py -q
+	@echo "=== Unit tests PASSED ==="
 
 # ---------------------------------------------------------------------------
 # Test data
@@ -115,14 +153,18 @@ get-test-data:
 # ---------------------------------------------------------------------------
 
 test-workflow-targeted: check-test-data
-	@if [ ! -f "$(TARGETED_CONFIG)" ]; then \
-		echo "Error: targeted config missing: $(TARGETED_CONFIG)"; \
+	@if [ ! -x "$(PYTHON)" ] && ! command -v "$(PYTHON)" >/dev/null 2>&1; then \
+		echo "Error: Python not found: $(PYTHON)"; \
+		echo "Create the repo venv (.venv) or set PYTHON=..."; \
 		exit 1; \
 	fi
 	@echo "=== Targeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
-	@echo "Config: $(TARGETED_CONFIG)  (--once --force-reprocess)"
-	$(PYTHON) src/pipeline.py --mode watch --config $(TARGETED_CONFIG) --once --force-reprocess
+	@echo "Preset: --method $(METHOD) --search targeted  (--once --force-reprocess)"
+	$(PYTHON) -m metabwatch.pipeline --mode watch \
+		--method $(METHOD) --search targeted \
+		--input $(RAW_DIR) --output $(TARGETED_RESULTS_DIR) \
+		--once --force-reprocess
 	@$(MAKE) verify-workflow-outputs RESULTS_DIR="$(TARGETED_RESULTS_DIR)"
 	@echo "=== Targeted workflow test PASSED ==="
 
@@ -131,10 +173,15 @@ test-workflow-untargeted: check-test-data
 		echo "Error: untargeted config missing: $(UNTARGETED_CONFIG)"; \
 		exit 1; \
 	fi
+	@if [ ! -x "$(PYTHON)" ] && ! command -v "$(PYTHON)" >/dev/null 2>&1; then \
+		echo "Error: Python not found: $(PYTHON)"; \
+		echo "Create the repo venv (.venv) or set PYTHON=..."; \
+		exit 1; \
+	fi
 	@echo "=== Untargeted workflow test ==="
 	@echo "Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "Config: $(UNTARGETED_CONFIG)  (--once --force-reprocess)"
-	$(PYTHON) src/pipeline.py --mode watch --config $(UNTARGETED_CONFIG) --once --force-reprocess
+	$(PYTHON) -m metabwatch.pipeline --mode watch --config $(UNTARGETED_CONFIG) --once --force-reprocess
 	@$(MAKE) verify-workflow-outputs RESULTS_DIR="$(UNTARGETED_RESULTS_DIR)"
 	@echo "=== Untargeted workflow test PASSED ==="
 
@@ -142,7 +189,7 @@ test-workflow: test-workflow-targeted test-workflow-untargeted
 	@echo ""
 	@echo "========================================"
 	@echo " test-workflow: ALL CHECKS PASSED"
-	@echo "  targeted:   $(TARGETED_CONFIG) -> $(TARGETED_RESULTS_DIR)"
+	@echo "  targeted:   --method $(METHOD) --search targeted -> $(TARGETED_RESULTS_DIR)"
 	@echo "  untargeted: $(UNTARGETED_CONFIG) -> $(UNTARGETED_RESULTS_DIR)"
 	@echo "========================================"
 
