@@ -1,8 +1,9 @@
-"""Built-in RP / HILIC pipeline presets.
+"""Built-in PNNL Standard RP / HILIC metabolomics pipeline presets.
 
 Scientific assets (CoreMS TOML + QC compound CSVs) ship as package data under
-``metabwatch.presets.{hilic,rp}/``. Call :func:`build_pipeline_config` for the
-four common modes; the CLI and a future GUI both use this API.
+``metabwatch.presets.{hilic_metab_pnnl,rp_metab_pnnl}/``. Call
+:func:`build_pipeline_config` for the four common modes; the CLI and GUI both
+use this API.
 """
 
 from __future__ import annotations
@@ -11,16 +12,16 @@ from pathlib import Path
 
 from metabwatch.config import PipelineConfig, _NormalizedConfig, _build_pipeline_config
 
-_METHODS = frozenset({"rp", "hilic"})
+_METHODS = frozenset({"rp_metab_pnnl", "hilic_metab_pnnl"})
 _SEARCHES = frozenset({"targeted", "untargeted"})
 
 _THRESHOLDS: dict[str, dict[str, float]] = {
-    "hilic": {
+    "hilic_metab_pnnl": {
         "mz_tolerance_ppm": 5.0,
         "rt_tolerance": 0.8,
         "min_area": 1000.0,
     },
-    "rp": {
+    "rp_metab_pnnl": {
         "mz_tolerance_ppm": 5.0,
         "rt_tolerance": 0.4,
         "min_area": 20000.0,
@@ -52,7 +53,7 @@ def build_pipeline_config(
     Parameters
     ----------
     method
-        Chromatography method: ``"rp"`` or ``"hilic"``.
+        Chromatography method: ``"rp_metab_pnnl"`` or ``"hilic_metab_pnnl"``.
     search
         Search mode: ``"targeted"`` or ``"untargeted"``.
     input_folder

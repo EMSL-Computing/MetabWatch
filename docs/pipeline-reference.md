@@ -20,15 +20,15 @@ After `pip install -e .`:
 ### Standard path (presets)
 
 ```bash
-metabwatch --method hilic --search targeted \
+metabwatch --method hilic_metab_pnnl --search targeted \
   --input /path/to/raw --output /path/to/results
 # or short aliases:
-metabwatch --method rp --search untargeted -i RAW -o OUT
+metabwatch --method rp_metab_pnnl --search untargeted -i RAW -o OUT
 ```
 
 | Flag | Values | Meaning |
 |------|--------|---------|
-| `--method` | `rp`, `hilic` | Chromatography method (selects CoreMS + QC assets) |
+| `--method` | `hilic_metab_pnnl`, `rp_metab_pnnl` | PNNL standard method preset (selects CoreMS + QC assets) |
 | `--search` | `targeted`, `untargeted` | Search-space mode |
 | `--input` / `-i` | path | Folder of Thermo `.raw` files |
 | `--output` / `-o` | path | Results folder |
@@ -52,14 +52,14 @@ Simplified flat JSON and legacy nested schemas are both supported (see below).
 
 ## Built-in presets
 
-Assets ship with the package under `metabwatch.presets` (`src/presets/`):
+Assets ship with the package under `metabwatch.presets` (`src/presets/`). Method keys map to PNNL standard methods:
 
-| method | search | CoreMS | QC CSV | sample_name_regex | mz ppm | RT min | min_area |
-|--------|--------|--------|--------|-------------------|--------|--------|----------|
-| hilic | targeted | `hilic/corems.toml` | `hilic/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.8 | 1000 |
-| hilic | untargeted | `hilic/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.8 | 1000 |
-| rp | targeted | `rp/corems.toml` | `rp/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.4 | 20000 |
-| rp | untargeted | `rp/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.4 | 20000 |
+| method key | Display name | search | CoreMS | QC CSV | sample_name_regex | mz ppm | RT min | min_area |
+|------------|--------------|--------|--------|--------|-------------------|--------|--------|----------|
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | targeted | `hilic_metab_pnnl/corems.toml` | `hilic_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.8 | 1000 |
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | untargeted | `hilic_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.8 | 1000 |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | targeted | `rp_metab_pnnl/corems.toml` | `rp_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.4 | 20000 |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | untargeted | `rp_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.4 | 20000 |
 
 
 ## Example Commands
@@ -67,27 +67,27 @@ Assets ship with the package under `metabwatch.presets` (`src/presets/`):
 Watch mode (preset):
 
 ```bash
-metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos
+metabwatch --method hilic_metab_pnnl --search targeted -i data/raw_positive -o data/results_hilic_pos
 ```
 
 One-shot watch loop:
 
 ```bash
-metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos --once
+metabwatch --method hilic_metab_pnnl --search targeted -i data/raw_positive -o data/results_hilic_pos --once
 ```
 
 Force reprocess:
 Allows reprocessing of previously processed files (overwrites existing results):
 
 ```bash
-metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos \
+metabwatch --method hilic_metab_pnnl --search targeted -i data/raw_positive -o data/results_hilic_pos \
   --once --force-reprocess
 ```
 
 Single-file process mode:
 
 ```bash
-metabwatch --method hilic --search targeted -i data/raw_positive -o data/results_hilic_pos \
+metabwatch --method hilic_metab_pnnl --search targeted -i data/raw_positive -o data/results_hilic_pos \
   --mode process --raw data/raw_positive/your_file.raw
 ```
 
@@ -135,9 +135,9 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos",
-  "corems_params": "src/presets/hilic/corems.toml",
+  "corems_params": "src/presets/hilic_metab_pnnl/corems.toml",
   "targeted": true,
-  "qc_compounds": "src/presets/hilic/qc_compounds.csv",
+  "qc_compounds": "src/presets/hilic_metab_pnnl/qc_compounds.csv",
   "sample_name_regex": "QC_Metab_(.+)",
   "mz_tolerance_ppm": 5.0,
   "rt_tolerance": 0.8,
@@ -151,7 +151,7 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos_untargeted",
-  "corems_params": "src/presets/hilic/corems.toml",
+  "corems_params": "src/presets/hilic_metab_pnnl/corems.toml",
   "targeted": false,
   "sample_name_regex": "QC_Metab_(.+)",
   "top_n": 100

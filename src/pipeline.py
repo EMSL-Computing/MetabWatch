@@ -690,9 +690,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--method",
-        choices=["rp", "hilic"],
+        choices=["rp_metab_pnnl", "hilic_metab_pnnl"],
         default=None,
-        help="Chromatography method for a standard preset run",
+        help=(
+            "Method preset: hilic_metab_pnnl = PNNL Standard HILIC Metabolomics Method; "
+            "rp_metab_pnnl = PNNL Standard RP Metabolomics Method"
+        ),
     )
     parser.add_argument(
         "--search",

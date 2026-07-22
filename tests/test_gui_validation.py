@@ -16,12 +16,12 @@ from metabwatch.gui.validation import (
 
 
 def test_preset_summary_mentions_method_defaults() -> None:
-    text = preset_summary_text("hilic", "targeted")
+    text = preset_summary_text("hilic_metab_pnnl", "targeted")
     assert "0.8" in text
     assert "1000" in text
     assert "QC_Metab" in text
 
-    rp = preset_summary_text("rp", "untargeted")
+    rp = preset_summary_text("rp_metab_pnnl", "untargeted")
     assert "0.4" in text or "0.4" in rp
     assert "20000" in rp
     assert "Pooled" in rp
@@ -30,7 +30,7 @@ def test_preset_summary_mentions_method_defaults() -> None:
 def test_validate_preset_requires_existing_input(tmp_path: Path) -> None:
     req = GuiRunRequest(
         source="preset",
-        method="hilic",
+        method="hilic_metab_pnnl",
         search="targeted",
         input_folder=str(tmp_path / "missing"),
         output_folder=str(tmp_path / "out"),
@@ -45,7 +45,7 @@ def test_validate_preset_ok(tmp_path: Path) -> None:
     raw.mkdir()
     req = GuiRunRequest(
         source="preset",
-        method="hilic",
+        method="hilic_metab_pnnl",
         search="targeted",
         input_folder=str(raw),
         output_folder=str(tmp_path / "out"),
@@ -78,7 +78,7 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     out = tmp_path / "out"
     req = GuiRunRequest(
         source="preset",
-        method="rp",
+        method="rp_metab_pnnl",
         search="untargeted",
         input_folder=str(raw),
         output_folder=str(out),
@@ -99,7 +99,7 @@ def test_resolve_json_loads_config(tmp_path: Path) -> None:
     from metabwatch.presets import build_pipeline_config
 
     # Use build_pipeline_config only to locate a real corems.toml for the JSON
-    seed = build_pipeline_config("hilic", "targeted", raw, out)
+    seed = build_pipeline_config("hilic_metab_pnnl", "targeted", raw, out)
     payload = {
         "input_folder": str(raw),
         "output_folder": str(out),
@@ -126,7 +126,7 @@ def test_resolve_json_loads_config(tmp_path: Path) -> None:
 def test_resolve_raises_on_invalid_preset(tmp_path: Path) -> None:
     req = GuiRunRequest(
         source="preset",
-        method="hilic",
+        method="hilic_metab_pnnl",
         search="targeted",
         input_folder="",
         output_folder=str(tmp_path / "out"),

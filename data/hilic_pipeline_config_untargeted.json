@@ -1,7 +1,7 @@
 {
   "input_folder": "data/raw_positive",
   "output_folder": "data/results_hilic_pos_untargeted",
-  "corems_params": "src/presets/hilic/corems.toml",
+  "corems_params": "src/presets/hilic_metab_pnnl/corems.toml",
   "targeted": false,
   "sample_name_regex": "QC_Metab_(.+)",
   "top_n": 100,

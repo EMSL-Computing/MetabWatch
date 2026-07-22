@@ -1,20 +1,20 @@
 # Files in data folder
 
-1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026). The shipped search space is packaged as `metabwatch.presets.hilic` (`src/presets/hilic/qc_compounds.csv`).
+1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026). The shipped search space is packaged as `metabwatch.presets.hilic_metab_pnnl` (`src/presets/hilic_metab_pnnl/qc_compounds.csv`).
 
 2. **Built-in scientific presets** live in the package (not under `data/`):
 
-   | Method | CoreMS params | QC compounds CSV |
-   |--------|---------------|------------------|
-   | HILIC | `src/presets/hilic/corems.toml` | `src/presets/hilic/qc_compounds.csv` |
-   | RP | `src/presets/rp/corems.toml` | `src/presets/rp/qc_compounds.csv` |
+   | Method key | Display name | CoreMS params | QC compounds CSV |
+   |------------|--------------|---------------|------------------|
+   | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `src/presets/hilic_metab_pnnl/corems.toml` | `src/presets/hilic_metab_pnnl/qc_compounds.csv` |
+   | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `src/presets/rp_metab_pnnl/corems.toml` | `src/presets/rp_metab_pnnl/qc_compounds.csv` |
 
    Prefer the CLI presets (`--method` / `--search`) so these paths are resolved automatically after `pip install`.
 
 3. Example advanced JSON configs (optional `--config` path; repo-relative paths):
 
-   - `hilic_pipeline_config.json` — HILIC targeted
-   - `hilic_pipeline_config_untargeted.json` — HILIC untargeted (uses `QC_Metab_(.+)` for local smoke fixtures)
+   - `hilic_pipeline_config.json` — PNNL Standard HILIC targeted
+   - `hilic_pipeline_config_untargeted.json` — PNNL Standard HILIC untargeted (uses `QC_Metab_(.+)` for local smoke fixtures)
    - `hilic_pipeline_config_mixed.json` — mixed-polarity input folder (for polarity-policy demos)
 
 4. `raw_positive/`, `raw_negative/`, `raw_mixed/` — local Thermo `.raw` fixtures (gitignored / large files).
