@@ -42,6 +42,30 @@ python -m metabwatch.pipeline --method hilic --search targeted \
 3. Drop new `.raw` files into the input folder.
 4. Open the generated dashboard at `<output>/dashboard.html`.
 
+### GUI (Windows)
+
+**Recommended for non-coders:** double-click **`Start-MetabWatch.ps1`** in the repo root, or use a desktop shortcut created by a maintainer (named with the version, e.g. `MetabWatch 0.1.0`). Setup and shortcut steps: [docs/MAINTAINER.md](docs/MAINTAINER.md).
+
+For developers, after `pip install -e .`:
+
+```bash
+metabwatch-gui
+# or:
+python -m metabwatch.gui
+```
+
+The window provides:
+
+- **Preset shortcuts** — HILIC or RP × targeted or untargeted, plus input/output folder pickers
+- **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`)
+- **Watch continuously** or **Process once**, optional force reprocess
+- **Start / Stop** (stop finishes the current file, then exits the watch loop)
+- Live log, **Open dashboard**, and **Open output**
+
+Requires a Python install that includes **tkinter** (the official [python.org](https://www.python.org/downloads/) Windows installer does). Thermo `.raw` support needs `pythonnet` (and Mono on macOS/Linux).
+
+**macOS note:** TIC plots use a non-interactive matplotlib backend so the GUI does not freeze after the first sample. Prefer **Process once** for a single batch; **Watch continuously** keeps running (idle between files) until you press Stop.
+
 The watcher detects new files via filesystem notifications (`watchdog`) with a periodic directory-scan fallback (`discovery_mode`: `hybrid` by default). Files are processed only after they remain unchanged for `stability_wait_sec` (Thermo creation events fire before writing finishes). Duplicate processing is avoided via `pipeline_manifest.json`.
 
 ### One polarity per run
@@ -125,6 +149,7 @@ Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic,rp}/` (installed
 
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
+- Windows lab setup and desktop shortcut: [docs/MAINTAINER.md](docs/MAINTAINER.md)
 
 ## Requirements
 
