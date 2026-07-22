@@ -7,6 +7,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-22
+
+No functional changes; this is a patch release to update the changelog and docs for the 0.2.0 release.
+
+
 ## [0.2.0] - 2026-07-22
 
 ### Added

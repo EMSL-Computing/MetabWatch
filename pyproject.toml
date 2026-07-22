@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metabwatch"
-version = "0.2.0"
+version = "0.2.1"
 description = "MetabWatch: automated LC–MS metabolomics QC watcher for Thermo .raw files"
 readme = "README.md"
 requires-python = ">=3.10"
