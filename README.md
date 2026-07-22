@@ -44,7 +44,9 @@ python -m metabwatch.pipeline --method hilic --search targeted \
 
 ### GUI (Windows)
 
-For a point-and-click form (no CLI flags), launch:
+**Recommended for non-coders:** double-click **`Start-MetabWatch.ps1`** in the repo root, or use a desktop shortcut created by a maintainer (named with the version, e.g. `MetabWatch 0.1.0`). Setup and shortcut steps: [docs/MAINTAINER.md](docs/MAINTAINER.md).
+
+For developers, after `pip install -e .`:
 
 ```bash
 metabwatch-gui
@@ -147,6 +149,7 @@ Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic,rp}/` (installed
 
 - Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
 - Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
+- Windows lab setup and desktop shortcut: [docs/MAINTAINER.md](docs/MAINTAINER.md)
 
 ## Requirements
 

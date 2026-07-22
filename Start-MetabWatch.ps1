@@ -1,13 +1,7 @@
-# Launch MetabWatch GUI from the repo virtual environment.
-# Optional: -Config path\to\pipeline.json (pre-selects Custom JSON in the GUI).
-# Paths for raw/output live in the JSON — not in this script.
+# Launch MetabWatch GUI from the repo virtual environment (unconfigured form).
 #
-# Desktop shortcut Target example:
-#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\repo\Start-MetabWatch.ps1" -Config "C:\path\to\repo\data\lab_hilic_pos.json"
-
-param(
-    [string]$Config = ""
-)
+# Desktop shortcut Target example (name the shortcut with the version, e.g. "MetabWatch 0.1.0"):
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\repo\Start-MetabWatch.ps1"
 
 $ErrorActionPreference = "Stop"
 
@@ -53,87 +47,14 @@ From the repo root run:
 "@
 }
 
-$GuiArgs = @("-m", "metabwatch.gui")
-
-if ($Config) {
-    if (-not [System.IO.Path]::IsPathRooted($Config)) {
-        $Config = Join-Path $AppDir $Config
-    }
-    if (-not (Test-Path -LiteralPath $Config)) {
-        Stop-WithError "Configuration file was not found at:`n$Config"
-    }
-    $Config = (Resolve-Path -LiteralPath $Config).Path
-    if ([System.IO.Path]::GetExtension($Config).ToLowerInvariant() -ne ".json") {
-        Stop-WithError "Configuration file must be a .json file:`n$Config"
-    }
-
-    try {
-        $cfg = Get-Content -LiteralPath $Config -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        Stop-WithError "Could not parse configuration JSON:`n$Config`n`n$($_.Exception.Message)"
-    }
-
-    # Simplified flat schema (preferred)
-    $inputFolder = $cfg.input_folder
-    $outputFolder = $cfg.output_folder
-    # Legacy nested schema fallback
-    if (-not $inputFolder -and $cfg.watcher) {
-        $inputFolder = $cfg.watcher.raw_dir
-    }
-    if (-not $outputFolder -and $cfg.processor) {
-        $outputFolder = $cfg.processor.output_dir
-    }
-
-    if (-not $inputFolder -or -not $outputFolder) {
-        Stop-WithError @"
-Config is missing input/output paths.
-Expected top-level input_folder and output_folder
-(or legacy watcher.raw_dir / processor.output_dir):
-$Config
-"@
-    }
-
-    function Resolve-ConfigPath {
-        param([string]$PathValue)
-        if ([System.IO.Path]::IsPathRooted($PathValue)) {
-            return $PathValue
-        }
-        return (Join-Path $AppDir $PathValue)
-    }
-
-    $RawDir = Resolve-ConfigPath -PathValue ([string]$inputFolder)
-    $OutputDir = Resolve-ConfigPath -PathValue ([string]$outputFolder)
-
-    if (-not (Test-Path -LiteralPath $RawDir)) {
-        Stop-WithError "RAW data directory from config was not found at:`n$RawDir`n`n(Config: $Config)"
-    }
-
-    if (-not (Test-Path -LiteralPath $OutputDir)) {
-        Write-Host "Creating output directory from config:" -ForegroundColor Yellow
-        Write-Host "  $OutputDir"
-        New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-    }
-
-    Write-Host ""
-    Write-Host "Starting MetabWatch GUI" -ForegroundColor Green
-    Write-Host "Config:  $Config"
-    Write-Host "RAW:     $RawDir"
-    Write-Host "Results: $OutputDir"
-    Write-Host ""
-
-    $GuiArgs += @("--config", $Config)
-}
-else {
-    Write-Host ""
-    Write-Host "Starting MetabWatch GUI (no config pre-selected)" -ForegroundColor Green
-    Write-Host ""
-}
+Write-Host ""
+Write-Host "Starting MetabWatch GUI" -ForegroundColor Green
+Write-Host ""
 
 Set-Location -LiteralPath $AppDir
 
 try {
-    Start-Process -FilePath $Launcher -ArgumentList $GuiArgs -WorkingDirectory $AppDir
+    Start-Process -FilePath $Launcher -ArgumentList @("-m", "metabwatch.gui") -WorkingDirectory $AppDir
 }
 catch {
     Stop-WithError "Failed to start MetabWatch GUI:`n$($_.Exception.Message)"
