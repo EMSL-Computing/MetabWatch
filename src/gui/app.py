@@ -18,7 +18,7 @@ from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
 class MetabWatchApp(ttk.Frame):
     """Main application frame."""
 
-    def __init__(self, master: tk.Tk) -> None:
+    def __init__(self, master: tk.Tk, *, config_path: str | None = None) -> None:
         super().__init__(master, padding=12)
         self.master = master
         self.runner = PipelineRunner()
@@ -39,7 +39,17 @@ class MetabWatchApp(ttk.Frame):
         self._update_source_enabled()
         self._update_summary()
         self._set_running_ui(False)
+        if config_path:
+            self._prefill_config(config_path)
         self.after(150, self._drain_log)
+
+    def _prefill_config(self, config_path: str) -> None:
+        """Select Custom JSON and set the config path (launcher / CLI prefill)."""
+        path = str(Path(config_path).expanduser().resolve())
+        self.source_var.set("json")
+        self.config_var.set(path)
+        self._update_source_enabled()
+        self.status_var.set(f"Status: Idle (config: {Path(path).name})")
 
     def _build(self) -> None:
         self.grid(sticky="nsew")
@@ -423,9 +433,20 @@ class MetabWatchApp(ttk.Frame):
             subprocess.run(["xdg-open", str(path)], check=False)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Create the root window and run the Tk event loop."""
+    import argparse
+
     from metabwatch import get_version
+
+    parser = argparse.ArgumentParser(description="MetabWatch GUI")
+    parser.add_argument(
+        "--config",
+        metavar="PATH",
+        default=None,
+        help="Pre-select Custom JSON mode with this pipeline config file",
+    )
+    args = parser.parse_args(argv)
 
     version = get_version()
     root = tk.Tk()
@@ -444,7 +465,7 @@ def main() -> int:
         pass
 
     try:
-        MetabWatchApp(root)
+        MetabWatchApp(root, config_path=args.config)
     except Exception as exc:  # pragma: no cover - UI error path
         messagebox.showerror(
             "MetabWatch failed to start",
