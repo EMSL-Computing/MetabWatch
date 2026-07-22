@@ -20,6 +20,7 @@ First tagged release of the work accumulated on `dev` since `main`.
 - Area CV and area histogram on the dashboard landing page.
 - Unit tests and Makefile workflow smoke targets (targeted / untargeted).
 - Simplified flat JSON pipeline config (legacy nested schema still supported).
+- Maintainer changelog (`docs/CHANGELOG.md`), release process (`docs/RELEASING.md`), and `make changelog-draft`.
 
 ### Changed
 
