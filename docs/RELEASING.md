@@ -66,9 +66,9 @@ make changelog-draft
 
 Prints `origin/main..HEAD` commit subjects for editing into `docs/CHANGELOG.md`. Does not edit files.
 
-## First release (0.1.0)
+## First tagged release under this process
 
-Ship **0.1.0** as the first tagged release of accumulated `dev` work vs `main`. Version strings in `pyproject.toml` and `src/__init__.py` already match. The initial [CHANGELOG.md](CHANGELOG.md) entry summarizes user-facing changes on `dev` since `main`.
+Use the normal cut-a-release steps. Choose the version with semver (for example **0.2.0** when shipping a feature set that was still labeled 0.1.0 on `dev`). Keep `pyproject.toml` and `_FALLBACK_VERSION` in sync, and put the notes under a new section in [CHANGELOG.md](CHANGELOG.md) drafted from `origin/main..HEAD`.
 
 ## Checklist
 

@@ -44,7 +44,7 @@ python -m metabwatch.pipeline --method hilic_metab_pnnl --search targeted \
 
 ### GUI (Windows)
 
-**Recommended for non-coders:** double-click **`Start-MetabWatch.ps1`** in the repo root, or use a desktop shortcut created by a maintainer (named with the version, e.g. `MetabWatch 0.1.0`). Setup and shortcut steps: [docs/MAINTAINER.md](docs/MAINTAINER.md).
+**Recommended for non-coders:** double-click **`Start-MetabWatch.ps1`** in the repo root, or use a desktop shortcut created by a maintainer (named with the version, e.g. `MetabWatch 0.2.0`). Setup and shortcut steps: [docs/MAINTAINER.md](docs/MAINTAINER.md).
 
 For developers, after `pip install -e .`:
 

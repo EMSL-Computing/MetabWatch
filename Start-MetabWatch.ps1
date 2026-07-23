@@ -1,6 +1,6 @@
 # Launch MetabWatch GUI from the repo virtual environment (unconfigured form).
 #
-# Desktop shortcut Target example (name the shortcut with the version, e.g. "MetabWatch 0.1.0"):
+# Desktop shortcut Target example (name the shortcut with the version, e.g. "MetabWatch 0.2.0"):
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\repo\Start-MetabWatch.ps1"
 
 $ErrorActionPreference = "Stop"

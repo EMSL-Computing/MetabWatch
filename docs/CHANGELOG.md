@@ -7,9 +7,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-07-22
+## [0.2.1] - 2026-07-22
 
-First tagged release of the work accumulated on `dev` since `main`.
+No functional changes; this is a patch release to update the changelog and docs for the 0.2.0 release.
+
+
+## [0.2.0] - 2026-07-22
 
 ### Added
 
@@ -20,6 +23,7 @@ First tagged release of the work accumulated on `dev` since `main`.
 - Area CV and area histogram on the dashboard landing page.
 - Unit tests and Makefile workflow smoke targets (targeted / untargeted).
 - Simplified flat JSON pipeline config (legacy nested schema still supported).
+- Maintainer changelog (`docs/CHANGELOG.md`), release process (`docs/RELEASING.md`), and `make changelog-draft`.
 
 ### Changed
 
@@ -28,6 +32,6 @@ First tagged release of the work accumulated on `dev` since `main`.
 - Paths and project naming standardized on MetabWatch / `metabwatch`.
 - Makefile and `.gitignore` updated for a repo-local `.venv`.
 
-### Fixed
+## [0.1.0]
 
-- Restored the GUI path without Windows exe packaging complexity.
+Prior package version on `main` before the 0.2.0 release. No formal changelog was maintained for that line.
