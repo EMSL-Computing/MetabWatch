@@ -78,7 +78,7 @@ The dashboard header shows the run polarity (and warns if legacy mixed outputs a
 
 - A per-sample matches CSV (`*_targeted_matches.csv`)
 - A per-sample MS1 trace CSV (`*_ms1_traces.csv`)
-- A refreshed compound dashboard (`dashboard.html`) with polarity labeled
+- A compound dashboard (`dashboard.html`) with polarity labeled (plots work offline; Plotly.js is copied into the results folder). A waiting page is written at run start so you can open the dashboard while the first sample is still processing
 - Per-compound pages in `compounds/`
 - Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv`
 

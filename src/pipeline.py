@@ -357,6 +357,11 @@ def run_watch_mode(
         print(f"Invalid watcher.sample_name_regex: {exc}")
         return 2
 
+    # Openable waiting page while the first sample is still processing.
+    placeholder = synthesizer.write_placeholder_if_missing()
+    if placeholder.is_file():
+        print(f"[dashboard] {_clickable_path(placeholder)}")
+
     discovery_mode = config.watcher.discovery_mode
     # --once uses a full scan only (deterministic smoke tests; no observer).
     use_observer = (not once) and discovery_mode in {"hybrid", "watchdog"}
@@ -606,6 +611,8 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     except re.error as exc:
         print(f"Invalid watcher.sample_name_regex: {exc}")
         return 2
+
+    synthesizer.write_placeholder_if_missing()
 
     if not raw_file.exists():
         print(f"Raw file missing: {raw_file}")

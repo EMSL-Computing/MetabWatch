@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from metabwatch.synthesis.synthesizer import HTMLSynthesizer
+from metabwatch.synthesis.synthesizer import HTMLSynthesizer, PLOTLY_JS_FILENAME
 
 
 def _write_sample(
@@ -258,3 +258,70 @@ def test_landing_cv_histogram_data_matches_mean_cv(tmp_path: Path) -> None:
     assert by_name["Intensity CV"]["xbins"]["size"] == 5.0
     assert cv_plot["layout"]["barmode"] == "overlay"
     assert any(shape.get("x0") == 30 for shape in cv_plot["layout"]["shapes"])
+
+
+def test_write_placeholder_if_missing(tmp_path: Path) -> None:
+    """Placeholder dashboard appears before first synthesis; not overwritten."""
+    output_dir = tmp_path / "results"
+    html_output = output_dir / "dashboard.html"
+    synth = HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+    )
+
+    path = synth.write_placeholder_if_missing()
+    assert path == html_output
+    assert html_output.is_file()
+    text = html_output.read_text(encoding="utf-8")
+    assert "Processing first sample" in text
+    assert "Refresh" in text or "refresh" in text
+    assert "cdn.plot.ly" not in text
+
+    # Second call must not clobber an existing file (placeholder or real).
+    html_output.write_text("KEEP_ME", encoding="utf-8")
+    synth.write_placeholder_if_missing()
+    assert html_output.read_text(encoding="utf-8") == "KEEP_ME"
+
+
+def test_dashboard_uses_local_plotly_offline(tmp_path: Path) -> None:
+    """Dashboard HTML must load vendored Plotly.js (no CDN) for offline use."""
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 100.0,
+                "area": 1000.0,
+            }
+        ],
+    )
+
+    synth = HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+    )
+    synth.render()
+
+    plotly_dest = output_dir / PLOTLY_JS_FILENAME
+    assert plotly_dest.is_file()
+    assert plotly_dest.stat().st_size > 1000
+
+    index_html = html_output.read_text(encoding="utf-8")
+    assert "cdn.plot.ly" not in index_html
+    assert f'src="{PLOTLY_JS_FILENAME}"' in index_html
+    assert "Plotly.newPlot" in index_html
+
+    compound_html = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
+    assert "cdn.plot.ly" not in compound_html
+    assert f'src="../{PLOTLY_JS_FILENAME}"' in compound_html
