@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = ["__version__", "get_version"]
 
 # Fallback when package metadata is unavailable (editable/dev edge cases).
-_FALLBACK_VERSION = "0.2.1"
+_FALLBACK_VERSION = "0.2.2"
 
 
 def get_version() -> str:

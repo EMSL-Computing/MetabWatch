@@ -7,6 +7,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-04
+
 ### Added
 
 - Offline dashboard charts: vendored Plotly.js is copied into the results folder (no CDN).
