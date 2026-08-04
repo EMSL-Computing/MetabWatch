@@ -16,6 +16,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - Maintainer and release docs cover offline Plotly packaging, lab reinstall, and blank-plot troubleshooting.
 
+### Fixed
+
+- PNNL Standard RP Metabolomics Method CoreMS preset: use `persistent homology` peak picking and raised PH intensity/persistence floors so defaults are compatible with the pinned CoreMS release (closes #14).
+
 ## [0.2.1] - 2026-07-22
 
 No functional changes; this is a patch release to update the changelog and docs for the 0.2.0 release.
