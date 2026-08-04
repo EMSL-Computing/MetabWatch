@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Offline dashboard charts: vendored Plotly.js is copied into the results folder (no CDN).
+- Waiting-page `dashboard.html` at run start so the dashboard can be opened while the first sample is still processing.
+
+### Changed
+
+- Maintainer and release docs cover offline Plotly packaging, lab reinstall, and blank-plot troubleshooting.
+
 ### Fixed
 
 - PNNL Standard RP Metabolomics Method CoreMS preset: use `persistent homology` peak picking and raised PH intensity/persistence floors so defaults are compatible with the pinned CoreMS release (closes #14).

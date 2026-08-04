@@ -72,7 +72,7 @@ packages = [
 [tool.setuptools.package-data]
 "metabwatch.presets.hilic_metab_pnnl" = ["*.toml", "*.csv"]
 "metabwatch.presets.rp_metab_pnnl" = ["*.toml", "*.csv"]
-"metabwatch.synthesis" = ["templates/*"]
+"metabwatch.synthesis" = ["templates/*", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -396,11 +396,34 @@ class MetabWatchApp(ttk.Frame):
                 messagebox.showerror("Open dashboard", str(exc))
                 return
         if not path.is_file():
-            messagebox.showinfo(
-                "Open dashboard",
-                f"Dashboard not found yet:\n{path}\n\nRun the pipeline first.",
-            )
-            return
+            # Write the same waiting page used at pipeline start (if output is known).
+            try:
+                from metabwatch.synthesis.synthesizer import HTMLSynthesizer
+
+                cfg = self.runner.state.config
+                if cfg is None:
+                    from metabwatch.gui.validation import resolve_config
+
+                    cfg = resolve_config(self._build_request())
+                HTMLSynthesizer(
+                    output_dirs=(cfg.synthesizer.output_dir,),
+                    html_output=path,
+                    mz_tolerance_ppm=cfg.synthesizer.mz_tolerance_ppm,
+                    rt_tolerance=cfg.synthesizer.rt_tolerance,
+                    untargeted_mode=(cfg.search_space.mode == "untargeted"),
+                ).write_placeholder_if_missing()
+            except Exception as exc:
+                messagebox.showinfo(
+                    "Open dashboard",
+                    f"Dashboard not found yet:\n{path}\n\n{exc}",
+                )
+                return
+            if not path.is_file():
+                messagebox.showinfo(
+                    "Open dashboard",
+                    f"Dashboard not found yet:\n{path}\n\nRun the pipeline first.",
+                )
+                return
         webbrowser.open(path.resolve().as_uri())
 
     def _open_output(self) -> None:

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 
 import pandas as pd
+
+# Vendored Plotly.js (offline dashboards). Copied next to dashboard.html on render.
+PLOTLY_JS_FILENAME = "plotly-2.35.2.min.js"
+_PLOTLY_PACKAGE_PATH = Path(__file__).resolve().parent / "static" / PLOTLY_JS_FILENAME
 
 
 class HTMLSynthesizer:
@@ -111,6 +116,100 @@ class HTMLSynthesizer:
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         tmp_path.write_text(content, encoding="utf-8")
         tmp_path.replace(path)
+
+    def _ensure_plotly_asset(self) -> Path:
+        """Copy vendored Plotly.js into the dashboard output directory.
+
+        Returns
+        -------
+        Path
+            Destination path next to ``dashboard.html`` (same folder).
+        """
+        if not _PLOTLY_PACKAGE_PATH.is_file():
+            raise FileNotFoundError(
+                f"Vendored Plotly.js missing: {_PLOTLY_PACKAGE_PATH}. "
+                "Reinstall metabwatch or restore src/synthesis/static/."
+            )
+        dest = self.html_output.parent / PLOTLY_JS_FILENAME
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_PLOTLY_PACKAGE_PATH, dest)
+        return dest
+
+    def write_placeholder_if_missing(self) -> Path:
+        """Write a waiting-page dashboard when no dashboard HTML exists yet.
+
+        Used at pipeline start so Open dashboard works while the first sample
+        is still processing. Does not overwrite an existing dashboard
+        (placeholder or full results).
+
+        Returns
+        -------
+        Path
+            Path to ``dashboard.html`` (existing or newly written).
+        """
+        if self.html_output.is_file():
+            return self.html_output
+        self._write_atomic(self.html_output, self._placeholder_html())
+        return self.html_output
+
+    @staticmethod
+    def _placeholder_html() -> str:
+        """Return HTML shown before the first synthesis completes."""
+        return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="15" />
+  <title>MetabWatch Compound Index</title>
+  <style>
+    :root {
+      --bg: #f6f7f2;
+      --panel: #ffffff;
+      --ink: #1f2623;
+      --line: #dde3dc;
+      --accent: #24584b;
+      --muted: #47524d;
+    }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: radial-gradient(circle at top right, #e4f1eb, var(--bg));
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px 24px;
+      box-shadow: 0 8px 22px rgba(17, 24, 39, 0.08);
+      max-width: 640px;
+      margin: 48px auto;
+    }
+    h1 { margin: 0 0 12px; font-size: 1.5rem; }
+    p { margin: 0 0 10px; color: var(--muted); line-height: 1.5; }
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: #eef6f2;
+      border: 1px solid #c5ddd3;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .hint { margin-top: 16px; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <section class="card">
+    <h1>MetabWatch Compound Index</h1>
+    <p class="status">Processing first sample&hellip;</p>
+    <p class="hint">Refresh this page to update once processing finishes (this page also auto-refreshes every 15 seconds).</p>
+  </section>
+</body>
+</html>
+"""
 
     @staticmethod
     def _write_atomic_csv(path: Path, df: pd.DataFrame) -> None:
@@ -956,7 +1055,7 @@ class HTMLSynthesizer:
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>MetabWatch Compound Index</title>
-    <script src=\"https://cdn.plot.ly/plotly-2.35.2.min.js\"></script>
+    <script src=\"{escape(PLOTLY_JS_FILENAME)}\"></script>
   <style>
     :root {{
       --bg: #f6f7f2;
@@ -1388,7 +1487,7 @@ class HTMLSynthesizer:
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>Compound Dashboard | {escape(compound['name'])}</title>
-  <script src=\"https://cdn.plot.ly/plotly-2.35.2.min.js\"></script>
+  <script src=\"../{escape(PLOTLY_JS_FILENAME)}\"></script>
   <style>
     :root {{
       --bg: #f6f7f2;
@@ -1512,6 +1611,8 @@ class HTMLSynthesizer:
         samples, compounds, polarities = self._build_dataset()
         polarity_label = self.format_run_polarity_label(polarities)
         self.last_polarity_label = polarity_label
+
+        self._ensure_plotly_asset()
 
         index_html = self._render_index(
             samples=samples,

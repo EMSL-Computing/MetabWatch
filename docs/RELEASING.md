@@ -54,7 +54,31 @@ How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin`
    ```
    Optionally create a GitLab **Release** from the tag in the UI (notes = the changelog section). Tags alone are enough if you do not use Releases.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
-9. Lab machines: `git pull`, reinstall if needed (`pip install -e .`), and create a new versioned desktop shortcut per [MAINTAINER.md](MAINTAINER.md) (e.g. `MetabWatch X.Y.Z`).
+9. Lab machines: `git pull`, **always** reinstall into the lab venv (`pip install -e .`) so package data (presets **and** vendored Plotly under `src/synthesis/static/`) is present, then create a new versioned desktop shortcut per [MAINTAINER.md](MAINTAINER.md) (e.g. `MetabWatch X.Y.Z`). Offline dashboards depend on that static file being installed; a `git pull` alone is not enough if the editable install is stale.
+
+### Offline dashboard assets (when relevant)
+
+Dashboard charts ship **offline by default** (no CDN). Maintainers should treat the vendored Plotly bundle as part of the release surface:
+
+| Item | Location |
+|------|----------|
+| Minified Plotly.js | `src/synthesis/static/plotly-*.min.js` (~4 MB; committed in git) |
+| Filename pin in code | `PLOTLY_JS_FILENAME` in `src/synthesis/synthesizer.py` |
+| Packaging | `pyproject.toml` → `[tool.setuptools.package-data]` → `"metabwatch.synthesis" = [..., "static/*"]` |
+
+**If you upgrade Plotly.js:**
+
+1. Download the matching `plotly-X.Y.Z.min.js` into `src/synthesis/static/`.
+2. Update `PLOTLY_JS_FILENAME` (and any tests that assert the name).
+3. Remove or stop shipping the old file so the tree stays clear.
+4. Note the upgrade under **Changed** or **Fixed** in the changelog (lab impact: reinstall + next dashboard rebuild recopies the JS into each results folder).
+
+**When cutting a release that touches packaging or the dashboard:**
+
+- Confirm `static/*` is still listed in `package-data` (do not drop it when editing `pyproject.toml`).
+- After install on a clean venv, confirm the file is reachable from the package tree (or that a one-sample smoke run writes `plotly-*.min.js` next to `dashboard.html`).
+
+Existing results folders from older builds that still point at `cdn.plot.ly` will not plot offline until the dashboard is regenerated (reprocess once or let a new sample finish synthesis).
 
 ### Helper (optional)
 
@@ -75,7 +99,8 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 - [ ] Changelog section for `X.Y.Z` written (from `main..dev`)
 - [ ] `pyproject.toml` version = `X.Y.Z`
 - [ ] `src/__init__.py` `_FALLBACK_VERSION` = `X.Y.Z`
+- [ ] If dashboard/packaging changed: vendored `src/synthesis/static/plotly-*.min.js` present, filename pin matches, `package-data` still includes `static/*`
 - [ ] MR into `main` opened and merged
 - [ ] Annotated tag `vX.Y.Z` pushed to `origin`
 - [ ] `dev` updated from `main` if needed
-- [ ] Lab shortcuts updated for the new version
+- [ ] Lab machines: `git pull` + `pip install -e .` (refreshes Plotly static asset) + versioned shortcut updated
