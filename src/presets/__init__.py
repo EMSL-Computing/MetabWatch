@@ -35,7 +35,7 @@ _THRESHOLDS: dict[str, dict[str, float]] = {
 
 _SAMPLE_REGEX = {
     "targeted": r"QC_Metab_(.+)",
-    "untargeted": r"(?i)Pooled",
+    "untargeted": r"(?i)Pool",
 }
 
 

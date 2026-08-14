@@ -58,9 +58,9 @@ Assets ship with the package under `metabwatch.presets` (`src/presets/`). Method
 | method key | Display name | search | CoreMS | QC CSV | sample_name_regex | mz ppm | RT min | min_area |
 |------------|--------------|--------|--------|--------|-------------------|--------|--------|----------|
 | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | targeted | `hilic_metab_pnnl/corems.toml` | `hilic_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.8 | 1000 |
-| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | untargeted | `hilic_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.8 | 1000 |
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | untargeted | `hilic_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.8 | 1000 |
 | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | targeted | `rp_metab_pnnl/corems.toml` | `rp_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.4 | 20000 |
-| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | untargeted | `rp_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pooled` | 5 | 0.4 | 20000 |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | untargeted | `rp_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.4 | 20000 |
 
 
 ## Example Commands
