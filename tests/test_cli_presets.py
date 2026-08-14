@@ -69,6 +69,39 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     assert cfg.search_space.mode == "targeted"
     assert cfg.processor.params_path.is_file()
     assert cfg.watcher.sample_name_regex == r"QC_Metab_(.+)"
+    assert cfg.polarity is None
+
+
+def test_resolve_preset_polarity(tmp_path: Path) -> None:
+    ns = parse_args(
+        [
+            "--method",
+            "hilic_metab_pnnl",
+            "--search",
+            "targeted",
+            "--input",
+            str(tmp_path / "raw"),
+            "--output",
+            str(tmp_path / "out"),
+            "--polarity",
+            "negative",
+        ]
+    )
+    cfg = resolve_config_from_args(ns)
+    assert cfg.polarity == "negative"
+
+
+def test_resolve_rejects_polarity_with_config(tmp_path: Path) -> None:
+    ns = parse_args(
+        [
+            "--config",
+            str(tmp_path / "c.json"),
+            "--polarity",
+            "positive",
+        ]
+    )
+    with pytest.raises(ValueError, match="polarity"):
+        resolve_config_from_args(ns)
 
 
 def test_resolve_rejects_mixed_args(tmp_path: Path) -> None:

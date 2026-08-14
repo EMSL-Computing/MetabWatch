@@ -57,6 +57,7 @@ def test_simplified_targeted_loads_paths_and_mode(
     assert cfg.state.pipeline_manifest == (
         project_root / "data/results_hilic_pos/pipeline_manifest.json"
     )
+    assert cfg.polarity is None
 
 
 def test_simplified_untargeted_without_qc_compounds(
@@ -300,3 +301,58 @@ def test_absolute_paths_preserved(tmp_path: Path, project_root: Path) -> None:
     assert cfg.processor.output_dir == abs_output
     assert cfg.processor.params_path == abs_params
     assert cfg.processor.standards_csv == abs_qc
+
+
+def test_simplified_polarity_optional(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "polarity.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "polarity": "NEGATIVE",
+        },
+    )
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.polarity == "negative"
+
+
+def test_simplified_empty_polarity_is_auto(
+    tmp_path: Path, project_root: Path
+) -> None:
+    config_path = _write_json(
+        tmp_path / "empty_polarity.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "polarity": "",
+        },
+    )
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.polarity is None
+
+
+def test_simplified_invalid_polarity_raises(
+    tmp_path: Path, project_root: Path
+) -> None:
+    config_path = _write_json(
+        tmp_path / "bad_polarity.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "polarity": "both",
+        },
+    )
+    with pytest.raises(ValueError, match="polarity"):
+        load_pipeline_config(config_path, project_root)

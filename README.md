@@ -56,7 +56,7 @@ python -m metabwatch.gui
 
 The window provides:
 
-- **Preset shortcuts** — PNNL Standard HILIC / RP Metabolomics methods × targeted or untargeted, plus input/output folder pickers
+- **Preset shortcuts** — PNNL Standard HILIC / RP Metabolomics methods × targeted or untargeted, optional polarity (Auto / Positive / Negative), plus input/output folder pickers
 - **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`)
 - **Watch continuously** or **Process once**, optional force reprocess
 - **Start / Stop** (stop finishes the current file, then exits the watch loop)
@@ -70,7 +70,7 @@ The watcher detects new files via filesystem notifications (`watchdog`) with a p
 
 ### One polarity per run
 
-Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). The first successfully processed sample writes that polarity into `pipeline_manifest.json`; later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
+Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). Optionally set it up front (GUI **Polarity** radios, CLI `--polarity`, or JSON `"polarity"`); otherwise the first successfully processed sample writes it into `pipeline_manifest.json`. Later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
 
 The dashboard header shows the run polarity (and warns if legacy mixed outputs are present).
 

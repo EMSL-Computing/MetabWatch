@@ -7,6 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.
+
 ### Changed
 
 - Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
