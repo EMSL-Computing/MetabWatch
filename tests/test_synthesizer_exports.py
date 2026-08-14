@@ -317,10 +317,11 @@ def test_landing_cv_threshold_summary_matches_histogram(tmp_path: Path) -> None:
     # Intensity CVs 0% and 50% → <20%: 1/2 (50%); <30%: 1/2 (50%)
     # Area CVs 20% and 50% → <20%: 0/2 (0%); <30%: 1/2 (50%)
     assert 'id="landing-cv-summary"' in index_html
+    assert 'class="cv-overview"' in index_html
     assert "&lt; 20% CV" in index_html
     assert "&lt; 30% CV" in index_html
-    assert "1 / 2 (50%)" in index_html
-    assert "0 / 2 (0%)" in index_html
+    assert "<strong>50%</strong> (1/2)" in index_html
+    assert "<strong>0%</strong> (0/2)" in index_html
 
     _samples, compounds, _polarities = synth._build_dataset()
     intensity_cvs, area_cvs = synth._collect_landing_cvs(compounds)
@@ -331,8 +332,8 @@ def test_landing_cv_threshold_summary_matches_histogram(tmp_path: Path) -> None:
 
 
 def test_cv_below_cell_empty() -> None:
-    assert HTMLSynthesizer._format_cv_below_cell(0, 0) == "0 / 0"
-    assert HTMLSynthesizer._format_cv_below_cell(1, 2) == "1 / 2 (50%)"
+    assert HTMLSynthesizer._format_cv_below_cell(0, 0) == "<strong>0%</strong> (0/0)"
+    assert HTMLSynthesizer._format_cv_below_cell(1, 2) == "<strong>50%</strong> (1/2)"
 
 
 def test_write_placeholder_if_missing(tmp_path: Path) -> None:

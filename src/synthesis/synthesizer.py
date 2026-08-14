@@ -908,9 +908,10 @@ class HTMLSynthesizer:
 
     @staticmethod
     def _format_cv_below_cell(n: int, total: int) -> str:
+        """Return HTML: bold percent, then ``(n/N)``."""
         if total == 0:
-            return "0 / 0"
-        return f"{n} / {total} ({100.0 * n / total:.0f}%)"
+            return "<strong>0%</strong> (0/0)"
+        return f"<strong>{100.0 * n / total:.0f}%</strong> ({n}/{total})"
 
     def _render_cv_threshold_table(
         self, intensity_cvs: list[float], area_cvs: list[float]
@@ -923,8 +924,8 @@ class HTMLSynthesizer:
             rows.append(
                 "<tr>"
                 f"<th scope='row'>{label}</th>"
-                f"<td>{escape(self._format_cv_below_cell(n20, n_total))}</td>"
-                f"<td>{escape(self._format_cv_below_cell(n30, n_total))}</td>"
+                f"<td>{self._format_cv_below_cell(n20, n_total)}</td>"
+                f"<td>{self._format_cv_below_cell(n30, n_total)}</td>"
                 "</tr>"
             )
         body = "\n".join(rows)
@@ -1124,7 +1125,7 @@ class HTMLSynthesizer:
       border-radius: 14px;
       padding: 20px;
       box-shadow: 0 8px 22px rgba(17, 24, 39, 0.08);
-      max-width: 980px;
+      max-width: 1280px;
       margin: 0 auto;
     }}
     a {{ color: var(--accent); text-decoration: none; }}
@@ -1132,8 +1133,23 @@ class HTMLSynthesizer:
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
-    table.cv-summary {{ width: auto; max-width: 100%; margin: 8px 0 4px; }}
+    .cv-overview {{
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }}
+    #landing-cv {{ flex: 1 1 0; min-width: 0; }}
+    table.cv-summary {{
+      width: auto;
+      flex: 0 0 auto;
+      margin: 0;
+      white-space: nowrap;
+    }}
     table.cv-summary th[scope="row"] {{ background: #f0f4ef; font-weight: 600; }}
+    @media (max-width: 900px) {{
+      .cv-overview {{ flex-direction: column; align-items: stretch; }}
+      table.cv-summary {{ align-self: flex-start; }}
+    }}
         .section-title {{ margin: 22px 0 10px; }}
         .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
   </style>
@@ -1145,8 +1161,10 @@ class HTMLSynthesizer:
     {self._polarity_meta_html(polarity_label)}
 
         <h2 class=\"section-title\">Reproducibility overview (CV)</h2>
-        <div id=\"landing-cv\"></div>
-        {cv_summary_html}
+        <div class=\"cv-overview\">
+          <div id=\"landing-cv\"></div>
+          {cv_summary_html}
+        </div>
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>
