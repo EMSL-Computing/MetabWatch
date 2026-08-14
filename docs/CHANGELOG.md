@@ -9,11 +9,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex (`QC_Metab_` / `Pool`) still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
 - Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.
 
 ### Changed
 
+- GUI label **Method** is now **LC Method**.
 - Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
 
 ## [0.2.2] - 2026-08-04

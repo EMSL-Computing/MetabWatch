@@ -85,6 +85,9 @@ class WatcherConfig:
         Number of seconds a file must remain unchanged to be treated as stable.
     sample_name_regex : str | None
         Optional regex applied to raw filename stem to decide processing.
+    project_id : str
+        Optional case-insensitive substring of the filename stem. Empty
+        means no extra filter; the regex still applies.
     discovery_mode : str
         How new files are discovered: ``hybrid`` (watchdog + fallback poll,
         default), ``watchdog`` (FS events + startup scan only), or ``poll``
@@ -95,6 +98,7 @@ class WatcherConfig:
     stability_wait_sec: float = 20.0
     sample_name_regex: str | None = None
     discovery_mode: str = "hybrid"
+    project_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -322,6 +326,13 @@ def _normalize_optional_polarity(value: Any, *, context: str) -> str | None:
     return text
 
 
+def _normalize_project_id(value: Any) -> str:
+    """Return a stripped project-id substring, or empty when unset."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 @dataclass(frozen=True)
 class _NormalizedConfig:
     """Intermediate field bag shared by simplified and legacy loaders."""
@@ -349,6 +360,7 @@ class _NormalizedConfig:
     initial_backoff_sec: float
     backoff_multiplier: float
     polarity: str | None = None
+    project_id: str = ""
 
 
 def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
@@ -412,6 +424,7 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         polarity=_normalize_optional_polarity(
             payload.get("polarity"), context=context
         ),
+        project_id=_normalize_project_id(payload.get("project_id")),
     )
 
 
@@ -491,6 +504,9 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
         polarity=_normalize_optional_polarity(
             payload.get("polarity"), context="legacy config"
         ),
+        project_id=_normalize_project_id(
+            payload.get("project_id", watcher.get("project_id"))
+        ),
     )
 
 
@@ -536,6 +552,7 @@ def _build_pipeline_config(
             stability_wait_sec=normalized.stability_wait_sec,
             sample_name_regex=normalized.sample_name_regex,
             discovery_mode=normalized.discovery_mode,
+            project_id=normalized.project_id,
         ),
         state=StateConfig(
             pipeline_manifest=output_dir / "pipeline_manifest.json",

@@ -58,6 +58,7 @@ def test_simplified_targeted_loads_paths_and_mode(
         project_root / "data/results_hilic_pos/pipeline_manifest.json"
     )
     assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
 
 
 def test_simplified_untargeted_without_qc_compounds(
@@ -356,3 +357,37 @@ def test_simplified_invalid_polarity_raises(
     )
     with pytest.raises(ValueError, match="polarity"):
         load_pipeline_config(config_path, project_root)
+
+
+def test_simplified_project_id_optional(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "project.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": False,
+            "sample_name_regex": "(?i)Pool",
+            "project_id": " 25-02 ",
+        },
+    )
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.watcher.project_id == "25-02"
+    assert cfg.watcher.sample_name_regex == "(?i)Pool"
+
+
+def test_simplified_empty_project_id(tmp_path: Path, project_root: Path) -> None:
+    config_path = _write_json(
+        tmp_path / "empty_project.json",
+        {
+            "input_folder": "data/raw_positive",
+            "output_folder": "data/results_hilic_pos",
+            "corems_params": "data/corems_params/params.toml",
+            "targeted": True,
+            "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
+            "sample_name_regex": "QC_Metab_(.+)",
+            "project_id": "",
+        },
+    )
+    cfg = load_pipeline_config(config_path, project_root)
+    assert cfg.watcher.project_id == ""

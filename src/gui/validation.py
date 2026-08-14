@@ -43,6 +43,7 @@ class GuiRunRequest:
     method: str | None = None
     search: str | None = None
     polarity: str | None = None
+    project_id: str | None = None
     input_folder: str | None = None
     output_folder: str | None = None
     config_path: str | None = None
@@ -124,4 +125,5 @@ def resolve_config(req: GuiRunRequest) -> PipelineConfig:
         Path(req.input_folder.strip()).expanduser(),
         Path(req.output_folder.strip()).expanduser(),
         polarity=polarity,
+        project_id=req.project_id or "",
     )
