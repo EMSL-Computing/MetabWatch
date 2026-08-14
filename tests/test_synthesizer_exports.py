@@ -260,6 +260,81 @@ def test_landing_cv_histogram_data_matches_mean_cv(tmp_path: Path) -> None:
     assert any(shape.get("x0") == 30 for shape in cv_plot["layout"]["shapes"])
 
 
+def test_landing_cv_threshold_summary_matches_histogram(tmp_path: Path) -> None:
+    """Summary table uses the same CVs as the histogram (below 20% / 30%)."""
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 100.0,
+                "area": 1000.0,
+            },
+            {
+                "mf_id": 1,
+                "compound_name": "Beta",
+                "intensity": 50.0,
+                "area": 400.0,
+            },
+        ],
+    )
+    _write_sample(
+        output_dir,
+        "sample_b",
+        acquisition_time="2026-01-01T11:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 300.0,
+                "area": 3000.0,
+            },
+            {
+                "mf_id": 1,
+                "compound_name": "Beta",
+                "intensity": 50.0,
+                "area": 600.0,
+            },
+        ],
+    )
+
+    synth = HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+    )
+    synth.render()
+    index_html = html_output.read_text(encoding="utf-8")
+
+    # Intensity CVs 0% and 50% → <20%: 1/2 (50%); <30%: 1/2 (50%)
+    # Area CVs 20% and 50% → <20%: 0/2 (0%); <30%: 1/2 (50%)
+    assert 'id="landing-cv-summary"' in index_html
+    assert "&lt; 20% CV" in index_html
+    assert "&lt; 30% CV" in index_html
+    assert "1 / 2 (50%)" in index_html
+    assert "0 / 2 (0%)" in index_html
+
+    _samples, compounds, _polarities = synth._build_dataset()
+    intensity_cvs, area_cvs = synth._collect_landing_cvs(compounds)
+    assert synth._count_cv_below(intensity_cvs, 20.0) == (1, 2)
+    assert synth._count_cv_below(intensity_cvs, 30.0) == (1, 2)
+    assert synth._count_cv_below(area_cvs, 20.0) == (0, 2)
+    assert synth._count_cv_below(area_cvs, 30.0) == (1, 2)
+
+
+def test_cv_below_cell_empty() -> None:
+    assert HTMLSynthesizer._format_cv_below_cell(0, 0) == "0 / 0"
+    assert HTMLSynthesizer._format_cv_below_cell(1, 2) == "1 / 2 (50%)"
+
+
 def test_write_placeholder_if_missing(tmp_path: Path) -> None:
     """Placeholder dashboard appears before first synthesis; not overwritten."""
     output_dir = tmp_path / "results"
