@@ -29,7 +29,7 @@ Built-in defaults (no extra flags needed):
 
 | Method | m/z ppm | RT (min) | min area | Sample name filter |
 |--------|---------|----------|----------|--------------------|
-| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pooled` (case-insensitive) |
+| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pool` (case-insensitive) |
 | PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
 
 Or as a module:
@@ -136,7 +136,7 @@ make test-workflow-targeted PYTHON=./venv/bin/python
 
 **Targeted** (`--search targeted`) matches against the packaged QC compound list for the method.
 
-**Untargeted** (`--search untargeted`) seeds the search space from the first sample whose name matches the untargeted filter (`Pooled` by default):
+**Untargeted** (`--search untargeted`) seeds the search space from the first sample whose name matches the untargeted filter (`Pool` by default):
 
 1. CoreMS untargeted peak picking + integration runs on that sample.
 2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_folder>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.
