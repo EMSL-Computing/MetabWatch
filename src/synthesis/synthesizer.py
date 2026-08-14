@@ -879,15 +879,16 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
-    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
-        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+    def _collect_landing_cvs(
+        self, compounds: dict[str, dict]
+    ) -> tuple[list[float], list[float]]:
+        """Return per-compound Intensity and Area CVs used on the landing page.
 
-        Uses the same ``_mean_cv`` definition as the compound index table.
-        Compounds missing area values contribute only to the intensity series.
+        Same ``_mean_cv`` definition as the compound index table. Compounds
+        missing area values contribute only to the intensity series.
         """
         intensity_cvs: list[float] = []
         area_cvs: list[float] = []
-
         for compound_name in sorted(compounds):
             series = compounds[compound_name]["samples"]
             if not series:
@@ -898,6 +899,51 @@ class HTMLSynthesizer:
                 intensity_cvs.append(float(intensity_cv))
             if area_cv is not None:
                 area_cvs.append(float(area_cv))
+        return intensity_cvs, area_cvs
+
+    @staticmethod
+    def _count_cv_below(cvs: list[float], threshold: float) -> tuple[int, int]:
+        """Return (n below threshold, N with a computable CV)."""
+        return sum(1 for cv in cvs if cv < threshold), len(cvs)
+
+    @staticmethod
+    def _format_cv_below_cell(n: int, total: int) -> str:
+        """Return HTML: bold percent, then ``(n/N)``."""
+        if total == 0:
+            return "<strong>0%</strong> (0/0)"
+        return f"<strong>{100.0 * n / total:.0f}%</strong> ({n}/{total})"
+
+    def _render_cv_threshold_table(
+        self, intensity_cvs: list[float], area_cvs: list[float]
+    ) -> str:
+        """HTML summary of compounds below 20% and 30% CV."""
+        rows: list[str] = []
+        for label, cvs in (("Intensity", intensity_cvs), ("Area", area_cvs)):
+            n20, n_total = self._count_cv_below(cvs, 20.0)
+            n30, _ = self._count_cv_below(cvs, 30.0)
+            rows.append(
+                "<tr>"
+                f"<th scope='row'>{label}</th>"
+                f"<td>{self._format_cv_below_cell(n20, n_total)}</td>"
+                f"<td>{self._format_cv_below_cell(n30, n_total)}</td>"
+                "</tr>"
+            )
+        body = "\n".join(rows)
+        return (
+            '<table class="cv-summary" id="landing-cv-summary">'
+            "<thead><tr>"
+            "<th></th><th>&lt; 20% CV</th><th>&lt; 30% CV</th>"
+            "</tr></thead>"
+            f"<tbody>{body}</tbody></table>"
+        )
+
+    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
+        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+
+        Uses the same ``_mean_cv`` definition as the compound index table.
+        Compounds missing area values contribute only to the intensity series.
+        """
+        intensity_cvs, area_cvs = self._collect_landing_cvs(compounds)
 
         all_cvs = intensity_cvs + area_cvs
         bin_size = 5.0
@@ -1030,6 +1076,8 @@ class HTMLSynthesizer:
                 samples=samples, compounds=compounds
             )
         cv_plot = self._build_landing_cv_histogram(compounds)
+        intensity_cvs, area_cvs = self._collect_landing_cvs(compounds)
+        cv_summary_html = self._render_cv_threshold_table(intensity_cvs, area_cvs)
         cv_json = json.dumps(cv_plot)
         mz_json = json.dumps(mz_plot)
         rt_json = json.dumps(rt_plot)
@@ -1077,7 +1125,7 @@ class HTMLSynthesizer:
       border-radius: 14px;
       padding: 20px;
       box-shadow: 0 8px 22px rgba(17, 24, 39, 0.08);
-      max-width: 980px;
+      max-width: 1280px;
       margin: 0 auto;
     }}
     a {{ color: var(--accent); text-decoration: none; }}
@@ -1085,6 +1133,23 @@ class HTMLSynthesizer:
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
+    .cv-overview {{
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }}
+    #landing-cv {{ flex: 1 1 0; min-width: 0; }}
+    table.cv-summary {{
+      width: auto;
+      flex: 0 0 auto;
+      margin: 0;
+      white-space: nowrap;
+    }}
+    table.cv-summary th[scope="row"] {{ background: #f0f4ef; font-weight: 600; }}
+    @media (max-width: 900px) {{
+      .cv-overview {{ flex-direction: column; align-items: stretch; }}
+      table.cv-summary {{ align-self: flex-start; }}
+    }}
         .section-title {{ margin: 22px 0 10px; }}
         .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
   </style>
@@ -1096,7 +1161,10 @@ class HTMLSynthesizer:
     {self._polarity_meta_html(polarity_label)}
 
         <h2 class=\"section-title\">Reproducibility overview (CV)</h2>
-        <div id=\"landing-cv\"></div>
+        <div class=\"cv-overview\">
+          <div id=\"landing-cv\"></div>
+          {cv_summary_html}
+        </div>
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>

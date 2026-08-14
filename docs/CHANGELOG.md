@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
 - Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.
 
 ### Changed
