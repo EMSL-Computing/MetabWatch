@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from metabwatch.config import PipelineConfig, _NormalizedConfig, _build_pipeline_config
+from metabwatch.config import (
+    PipelineConfig,
+    _NormalizedConfig,
+    _build_pipeline_config,
+    _normalize_optional_polarity,
+)
 
 _METHODS = frozenset({"rp_metab_pnnl", "hilic_metab_pnnl"})
 _SEARCHES = frozenset({"targeted", "untargeted"})
@@ -47,6 +52,7 @@ def build_pipeline_config(
     search: str,
     input_folder: Path | str,
     output_folder: Path | str,
+    polarity: str | None = None,
 ) -> PipelineConfig:
     """Build a :class:`PipelineConfig` for a standard method × search mode.
 
@@ -60,6 +66,9 @@ def build_pipeline_config(
         Directory of Thermo ``.raw`` files.
     output_folder
         Results directory (dashboard, manifest, exports).
+    polarity
+        Optional run polarity (``positive`` / ``negative``). ``None`` keeps
+        locking from the first successfully processed sample.
 
     Returns
     -------
@@ -69,7 +78,7 @@ def build_pipeline_config(
     Raises
     ------
     ValueError
-        If ``method`` or ``search`` is not recognized.
+        If ``method``, ``search``, or ``polarity`` is not recognized.
     FileNotFoundError
         If a packaged CoreMS or QC asset is missing.
     """
@@ -119,6 +128,7 @@ def build_pipeline_config(
         max_retries=3,
         initial_backoff_sec=10.0,
         backoff_multiplier=2.0,
+        polarity=_normalize_optional_polarity(polarity, context="preset"),
     )
     # Absolute paths already; base_dir is only used for any remaining relatives.
     return _build_pipeline_config(normalized, base_dir=Path.cwd())

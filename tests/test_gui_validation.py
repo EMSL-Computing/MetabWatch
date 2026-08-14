@@ -89,6 +89,39 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     assert cfg.processor.output_dir == out.resolve()
     assert cfg.processor.params_path.is_file()
     assert cfg.processor.min_area == 20000.0
+    assert cfg.polarity is None
+
+
+def test_resolve_preset_polarity_positive(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_pnnl",
+        search="untargeted",
+        polarity="positive",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    assert validate_request(req) is None
+    cfg = resolve_config(req)
+    assert cfg.polarity == "positive"
+
+
+def test_validate_preset_rejects_bad_polarity(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="hilic_metab_pnnl",
+        search="targeted",
+        polarity="both",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    err = validate_request(req)
+    assert err is not None
+    assert "polarity" in err.lower()
 
 
 def test_resolve_json_loads_config(tmp_path: Path) -> None:
