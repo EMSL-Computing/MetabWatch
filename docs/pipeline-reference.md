@@ -30,6 +30,7 @@ metabwatch --method rp_metab_pnnl --search untargeted -i RAW -o OUT
 |------|--------|---------|
 | `--method` | `hilic_metab_pnnl`, `rp_metab_pnnl` | PNNL standard method preset (selects CoreMS + QC assets) |
 | `--search` | `targeted`, `untargeted` | Search-space mode |
+| `--polarity` | `positive`, `negative` | Optional. Locks the run before the first sample. Omit to auto-detect. |
 | `--input` / `-i` | path | Folder of Thermo `.raw` files |
 | `--output` / `-o` | path | Results folder |
 
@@ -128,6 +129,7 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 | `debounce_sec` | `5.0` | Dashboard rebuild debounce |
 | `max_retries` / `initial_backoff_sec` / `backoff_multiplier` | `3` / `10` / `2` | Retry policy |
 | `stale_in_progress_sec` | `3600` | Stale in-progress threshold |
+| `polarity` | _(unset)_ | `positive` or `negative`. When set, the run locks before the first sample. Omit to lock from the first successful file. |
 
 ### Targeted example
 
@@ -167,9 +169,9 @@ Derived automatically (never set in JSON):
 
 MetabWatch does **not** allow mixed ionization polarities in one output folder:
 
-1. Polarity is read from CoreMS (`lcms_obj.polarity`) after opening each Thermo `.raw` file.
-2. On first successful completion, the polarity is stored in `pipeline_manifest.json` as top-level `"polarity"` (and on that sample’s entry).
-3. Later samples pass `expected_polarity` from the manifest into processing; a mismatch fails with a non-retryable `Polarity mismatch` error.
+1. Optionally declare polarity in the GUI (Auto / Positive / Negative), CLI `--polarity`, or JSON `polarity`. When set, the pipeline writes that value to `pipeline_manifest.json` at run start so the first file is also checked.
+2. If polarity is omitted (Auto), it is read from CoreMS (`lcms_obj.polarity`) after opening each Thermo `.raw` file, and the first successful completion stores it in `pipeline_manifest.json` as top-level `"polarity"` (and on that sample’s entry).
+3. Later samples pass `expected_polarity` from the manifest into processing; a mismatch fails with a non-retryable `Polarity mismatch` error. A config/GUI/CLI polarity that disagrees with an existing lock fails immediately, before processing.
 4. In a multi-file batch (bootstrap / `--once` / force-reprocess), remaining files after the first mismatch are **hard-stopped**. With `--once`, the process exits non-zero.
 5. In continuous watch mode, a late opposite-polarity drop is rejected, but the watcher keeps running for matching-polarity files.
 6. The standards CSV may still list both polarities; only rows matching the sample’s polarity are searched.

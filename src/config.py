@@ -66,6 +66,7 @@ class ProcessorConfig:
 
 
 DISCOVERY_MODES = frozenset({"hybrid", "watchdog", "poll"})
+POLARITIES = frozenset({"positive", "negative"})
 
 
 @dataclass(frozen=True)
@@ -174,6 +175,9 @@ class PipelineConfig:
         Dashboard generation configuration.
     search_space : SearchSpaceConfig
         Search-space source configuration.
+    polarity : str | None
+        Optional run polarity (``positive`` / ``negative``). ``None`` means
+        lock from the first successfully processed sample.
     """
     processor: ProcessorConfig
     watcher: WatcherConfig
@@ -183,6 +187,7 @@ class PipelineConfig:
     max_retries: int = 3
     initial_backoff_sec: float = 10.0
     backoff_multiplier: float = 2.0
+    polarity: str | None = None
 
 
 # Keys that mark the preferred flat simplified schema.
@@ -302,6 +307,21 @@ def _normalize_discovery_mode(value: Any, *, context: str) -> str:
     return mode
 
 
+def _normalize_optional_polarity(value: Any, *, context: str) -> str | None:
+    """Return ``positive`` / ``negative``, or ``None`` when polarity is unset."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text == "":
+        return None
+    if text not in POLARITIES:
+        allowed = ", ".join(sorted(POLARITIES))
+        raise ValueError(
+            f"{context}: polarity must be one of {{{allowed}}}, got {value!r}"
+        )
+    return text
+
+
 @dataclass(frozen=True)
 class _NormalizedConfig:
     """Intermediate field bag shared by simplified and legacy loaders."""
@@ -328,6 +348,7 @@ class _NormalizedConfig:
     max_retries: int
     initial_backoff_sec: float
     backoff_multiplier: float
+    polarity: str | None = None
 
 
 def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
@@ -388,6 +409,9 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         max_retries=_optional_int(payload, "max_retries", 3),
         initial_backoff_sec=_optional_float(payload, "initial_backoff_sec", 10.0),
         backoff_multiplier=_optional_float(payload, "backoff_multiplier", 2.0),
+        polarity=_normalize_optional_polarity(
+            payload.get("polarity"), context=context
+        ),
     )
 
 
@@ -464,6 +488,9 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
         max_retries=int(payload.get("max_retries", 3)),
         initial_backoff_sec=float(payload.get("initial_backoff_sec", 10.0)),
         backoff_multiplier=float(payload.get("backoff_multiplier", 2.0)),
+        polarity=_normalize_optional_polarity(
+            payload.get("polarity"), context="legacy config"
+        ),
     )
 
 
@@ -529,6 +556,7 @@ def _build_pipeline_config(
         max_retries=normalized.max_retries,
         initial_backoff_sec=normalized.initial_backoff_sec,
         backoff_multiplier=normalized.backoff_multiplier,
+        polarity=normalized.polarity,
     )
 
 
