@@ -31,7 +31,7 @@ PRESET_SUMMARIES: dict[str, dict[str, str]] = {
 
 SAMPLE_FILTER_LABELS = {
     "targeted": "QC_Metab_(.+)",
-    "untargeted": "Pooled (case-insensitive)",
+    "untargeted": "Pool (case-insensitive)",
 }
 
 

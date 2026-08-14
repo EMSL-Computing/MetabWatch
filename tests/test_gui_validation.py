@@ -24,7 +24,7 @@ def test_preset_summary_mentions_method_defaults() -> None:
     rp = preset_summary_text("rp_metab_pnnl", "untargeted")
     assert "0.4" in text or "0.4" in rp
     assert "20000" in rp
-    assert "Pooled" in rp
+    assert "Pool" in rp
 
 
 def test_validate_preset_requires_existing_input(tmp_path: Path) -> None:

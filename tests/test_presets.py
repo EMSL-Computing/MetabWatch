@@ -13,9 +13,9 @@ from metabwatch.presets import build_pipeline_config
     "method,search,expect_mode,mz,rt,min_area,regex_fragment",
     [
         ("hilic_metab_pnnl", "targeted", "targeted", 5.0, 0.8, 1000.0, "QC_Metab_"),
-        ("hilic_metab_pnnl", "untargeted", "untargeted", 5.0, 0.8, 1000.0, "Pooled"),
+        ("hilic_metab_pnnl", "untargeted", "untargeted", 5.0, 0.8, 1000.0, "Pool"),
         ("rp_metab_pnnl", "targeted", "targeted", 5.0, 0.4, 20000.0, "QC_Metab_"),
-        ("rp_metab_pnnl", "untargeted", "untargeted", 5.0, 0.4, 20000.0, "Pooled"),
+        ("rp_metab_pnnl", "untargeted", "untargeted", 5.0, 0.4, 20000.0, "Pool"),
     ],
 )
 def test_build_pipeline_config_matrix(
