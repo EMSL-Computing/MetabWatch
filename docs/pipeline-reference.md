@@ -31,6 +31,7 @@ metabwatch --method rp_metab_pnnl --search untargeted -i RAW -o OUT
 | `--method` | `hilic_metab_pnnl`, `rp_metab_pnnl` | PNNL standard method preset (selects CoreMS + QC assets) |
 | `--search` | `targeted`, `untargeted` | Search-space mode |
 | `--polarity` | `positive`, `negative` | Optional. Locks the run before the first sample. Omit to auto-detect. |
+| `--project-id` | string | Optional filename-stem substring (batch / project). Combined with the preset sample filter. Omit for no extra filter. |
 | `--input` / `-i` | path | Folder of Thermo `.raw` files |
 | `--output` / `-o` | path | Results folder |
 
@@ -130,6 +131,7 @@ Configs use a flat JSON schema. Relative paths resolve against the process worki
 | `max_retries` / `initial_backoff_sec` / `backoff_multiplier` | `3` / `10` / `2` | Retry policy |
 | `stale_in_progress_sec` | `3600` | Stale in-progress threshold |
 | `polarity` | _(unset)_ | `positive` or `negative`. When set, the run locks before the first sample. Omit to lock from the first successful file. |
+| `project_id` | `""` | Optional case-insensitive substring of the raw filename stem. Empty means no extra filter; `sample_name_regex` still applies. |
 
 ### Targeted example
 

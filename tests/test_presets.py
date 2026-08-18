@@ -41,6 +41,7 @@ def test_build_pipeline_config_matrix(
     assert cfg.processor.output_dir == out.resolve()
     assert regex_fragment.lower() in (cfg.watcher.sample_name_regex or "").lower()
     assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
     assert cfg.processor.params_path.is_file()
     assert cfg.processor.params_path.name == "corems.toml"
     if expect_mode == "targeted":
@@ -50,6 +51,18 @@ def test_build_pipeline_config_matrix(
     else:
         assert cfg.search_space.csv_path == out.resolve() / "untargeted_search_space.csv"
         assert cfg.search_space.top_n == 100
+
+
+def test_preset_project_id_optional(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "untargeted",
+        tmp_path,
+        tmp_path,
+        project_id=" 25-02 ",
+    )
+    assert cfg.watcher.project_id == "25-02"
+    assert "(?i)Pool" in (cfg.watcher.sample_name_regex or "")
 
 
 def test_preset_polarity_optional(tmp_path: Path) -> None:

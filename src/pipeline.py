@@ -101,11 +101,32 @@ def _compile_sample_regex(pattern_text: str | None) -> re.Pattern[str] | None:
     return re.compile(pattern_text)
 
 
-def _sample_allowed(raw_file: Path, sample_regex: re.Pattern[str] | None) -> bool:
-    """Return True when a sample should be processed under regex gating."""
-    if sample_regex is None:
-        return True
-    return bool(sample_regex.search(raw_file.stem))
+def _sample_ignore_reason(
+    raw_file: Path,
+    sample_regex: re.Pattern[str] | None,
+    project_id: str = "",
+) -> str | None:
+    """Return why a sample is ignored, or None when both filters pass.
+
+    The preset/config regex (``QC_Metab_`` / ``Pool``) is always applied when
+    set. A non-empty ``project_id`` is an extra case-insensitive substring
+    on the filename stem; both must pass.
+    """
+    if sample_regex is not None and not sample_regex.search(raw_file.stem):
+        return "sample_name_regex no match"
+    needle = (project_id or "").strip()
+    if needle and needle.lower() not in raw_file.stem.lower():
+        return "project_id no match"
+    return None
+
+
+def _sample_allowed(
+    raw_file: Path,
+    sample_regex: re.Pattern[str] | None,
+    project_id: str = "",
+) -> bool:
+    """Return True when a sample passes regex and optional project-id filters."""
+    return _sample_ignore_reason(raw_file, sample_regex, project_id) is None
 
 
 def _clickable_path(path: Path) -> str:
@@ -415,6 +436,11 @@ def run_watch_mode(
             f"({_discovery_mode_description(discovery_mode, config.watcher.poll_interval_sec)}). "
             f"{stop_hint}"
         )
+        if config.watcher.project_id:
+            print(
+                f"[watching] project_id substring {config.watcher.project_id!r} "
+                "(in addition to sample_name_regex)"
+            )
 
         if configured_polarity:
             print(f"[polarity] run locked to {configured_polarity} (from config)")
@@ -444,8 +470,11 @@ def run_watch_mode(
                         f"{len(bootstrap_files)} existing raw files"
                     )
             for raw_file in bootstrap_files:
-                if not _sample_allowed(raw_file, sample_regex):
-                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                reason = _sample_ignore_reason(
+                    raw_file, sample_regex, config.watcher.project_id
+                )
+                if reason:
+                    print(f"[ignored] {raw_file.name} ({reason})")
                     continue
                 if force_reprocess or state_store.should_process(raw_file):
                     queue.enqueue(raw_file)
@@ -464,8 +493,11 @@ def run_watch_mode(
             for raw_file in watcher.get_stable_new_files(
                 scan_directory=scan_each_cycle
             ):
-                if not _sample_allowed(raw_file, sample_regex):
-                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                reason = _sample_ignore_reason(
+                    raw_file, sample_regex, config.watcher.project_id
+                )
+                if reason:
+                    print(f"[ignored] {raw_file.name} ({reason})")
                     continue
                 if force_reprocess and raw_file in forced_enqueued:
                     continue
@@ -657,8 +689,9 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         print(f"Raw file missing: {raw_file}")
         return 1
 
-    if not _sample_allowed(raw_file, sample_regex):
-        print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+    reason = _sample_ignore_reason(raw_file, sample_regex, config.watcher.project_id)
+    if reason:
+        print(f"[ignored] {raw_file.name} ({reason})")
         return 0
 
     if (
@@ -779,6 +812,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "first successful sample. For --config, set polarity in the JSON."
         ),
     )
+    parser.add_argument(
+        "--project-id",
+        default=None,
+        dest="project_id",
+        help=(
+            "Optional filename-stem substring (batch / project). Combined "
+            "with the preset sample-name filter (QC_Metab_ / Pool). Omit or "
+            "leave empty for no extra filter. For --config, set project_id "
+            "in the JSON."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -803,6 +847,10 @@ def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
             raise ValueError(
                 "Use --polarity with preset flags, or set polarity in the JSON."
             )
+        if args.project_id is not None:
+            raise ValueError(
+                "Use --project-id with preset flags, or set project_id in the JSON."
+            )
         return load_pipeline_config(args.config)
     if using_preset:
         missing = [
@@ -826,6 +874,7 @@ def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
             args.input,
             args.output,
             polarity=args.polarity,
+            project_id=args.project_id or "",
         )
     raise ValueError(
         "Provide --method/--search/--input/--output for a standard run, "

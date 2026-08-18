@@ -90,6 +90,23 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     assert cfg.processor.params_path.is_file()
     assert cfg.processor.min_area == 20000.0
     assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
+
+
+def test_resolve_preset_project_id(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_pnnl",
+        search="untargeted",
+        project_id=" 25-02 ",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    cfg = resolve_config(req)
+    assert cfg.watcher.project_id == "25-02"
+    assert "(?i)Pool" in (cfg.watcher.sample_name_regex or "")
 
 
 def test_resolve_preset_polarity_positive(tmp_path: Path) -> None:

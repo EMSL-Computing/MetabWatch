@@ -27,6 +27,7 @@ class MetabWatchApp(ttk.Frame):
         self.method_var = tk.StringVar(value="hilic_metab_pnnl")
         self.search_var = tk.StringVar(value="targeted")
         self.polarity_var = tk.StringVar(value="auto")
+        self.project_id_var = tk.StringVar()
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
         self.config_var = tk.StringVar()
@@ -88,7 +89,7 @@ class MetabWatchApp(ttk.Frame):
         self.preset_frame.columnconfigure(1, weight=1)
         prow = 0
 
-        ttk.Label(self.preset_frame, text="Method").grid(
+        ttk.Label(self.preset_frame, text="LC Method").grid(
             row=prow, column=0, sticky="w", pady=2
         )
         method_frame = ttk.Frame(self.preset_frame)
@@ -132,6 +133,15 @@ class MetabWatchApp(ttk.Frame):
             command=self._update_summary,
         )
         self.search_untargeted.pack(side=tk.LEFT)
+        prow += 1
+
+        ttk.Label(self.preset_frame, text="Project ID").grid(
+            row=prow, column=0, sticky="w", pady=2
+        )
+        self.project_id_entry = ttk.Entry(
+            self.preset_frame, textvariable=self.project_id_var
+        )
+        self.project_id_entry.grid(row=prow, column=1, sticky="ew", pady=2)
         prow += 1
 
         ttk.Label(self.preset_frame, text="Polarity").grid(
@@ -291,6 +301,7 @@ class MetabWatchApp(ttk.Frame):
             self.method_rp,
             self.search_targeted,
             self.search_untargeted,
+            self.project_id_entry,
             self.polarity_auto,
             self.polarity_positive,
             self.polarity_negative,
@@ -328,6 +339,7 @@ class MetabWatchApp(ttk.Frame):
             method=self.method_var.get(),
             search=self.search_var.get(),
             polarity=self.polarity_var.get(),
+            project_id=self.project_id_var.get(),
             input_folder=self.input_var.get(),
             output_folder=self.output_var.get(),
             config_path=self.config_var.get(),
@@ -388,6 +400,7 @@ class MetabWatchApp(ttk.Frame):
                 self.method_rp,
                 self.search_targeted,
                 self.search_untargeted,
+                self.project_id_entry,
                 self.polarity_auto,
                 self.polarity_positive,
                 self.polarity_negative,

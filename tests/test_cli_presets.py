@@ -70,6 +70,40 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     assert cfg.processor.params_path.is_file()
     assert cfg.watcher.sample_name_regex == r"QC_Metab_(.+)"
     assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
+
+
+def test_resolve_preset_project_id(tmp_path: Path) -> None:
+    ns = parse_args(
+        [
+            "--method",
+            "hilic_metab_pnnl",
+            "--search",
+            "untargeted",
+            "--input",
+            str(tmp_path / "raw"),
+            "--output",
+            str(tmp_path / "out"),
+            "--project-id",
+            "25-02",
+        ]
+    )
+    cfg = resolve_config_from_args(ns)
+    assert cfg.watcher.project_id == "25-02"
+    assert "(?i)Pool" in (cfg.watcher.sample_name_regex or "")
+
+
+def test_resolve_rejects_project_id_with_config(tmp_path: Path) -> None:
+    ns = parse_args(
+        [
+            "--config",
+            str(tmp_path / "c.json"),
+            "--project-id",
+            "25-02",
+        ]
+    )
+    with pytest.raises(ValueError, match="project"):
+        resolve_config_from_args(ns)
 
 
 def test_resolve_preset_polarity(tmp_path: Path) -> None:
