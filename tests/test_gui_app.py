@@ -10,7 +10,7 @@ from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
 
 def test_gui_app_builds_with_method_dropdown() -> None:
-    """LC Method is a combobox of all packaged presets, not a stack of radios."""
+    """Method preset is a combobox of all packaged presets, not a stack of radios."""
     from metabwatch.gui.app import MetabWatchApp
 
     try:

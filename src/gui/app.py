@@ -90,7 +90,7 @@ class MetabWatchApp(ttk.Frame):
         self.preset_frame.columnconfigure(1, weight=1)
         prow = 0
 
-        ttk.Label(self.preset_frame, text="LC Method").grid(
+        ttk.Label(self.preset_frame, text="Method preset").grid(
             row=prow, column=0, sticky="w", pady=2
         )
         self._method_labels = {
