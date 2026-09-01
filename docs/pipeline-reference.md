@@ -52,7 +52,7 @@ python -m metabwatch.pipeline --config <config.json>
 
 Simplified flat JSON and legacy nested schemas are both supported (see below).
 
-The GUI **Create custom config** button writes this simplified schema for you: a `metabwatch_config.json` with absolute paths, a copy of the packaged RP `corems.toml`, and (targeted only) a copy of `qc_compounds.csv`. Edit those copies; packaged presets under `src/presets/` are not modified. Untargeted starter files use the current RP pool regex `(?i)Pool` and include `top_n`.
+The GUI **Create custom config** button writes this simplified schema for you: a new folder (default name `metabwatch_config`; `_2`, `_3`, … if that name is already used) containing `metabwatch_config.json` with absolute paths, a copy of the packaged RP `corems.toml`, and (targeted only) a copy of `qc_compounds.csv`. Existing folders are not overwritten. Edit those copies; packaged presets under `src/presets/` are not modified. Untargeted starter files use the current RP pool regex `(?i)Pool` and include `top_n`.
 
 ## Built-in presets
 

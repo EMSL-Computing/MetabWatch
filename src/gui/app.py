@@ -14,6 +14,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from metabwatch.gui.runner import PipelineRunner, RunnerState
 from metabwatch.gui.starter import (
+    DEFAULT_CONFIG_FOLDER_NAME,
     RP_MIN_AREA,
     RP_MZ_TOLERANCE_PPM,
     RP_RT_TOLERANCE,
@@ -22,6 +23,8 @@ from metabwatch.gui.starter import (
     RP_UNTARGETED_REGEX,
     StarterWriteResult,
     default_sample_name_regex,
+    next_available_config_dir,
+    requested_config_dir,
     settings_from_form,
     write_rp_starter_folder,
 )
@@ -585,6 +588,8 @@ class StarterConfigDialog(tk.Toplevel):
         self.min_area_var = tk.StringVar(value=_fmt_starter_number(RP_MIN_AREA))
         self.regex_var = tk.StringVar(value=default_sample_name_regex(True))
         self.top_n_var = tk.StringVar(value=str(RP_TOP_N))
+        self.save_in_var = tk.StringVar()
+        self.folder_name_var = tk.StringVar(value=DEFAULT_CONFIG_FOLDER_NAME)
 
         self._build()
         self._sync_mode_widgets()
@@ -694,6 +699,30 @@ class StarterConfigDialog(tk.Toplevel):
         self._top_n_row = row
         row += 1
 
+        ttk.Label(body, text="Save in").grid(row=row, column=0, sticky="w", pady=2)
+        ttk.Entry(body, textvariable=self.save_in_var, width=64).grid(
+            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
+        )
+        ttk.Button(body, text="Browse…", command=self._browse_save_in).grid(
+            row=row, column=2, pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="New folder name").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.folder_name_var).grid(
+            row=row, column=1, columnspan=2, sticky="ew", pady=2
+        )
+        row += 1
+
+        ttk.Label(
+            body,
+            text="A new folder is created. Existing folders are not overwritten.",
+            foreground="#444444",
+        ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 4))
+        row += 1
+
         btn_frame = ttk.Frame(body)
         btn_frame.grid(row=row, column=0, columnspan=3, sticky="e", pady=(12, 0))
         ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(
@@ -701,7 +730,7 @@ class StarterConfigDialog(tk.Toplevel):
         )
         ttk.Button(
             btn_frame,
-            text="Save config…",
+            text="Save config",
             command=self._on_save,
         ).pack(side=tk.RIGHT)
 
@@ -737,6 +766,14 @@ class StarterConfigDialog(tk.Toplevel):
         if path:
             self.output_var.set(path)
 
+    def _browse_save_in(self) -> None:
+        path = filedialog.askdirectory(
+            title="Choose where to create the new config folder",
+            parent=self,
+        )
+        if path:
+            self.save_in_var.set(path)
+
     def _on_save(self) -> None:
         targeted = self.search_var.get() == "targeted"
         try:
@@ -750,37 +787,33 @@ class StarterConfigDialog(tk.Toplevel):
                 sample_name_regex=self.regex_var.get(),
                 top_n=self.top_n_var.get(),
             )
+            requested = requested_config_dir(
+                self.save_in_var.get(),
+                self.folder_name_var.get(),
+            )
+            dest = next_available_config_dir(
+                self.save_in_var.get(),
+                self.folder_name_var.get(),
+            )
         except ValueError as exc:
             messagebox.showerror("Custom config", str(exc), parent=self)
             return
 
-        dest = filedialog.askdirectory(
-            title="Choose a folder for your config files",
-            parent=self,
-        )
-        if not dest:
-            return
+        if dest != requested:
+            create_new = messagebox.askyesno(
+                "Folder already exists",
+                f"A folder named {requested.name} already exists in:\n"
+                f"{requested.parent}\n\n"
+                f"Create a new folder named {dest.name} instead?\n\n"
+                "Existing files will not be changed.",
+                parent=self,
+            )
+            if not create_new:
+                return
 
         try:
             result = write_rp_starter_folder(dest, settings, overwrite=False)
-        except FileExistsError as exc:
-            replace = messagebox.askyesno(
-                "Overwrite config files?",
-                f"{exc}\n\nReplace the existing config files?",
-                parent=self,
-            )
-            if not replace:
-                return
-            try:
-                result = write_rp_starter_folder(dest, settings, overwrite=True)
-            except (OSError, ValueError) as write_exc:
-                messagebox.showerror(
-                    "Could not save custom config",
-                    str(write_exc),
-                    parent=self,
-                )
-                return
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, FileExistsError) as exc:
             messagebox.showerror(
                 "Could not save custom config",
                 str(exc),

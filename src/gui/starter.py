@@ -27,6 +27,8 @@ RP_MIN_AREA = 20000.0
 RP_TOP_N = 100
 RP_TARGETED_REGEX = r"QC_Metab_(.+)"
 RP_UNTARGETED_REGEX = r"(?i)Pool"
+DEFAULT_CONFIG_FOLDER_NAME = "metabwatch_config"
+_INVALID_FOLDER_CHARS = set('<>:"/\\|?*')
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,56 @@ def default_sample_name_regex(targeted: bool) -> str:
 def rp_packaged_dir() -> Path:
     """Directory of shipped RP CoreMS / QC files (read-only for this writer)."""
     return _asset_path(RP_METHOD, COREMS_FILENAME).parent
+
+
+def normalize_config_folder_name(name: str) -> str:
+    """Return a single path component for a new config folder."""
+    text = str(name or "").strip()
+    if not text:
+        raise ValueError("Folder name is required.")
+    if text in {".", ".."}:
+        raise ValueError("Folder name is not valid.")
+    if any(char in text for char in _INVALID_FOLDER_CHARS) or Path(text).name != text:
+        raise ValueError("Folder name cannot contain slashes or other special characters.")
+    return text
+
+
+def requested_config_dir(parent: Path | str, folder_name: str) -> Path:
+    """Return ``parent / folder_name`` after validating both pieces."""
+    parent_text = str(parent or "").strip()
+    if not parent_text:
+        raise ValueError("Save-in folder is required.")
+    parent_path = Path(parent_text).expanduser().resolve()
+    if not parent_path.is_dir():
+        raise ValueError(
+            f"Save-in folder does not exist or is not a directory:\n{parent_path}"
+        )
+    return parent_path / normalize_config_folder_name(folder_name)
+
+
+def next_available_config_dir(parent: Path | str, folder_name: str) -> Path:
+    """Return a new (or empty) folder path under ``parent``.
+
+    If ``parent / folder_name`` is missing or empty, that path is used.
+    If it already has files, return ``folder_name_2``, ``folder_name_3``, …
+    so an existing config folder is never reused.
+    """
+    requested = requested_config_dir(parent, folder_name)
+    if _dir_is_free(requested):
+        return requested
+    n = 2
+    while True:
+        candidate = requested.parent / f"{requested.name}_{n}"
+        if _dir_is_free(candidate):
+            return candidate
+        n += 1
+
+
+def _dir_is_free(path: Path) -> bool:
+    """True when ``path`` does not exist or is an empty directory."""
+    if not path.exists():
+        return True
+    return path.is_dir() and not any(path.iterdir())
 
 
 def settings_from_form(

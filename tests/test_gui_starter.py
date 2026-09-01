@@ -11,6 +11,7 @@ from metabwatch.config import load_pipeline_config
 from metabwatch.gui.starter import (
     CONFIG_FILENAME,
     COREMS_FILENAME,
+    DEFAULT_CONFIG_FOLDER_NAME,
     QC_CSV_FILENAME,
     RP_MIN_AREA,
     RP_MZ_TOLERANCE_PPM,
@@ -18,6 +19,9 @@ from metabwatch.gui.starter import (
     RP_TARGETED_REGEX,
     RP_UNTARGETED_REGEX,
     StarterSettings,
+    next_available_config_dir,
+    normalize_config_folder_name,
+    requested_config_dir,
     rp_packaged_dir,
     settings_from_form,
     write_rp_starter_folder,
@@ -178,6 +182,75 @@ def test_custom_tolerances_and_regex_round_trip(tmp_path: Path) -> None:
     cfg = load_pipeline_config(dest / CONFIG_FILENAME)
     assert cfg.processor.mz_tolerance_ppm == 7.5
     assert cfg.search_space.top_n == 25
+
+
+def test_next_available_config_dir_uses_free_name(tmp_path: Path) -> None:
+    parent = tmp_path / "save"
+    parent.mkdir()
+    dest = next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME)
+    assert dest == parent / DEFAULT_CONFIG_FOLDER_NAME
+    assert not dest.exists()
+
+
+def test_next_available_config_dir_skips_occupied_folder(tmp_path: Path) -> None:
+    parent = tmp_path / "save"
+    occupied = parent / DEFAULT_CONFIG_FOLDER_NAME
+    occupied.mkdir(parents=True)
+    (occupied / CONFIG_FILENAME).write_text("{}", encoding="utf-8")
+    dest = next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME)
+    assert dest == parent / f"{DEFAULT_CONFIG_FOLDER_NAME}_2"
+    assert (occupied / CONFIG_FILENAME).read_text(encoding="utf-8") == "{}"
+
+
+def test_next_available_config_dir_reuses_empty_folder(tmp_path: Path) -> None:
+    parent = tmp_path / "save"
+    empty = parent / DEFAULT_CONFIG_FOLDER_NAME
+    empty.mkdir(parents=True)
+    assert next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME) == empty
+
+
+def test_next_available_config_dir_skips_taken_suffixes(tmp_path: Path) -> None:
+    parent = tmp_path / "save"
+    parent.mkdir()
+    for name in (DEFAULT_CONFIG_FOLDER_NAME, f"{DEFAULT_CONFIG_FOLDER_NAME}_2"):
+        taken = parent / name
+        taken.mkdir()
+        (taken / "keep.txt").write_text("n", encoding="utf-8")
+    dest = next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME)
+    assert dest == parent / f"{DEFAULT_CONFIG_FOLDER_NAME}_3"
+
+
+def test_write_into_next_available_leaves_existing_folder(tmp_path: Path) -> None:
+    parent = tmp_path / "save"
+    parent.mkdir()
+    first = write_rp_starter_folder(
+        next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME),
+        _settings(tmp_path, targeted=True),
+    )
+    original = first.config_path.read_text(encoding="utf-8")
+    second_dest = next_available_config_dir(parent, DEFAULT_CONFIG_FOLDER_NAME)
+    assert second_dest == parent / f"{DEFAULT_CONFIG_FOLDER_NAME}_2"
+    write_rp_starter_folder(
+        second_dest,
+        _settings(tmp_path, targeted=True, mz=9.0),
+    )
+    assert first.config_path.read_text(encoding="utf-8") == original
+    payload = json.loads(
+        (second_dest / CONFIG_FILENAME).read_text(encoding="utf-8")
+    )
+    assert payload["mz_tolerance_ppm"] == 9.0
+
+
+def test_folder_name_rejects_separators() -> None:
+    with pytest.raises(ValueError, match="slashes"):
+        normalize_config_folder_name("a/b")
+    with pytest.raises(ValueError, match="required"):
+        normalize_config_folder_name("  ")
+
+
+def test_requested_config_dir_requires_existing_parent(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Save-in"):
+        requested_config_dir(tmp_path / "missing", DEFAULT_CONFIG_FOLDER_NAME)
 
 
 def test_refuse_overwrite_unless_requested(tmp_path: Path) -> None:
