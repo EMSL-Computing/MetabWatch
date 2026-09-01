@@ -1,6 +1,7 @@
 # Files in data folder
 
-1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026). The shipped search space is packaged as `metabwatch.presets.hilic_metab_pnnl` (`src/presets/hilic_metab_pnnl/qc_compounds.csv`).
+1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026).
+   `QC_Metab_26-06.csv`: Aug 2026 Olympic (Eclipse) QC list. Packaged HILIC/RP search spaces omit a compound when this list has no numeric RT for that method, and omit an ion type when [M+H]+ or [M-H]- is not numeric.
 
 2. **Built-in scientific presets** live in the package (not under `data/`):
 

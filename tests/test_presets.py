@@ -2,11 +2,38 @@
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import pytest
 
 from metabwatch.presets import build_pipeline_config
+
+
+def _qc_rows(method: str) -> list[dict[str, str]]:
+    path = Path(__file__).resolve().parents[1] / "src" / "presets" / method / "qc_compounds.csv"
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        return list(csv.DictReader(handle))
+
+
+_PRESET_TO_SOURCE = {
+    "Alanine": "L-Alanine",
+    "Malic acid": "L-Malic acid",
+    "Tartaric acid": "L-Tartaric acid",
+}
+
+
+def _parse_optional_float(value: str | None) -> float | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+    return float(text)
+
+
+def _source_compounds() -> dict[str, dict[str, str]]:
+    path = Path(__file__).resolve().parents[1] / "data" / "QC_Metab_26-06.csv"
+    with path.open(newline="", encoding="utf-8") as handle:
+        return {row["compound_name"]: row for row in csv.DictReader(handle)}
 
 
 @pytest.mark.parametrize(
@@ -68,3 +95,45 @@ def test_assets_live_under_package_presets() -> None:
     assert "presets" in path_str
     assert "hilic_metab_pnnl" in path_str
     assert "corems_params" not in path_str
+
+
+def test_presets_omit_compounds_without_method_rt() -> None:
+    """Drop compounds with no numeric RT(HILIC) from HILIC, no numeric RT(RP) from RP."""
+    source = _source_compounds()
+    source_to_preset = {v: k for k, v in _PRESET_TO_SOURCE.items()}
+    hilic_names = {row["compound_name"] for row in _qc_rows("hilic_metab_pnnl")}
+    rp_names = {row["compound_name"] for row in _qc_rows("rp_metab_pnnl")}
+
+    for source_name, src in source.items():
+        name = source_to_preset.get(source_name, source_name)
+        if _parse_optional_float(src["rt_hilic"]) is None:
+            assert name not in hilic_names, source_name
+        if _parse_optional_float(src["rt_rp"]) is None:
+            assert name not in rp_names, source_name
+
+
+def test_presets_omit_ions_without_numeric_mass() -> None:
+    """Drop [M+H]+ / [M-H]- rows when the Aug 2026 list has no numeric mass for that ion."""
+    source = _source_compounds()
+    source_to_preset = {v: k for k, v in _PRESET_TO_SOURCE.items()}
+
+    def ion_names(method: str, ion_type: str) -> set[str]:
+        return {
+            row["compound_name"]
+            for row in _qc_rows(method)
+            if row["ion_type"].strip() == ion_type
+        }
+
+    hilic_pos = ion_names("hilic_metab_pnnl", "[M+H]+")
+    hilic_neg = ion_names("hilic_metab_pnnl", "[M-H]-")
+    rp_pos = ion_names("rp_metab_pnnl", "[M+H]+")
+    rp_neg = ion_names("rp_metab_pnnl", "[M-H]-")
+
+    for source_name, src in source.items():
+        name = source_to_preset.get(source_name, source_name)
+        if _parse_optional_float(src["mz_m_plus_h"]) is None:
+            assert name not in hilic_pos, source_name
+            assert name not in rp_pos, source_name
+        if _parse_optional_float(src["mz_m_minus_h"]) is None:
+            assert name not in hilic_neg, source_name
+            assert name not in rp_neg, source_name
