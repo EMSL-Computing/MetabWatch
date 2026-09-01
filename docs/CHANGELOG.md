@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- GUI **LC Method** is a dropdown instead of radio buttons so more presets can be added without growing the window.
 - GUI label **Method** is now **LC Method**.
 - Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
 - Packaged HILIC/RP QC presets: omit a compound from a method when the Aug 2026 list has no numeric RT for that method, and omit an ion type when that list has no numeric [M+H]+ or [M-H]-. Sulfanilamide dropped from HILIC (no RT(HILIC)); polarity rows were already aligned.
