@@ -66,6 +66,7 @@ class ProcessorConfig:
 
 
 DISCOVERY_MODES = frozenset({"hybrid", "watchdog", "poll"})
+POLARITIES = frozenset({"positive", "negative"})
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,9 @@ class WatcherConfig:
         Number of seconds a file must remain unchanged to be treated as stable.
     sample_name_regex : str | None
         Optional regex applied to raw filename stem to decide processing.
+    project_id : str
+        Optional case-insensitive substring of the filename stem. Empty
+        means no extra filter; the regex still applies.
     discovery_mode : str
         How new files are discovered: ``hybrid`` (watchdog + fallback poll,
         default), ``watchdog`` (FS events + startup scan only), or ``poll``
@@ -94,6 +98,7 @@ class WatcherConfig:
     stability_wait_sec: float = 20.0
     sample_name_regex: str | None = None
     discovery_mode: str = "hybrid"
+    project_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -174,6 +179,9 @@ class PipelineConfig:
         Dashboard generation configuration.
     search_space : SearchSpaceConfig
         Search-space source configuration.
+    polarity : str | None
+        Optional run polarity (``positive`` / ``negative``). ``None`` means
+        lock from the first successfully processed sample.
     """
     processor: ProcessorConfig
     watcher: WatcherConfig
@@ -183,6 +191,7 @@ class PipelineConfig:
     max_retries: int = 3
     initial_backoff_sec: float = 10.0
     backoff_multiplier: float = 2.0
+    polarity: str | None = None
 
 
 # Keys that mark the preferred flat simplified schema.
@@ -302,6 +311,28 @@ def _normalize_discovery_mode(value: Any, *, context: str) -> str:
     return mode
 
 
+def _normalize_optional_polarity(value: Any, *, context: str) -> str | None:
+    """Return ``positive`` / ``negative``, or ``None`` when polarity is unset."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text == "":
+        return None
+    if text not in POLARITIES:
+        allowed = ", ".join(sorted(POLARITIES))
+        raise ValueError(
+            f"{context}: polarity must be one of {{{allowed}}}, got {value!r}"
+        )
+    return text
+
+
+def _normalize_project_id(value: Any) -> str:
+    """Return a stripped project-id substring, or empty when unset."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 @dataclass(frozen=True)
 class _NormalizedConfig:
     """Intermediate field bag shared by simplified and legacy loaders."""
@@ -328,6 +359,8 @@ class _NormalizedConfig:
     max_retries: int
     initial_backoff_sec: float
     backoff_multiplier: float
+    polarity: str | None = None
+    project_id: str = ""
 
 
 def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
@@ -388,6 +421,10 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         max_retries=_optional_int(payload, "max_retries", 3),
         initial_backoff_sec=_optional_float(payload, "initial_backoff_sec", 10.0),
         backoff_multiplier=_optional_float(payload, "backoff_multiplier", 2.0),
+        polarity=_normalize_optional_polarity(
+            payload.get("polarity"), context=context
+        ),
+        project_id=_normalize_project_id(payload.get("project_id")),
     )
 
 
@@ -464,6 +501,12 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
         max_retries=int(payload.get("max_retries", 3)),
         initial_backoff_sec=float(payload.get("initial_backoff_sec", 10.0)),
         backoff_multiplier=float(payload.get("backoff_multiplier", 2.0)),
+        polarity=_normalize_optional_polarity(
+            payload.get("polarity"), context="legacy config"
+        ),
+        project_id=_normalize_project_id(
+            payload.get("project_id", watcher.get("project_id"))
+        ),
     )
 
 
@@ -509,6 +552,7 @@ def _build_pipeline_config(
             stability_wait_sec=normalized.stability_wait_sec,
             sample_name_regex=normalized.sample_name_regex,
             discovery_mode=normalized.discovery_mode,
+            project_id=normalized.project_id,
         ),
         state=StateConfig(
             pipeline_manifest=output_dir / "pipeline_manifest.json",
@@ -529,6 +573,7 @@ def _build_pipeline_config(
         max_retries=normalized.max_retries,
         initial_backoff_sec=normalized.initial_backoff_sec,
         backoff_multiplier=normalized.backoff_multiplier,
+        polarity=normalized.polarity,
     )
 
 

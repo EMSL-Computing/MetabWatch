@@ -101,11 +101,32 @@ def _compile_sample_regex(pattern_text: str | None) -> re.Pattern[str] | None:
     return re.compile(pattern_text)
 
 
-def _sample_allowed(raw_file: Path, sample_regex: re.Pattern[str] | None) -> bool:
-    """Return True when a sample should be processed under regex gating."""
-    if sample_regex is None:
-        return True
-    return bool(sample_regex.search(raw_file.stem))
+def _sample_ignore_reason(
+    raw_file: Path,
+    sample_regex: re.Pattern[str] | None,
+    project_id: str = "",
+) -> str | None:
+    """Return why a sample is ignored, or None when both filters pass.
+
+    The preset/config regex (``QC_Metab_`` / ``Pool``) is always applied when
+    set. A non-empty ``project_id`` is an extra case-insensitive substring
+    on the filename stem; both must pass.
+    """
+    if sample_regex is not None and not sample_regex.search(raw_file.stem):
+        return "sample_name_regex no match"
+    needle = (project_id or "").strip()
+    if needle and needle.lower() not in raw_file.stem.lower():
+        return "project_id no match"
+    return None
+
+
+def _sample_allowed(
+    raw_file: Path,
+    sample_regex: re.Pattern[str] | None,
+    project_id: str = "",
+) -> bool:
+    """Return True when a sample passes regex and optional project-id filters."""
+    return _sample_ignore_reason(raw_file, sample_regex, project_id) is None
 
 
 def _clickable_path(path: Path) -> str:
@@ -131,6 +152,29 @@ def _clickable_path(path: Path) -> str:
 def _is_polarity_mismatch(error: str | None) -> bool:
     """Return True when an error message indicates a polarity lock failure."""
     return bool(error) and "polarity mismatch" in error.lower()
+
+
+def apply_configured_polarity(
+    config: PipelineConfig, state_store: ManifestStateStore
+) -> str | None:
+    """Lock the run polarity from config when the operator specified one.
+
+    Returns the locked polarity, or ``None`` when config leaves polarity unset
+    (first successful sample still locks the run). Raises ``ValueError`` if
+    the output folder is already locked to a different polarity.
+    """
+    requested = config.polarity
+    if requested is None:
+        return None
+    try:
+        return state_store.set_run_polarity(requested)
+    except ValueError:
+        existing = state_store.get_run_polarity()
+        raise ValueError(
+            f"Polarity mismatch: config requests '{requested}' but this run is "
+            f"locked to '{existing}' in {state_store.manifest_json.name}. "
+            "MetabWatch does not allow mixed polarities in one input folder / run."
+        ) from None
 
 
 def _ensure_untargeted_search_space(
@@ -357,6 +401,12 @@ def run_watch_mode(
         print(f"Invalid watcher.sample_name_regex: {exc}")
         return 2
 
+    try:
+        configured_polarity = apply_configured_polarity(config, state_store)
+    except ValueError as exc:
+        print(f"[polarity] {exc}")
+        return 2
+
     # Openable waiting page while the first sample is still processing.
     placeholder = synthesizer.write_placeholder_if_missing()
     if placeholder.is_file():
@@ -386,8 +436,15 @@ def run_watch_mode(
             f"({_discovery_mode_description(discovery_mode, config.watcher.poll_interval_sec)}). "
             f"{stop_hint}"
         )
+        if config.watcher.project_id:
+            print(
+                f"[watching] project_id substring {config.watcher.project_id!r} "
+                "(in addition to sample_name_regex)"
+            )
 
-        if state_store.get_run_polarity():
+        if configured_polarity:
+            print(f"[polarity] run locked to {configured_polarity} (from config)")
+        elif state_store.get_run_polarity():
             print(
                 f"[polarity] run locked to {state_store.get_run_polarity()} (from manifest)"
             )
@@ -413,8 +470,11 @@ def run_watch_mode(
                         f"{len(bootstrap_files)} existing raw files"
                     )
             for raw_file in bootstrap_files:
-                if not _sample_allowed(raw_file, sample_regex):
-                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                reason = _sample_ignore_reason(
+                    raw_file, sample_regex, config.watcher.project_id
+                )
+                if reason:
+                    print(f"[ignored] {raw_file.name} ({reason})")
                     continue
                 if force_reprocess or state_store.should_process(raw_file):
                     queue.enqueue(raw_file)
@@ -433,8 +493,11 @@ def run_watch_mode(
             for raw_file in watcher.get_stable_new_files(
                 scan_directory=scan_each_cycle
             ):
-                if not _sample_allowed(raw_file, sample_regex):
-                    print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+                reason = _sample_ignore_reason(
+                    raw_file, sample_regex, config.watcher.project_id
+                )
+                if reason:
+                    print(f"[ignored] {raw_file.name} ({reason})")
                     continue
                 if force_reprocess and raw_file in forced_enqueued:
                     continue
@@ -612,14 +675,23 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         print(f"Invalid watcher.sample_name_regex: {exc}")
         return 2
 
+    try:
+        configured_polarity = apply_configured_polarity(config, state_store)
+    except ValueError as exc:
+        print(f"[polarity] {exc}")
+        return 2
+    if configured_polarity:
+        print(f"[polarity] run locked to {configured_polarity} (from config)")
+
     synthesizer.write_placeholder_if_missing()
 
     if not raw_file.exists():
         print(f"Raw file missing: {raw_file}")
         return 1
 
-    if not _sample_allowed(raw_file, sample_regex):
-        print(f"[ignored] {raw_file.name} (sample_name_regex no match)")
+    reason = _sample_ignore_reason(raw_file, sample_regex, config.watcher.project_id)
+    if reason:
+        print(f"[ignored] {raw_file.name} ({reason})")
         return 0
 
     if (
@@ -731,6 +803,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Reprocess existing files even when manifest marks them completed (watch mode)",
     )
+    parser.add_argument(
+        "--polarity",
+        choices=["positive", "negative"],
+        default=None,
+        help=(
+            "Optional run polarity for a preset run. Omit to lock from the "
+            "first successful sample. For --config, set polarity in the JSON."
+        ),
+    )
+    parser.add_argument(
+        "--project-id",
+        default=None,
+        dest="project_id",
+        help=(
+            "Optional filename-stem substring (batch / project). Combined "
+            "with the preset sample-name filter (QC_Metab_ / Pool). Omit or "
+            "leave empty for no extra filter. For --config, set project_id "
+            "in the JSON."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -751,6 +843,14 @@ def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
             "Use either --config OR (--method --search --input --output), not both."
         )
     if using_config:
+        if args.polarity is not None:
+            raise ValueError(
+                "Use --polarity with preset flags, or set polarity in the JSON."
+            )
+        if args.project_id is not None:
+            raise ValueError(
+                "Use --project-id with preset flags, or set project_id in the JSON."
+            )
         return load_pipeline_config(args.config)
     if using_preset:
         missing = [
@@ -773,6 +873,8 @@ def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
             args.search,
             args.input,
             args.output,
+            polarity=args.polarity,
+            project_id=args.project_id or "",
         )
     raise ValueError(
         "Provide --method/--search/--input/--output for a standard run, "

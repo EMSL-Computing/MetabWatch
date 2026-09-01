@@ -29,7 +29,7 @@ Built-in defaults (no extra flags needed):
 
 | Method | m/z ppm | RT (min) | min area | Sample name filter |
 |--------|---------|----------|----------|--------------------|
-| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pooled` (case-insensitive) |
+| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pool` (case-insensitive) |
 | PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
 
 Or as a module:
@@ -56,7 +56,7 @@ python -m metabwatch.gui
 
 The window provides:
 
-- **Preset shortcuts** — PNNL Standard HILIC / RP Metabolomics methods × targeted or untargeted, plus input/output folder pickers
+- **Preset shortcuts** — PNNL Standard HILIC / RP Metabolomics LC methods × targeted or untargeted, optional polarity and project ID, plus input/output folder pickers
 - **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`)
 - **Watch continuously** or **Process once**, optional force reprocess
 - **Start / Stop** (stop finishes the current file, then exits the watch loop)
@@ -70,7 +70,7 @@ The watcher detects new files via filesystem notifications (`watchdog`) with a p
 
 ### One polarity per run
 
-Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). The first successfully processed sample writes that polarity into `pipeline_manifest.json`; later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
+Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). Optionally set it up front (GUI **Polarity** radios, CLI `--polarity`, or JSON `"polarity"`); otherwise the first successfully processed sample writes it into `pipeline_manifest.json`. Later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
 
 The dashboard header shows the run polarity (and warns if legacy mixed outputs are present).
 
@@ -136,7 +136,7 @@ make test-workflow-targeted PYTHON=./venv/bin/python
 
 **Targeted** (`--search targeted`) matches against the packaged QC compound list for the method.
 
-**Untargeted** (`--search untargeted`) seeds the search space from the first sample whose name matches the untargeted filter (`Pooled` by default):
+**Untargeted** (`--search untargeted`) seeds the search space from the first sample whose name matches the untargeted filter (`Pool` by default):
 
 1. CoreMS untargeted peak picking + integration runs on that sample.
 2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_folder>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.

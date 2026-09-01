@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from metabwatch.config import PipelineConfig, load_pipeline_config
+from metabwatch.config import POLARITIES, PipelineConfig, load_pipeline_config
 from metabwatch.presets import build_pipeline_config
 
 ConfigSource = Literal["preset", "json"]
@@ -31,7 +31,7 @@ PRESET_SUMMARIES: dict[str, dict[str, str]] = {
 
 SAMPLE_FILTER_LABELS = {
     "targeted": "QC_Metab_(.+)",
-    "untargeted": "Pooled (case-insensitive)",
+    "untargeted": "Pool (case-insensitive)",
 }
 
 
@@ -42,6 +42,8 @@ class GuiRunRequest:
     source: ConfigSource
     method: str | None = None
     search: str | None = None
+    polarity: str | None = None
+    project_id: str | None = None
     input_folder: str | None = None
     output_folder: str | None = None
     config_path: str | None = None
@@ -68,6 +70,9 @@ def validate_request(req: GuiRunRequest) -> str | None:
             return "Select a method (PNNL Standard HILIC or RP Metabolomics)."
         if not req.search or req.search not in {"targeted", "untargeted"}:
             return "Select a search mode (Targeted or Untargeted)."
+        polarity_key = (req.polarity or "auto").strip().lower()
+        if polarity_key not in {"auto", *POLARITIES}:
+            return "Select a polarity (Auto, Positive, or Negative)."
         input_text = (req.input_folder or "").strip()
         output_text = (req.output_folder or "").strip()
         if not input_text:
@@ -112,9 +117,13 @@ def resolve_config(req: GuiRunRequest) -> PipelineConfig:
     assert req.search is not None
     assert req.input_folder is not None
     assert req.output_folder is not None
+    polarity_key = (req.polarity or "auto").strip().lower()
+    polarity = None if polarity_key == "auto" else polarity_key
     return build_pipeline_config(
         req.method,
         req.search,
         Path(req.input_folder.strip()).expanduser(),
         Path(req.output_folder.strip()).expanduser(),
+        polarity=polarity,
+        project_id=req.project_id or "",
     )
