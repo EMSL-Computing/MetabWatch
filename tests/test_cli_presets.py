@@ -29,6 +29,22 @@ def test_parse_preset_args() -> None:
     assert ns.config is None
 
 
+def test_parse_olympic_eclipse01_method() -> None:
+    ns = parse_args(
+        [
+            "--method",
+            "hilic_metab_olympic_eclipse01",
+            "--search",
+            "targeted",
+            "--input",
+            "raw",
+            "--output",
+            "out",
+        ]
+    )
+    assert ns.method == "hilic_metab_olympic_eclipse01"
+
+
 def test_parse_short_input_output_aliases() -> None:
     ns = parse_args(
         [

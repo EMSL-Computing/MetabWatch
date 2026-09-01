@@ -36,6 +36,10 @@ def _source_compounds() -> dict[str, dict[str, str]]:
         return {row["compound_name"]: row for row in csv.DictReader(handle)}
 
 
+_HILIC_METHODS = ("hilic_metab_pnnl", "hilic_metab_olympic_eclipse01")
+_RP_METHODS = ("rp_metab_pnnl", "rp_metab_olympic_eclipse01")
+
+
 @pytest.mark.parametrize(
     "method,search,expect_mode,mz,rt,min_area,regex_fragment",
     [
@@ -43,6 +47,42 @@ def _source_compounds() -> dict[str, dict[str, str]]:
         ("hilic_metab_pnnl", "untargeted", "untargeted", 5.0, 0.8, 1000.0, "Pool"),
         ("rp_metab_pnnl", "targeted", "targeted", 5.0, 0.4, 20000.0, "QC_Metab_"),
         ("rp_metab_pnnl", "untargeted", "untargeted", 5.0, 0.4, 20000.0, "Pool"),
+        (
+            "hilic_metab_olympic_eclipse01",
+            "targeted",
+            "targeted",
+            5.0,
+            0.3,
+            1000.0,
+            "QC_Metab_",
+        ),
+        (
+            "hilic_metab_olympic_eclipse01",
+            "untargeted",
+            "untargeted",
+            5.0,
+            0.3,
+            1000.0,
+            "Pool",
+        ),
+        (
+            "rp_metab_olympic_eclipse01",
+            "targeted",
+            "targeted",
+            5.0,
+            0.2,
+            20000.0,
+            "QC_Metab_",
+        ),
+        (
+            "rp_metab_olympic_eclipse01",
+            "untargeted",
+            "untargeted",
+            5.0,
+            0.2,
+            20000.0,
+            "Pool",
+        ),
     ],
 )
 def test_build_pipeline_config_matrix(
@@ -137,8 +177,10 @@ def test_presets_omit_compounds_without_method_rt() -> None:
     """Drop compounds with no numeric RT(HILIC) from HILIC, no numeric RT(RP) from RP."""
     source = _source_compounds()
     source_to_preset = {v: k for k, v in _PRESET_TO_SOURCE.items()}
-    hilic_names = {row["compound_name"] for row in _qc_rows("hilic_metab_pnnl")}
-    rp_names = {row["compound_name"] for row in _qc_rows("rp_metab_pnnl")}
+    hilic_names = {
+        row["compound_name"] for method in _HILIC_METHODS for row in _qc_rows(method)
+    }
+    rp_names = {row["compound_name"] for method in _RP_METHODS for row in _qc_rows(method)}
 
     for source_name, src in source.items():
         name = source_to_preset.get(source_name, source_name)
@@ -153,17 +195,18 @@ def test_presets_omit_ions_without_numeric_mass() -> None:
     source = _source_compounds()
     source_to_preset = {v: k for k, v in _PRESET_TO_SOURCE.items()}
 
-    def ion_names(method: str, ion_type: str) -> set[str]:
+    def ion_names(methods: tuple[str, ...], ion_type: str) -> set[str]:
         return {
             row["compound_name"]
+            for method in methods
             for row in _qc_rows(method)
             if row["ion_type"].strip() == ion_type
         }
 
-    hilic_pos = ion_names("hilic_metab_pnnl", "[M+H]+")
-    hilic_neg = ion_names("hilic_metab_pnnl", "[M-H]-")
-    rp_pos = ion_names("rp_metab_pnnl", "[M+H]+")
-    rp_neg = ion_names("rp_metab_pnnl", "[M-H]-")
+    hilic_pos = ion_names(_HILIC_METHODS, "[M+H]+")
+    hilic_neg = ion_names(_HILIC_METHODS, "[M-H]-")
+    rp_pos = ion_names(_RP_METHODS, "[M+H]+")
+    rp_neg = ion_names(_RP_METHODS, "[M-H]-")
 
     for source_name, src in source.items():
         name = source_to_preset.get(source_name, source_name)
@@ -173,3 +216,34 @@ def test_presets_omit_ions_without_numeric_mass() -> None:
         if _parse_optional_float(src["mz_m_minus_h"]) is None:
             assert name not in hilic_neg, source_name
             assert name not in rp_neg, source_name
+
+
+def test_preset_qc_rts_match_aug_2026_list() -> None:
+    """Packaged QC retention times come from the Olympic LC / Eclipse 01 list."""
+    source = _source_compounds()
+    for method, rt_column in (
+        ("hilic_metab_pnnl", "rt_hilic"),
+        ("hilic_metab_olympic_eclipse01", "rt_hilic"),
+        ("rp_metab_pnnl", "rt_rp"),
+        ("rp_metab_olympic_eclipse01", "rt_rp"),
+    ):
+        for row in _qc_rows(method):
+            source_name = _PRESET_TO_SOURCE.get(row["compound_name"], row["compound_name"])
+            expected = _parse_optional_float(source[source_name][rt_column])
+            assert expected is not None, (method, row["compound_name"])
+            assert float(row["retention_time"]) == pytest.approx(expected, abs=0.005)
+
+
+def test_eclipse01_presets_use_own_asset_folders() -> None:
+    hilic = build_pipeline_config(
+        "hilic_metab_olympic_eclipse01", "targeted", Path("/tmp/in"), Path("/tmp/out")
+    )
+    rp = build_pipeline_config(
+        "rp_metab_olympic_eclipse01", "targeted", Path("/tmp/in"), Path("/tmp/out")
+    )
+    assert "hilic_metab_olympic_eclipse01" in str(hilic.processor.params_path)
+    assert "rp_metab_olympic_eclipse01" in str(rp.processor.params_path)
+    assert hilic.processor.standards_csv is not None
+    assert rp.processor.standards_csv is not None
+    assert hilic.processor.standards_csv.parent == hilic.processor.params_path.parent
+    assert rp.processor.standards_csv.parent == rp.processor.params_path.parent

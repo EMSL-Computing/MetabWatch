@@ -13,6 +13,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from metabwatch.gui.runner import PipelineRunner, RunnerState
 from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
+from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
 
 class MetabWatchApp(ttk.Frame):
@@ -94,22 +95,17 @@ class MetabWatchApp(ttk.Frame):
         )
         method_frame = ttk.Frame(self.preset_frame)
         method_frame.grid(row=prow, column=1, sticky="w", pady=2)
-        self.method_hilic = ttk.Radiobutton(
-            method_frame,
-            text="PNNL Standard HILIC Metabolomics Method",
-            variable=self.method_var,
-            value="hilic_metab_pnnl",
-            command=self._update_summary,
-        )
-        self.method_hilic.pack(side=tk.TOP, anchor="w")
-        self.method_rp = ttk.Radiobutton(
-            method_frame,
-            text="PNNL Standard RP Metabolomics Method",
-            variable=self.method_var,
-            value="rp_metab_pnnl",
-            command=self._update_summary,
-        )
-        self.method_rp.pack(side=tk.TOP, anchor="w")
+        self.method_buttons: list[ttk.Radiobutton] = []
+        for key in METHOD_KEYS:
+            button = ttk.Radiobutton(
+                method_frame,
+                text=PRESET_SPECS[key]["display_name"],
+                variable=self.method_var,
+                value=key,
+                command=self._update_summary,
+            )
+            button.pack(side=tk.TOP, anchor="w")
+            self.method_buttons.append(button)
         prow += 1
 
         ttk.Label(self.preset_frame, text="Search").grid(
@@ -297,8 +293,7 @@ class MetabWatchApp(ttk.Frame):
         json_state = tk.DISABLED if preset else tk.NORMAL
 
         for widget in (
-            self.method_hilic,
-            self.method_rp,
+            *self.method_buttons,
             self.search_targeted,
             self.search_untargeted,
             self.project_id_entry,
@@ -396,8 +391,7 @@ class MetabWatchApp(ttk.Frame):
         if running:
             # Lock form fields for the active source
             for widget in (
-                self.method_hilic,
-                self.method_rp,
+                *self.method_buttons,
                 self.search_targeted,
                 self.search_untargeted,
                 self.project_id_entry,

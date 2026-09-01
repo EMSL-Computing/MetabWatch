@@ -20,17 +20,21 @@ metabwatch --method hilic_metab_pnnl --search targeted \
 
 | `--method` | Display name | `--search` | What it uses |
 |------------|--------------|------------|--------------|
-| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `targeted` | HILIC CoreMS params + HILIC QC compounds |
+| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `targeted` | HILIC CoreMS params + HILIC QC compounds (general RT window) |
 | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `untargeted` | HILIC CoreMS params (bootstrap search space) |
-| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `targeted` | RP CoreMS params + RP QC compounds |
+| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | `targeted` | Same HILIC QC list, tighter RT window |
+| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `targeted` | RP CoreMS params + RP QC compounds (general RT window) |
 | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `untargeted` | RP CoreMS params (bootstrap search space) |
+| `rp_metab_olympic_eclipse01` | PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01 | `targeted` | Same RP QC list, tighter RT window |
 
 Built-in defaults (no extra flags needed):
 
 | Method | m/z ppm | RT (min) | min area | Sample name filter |
 |--------|---------|----------|----------|--------------------|
 | PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pool` (case-insensitive) |
+| PNNL Standard HILIC — Olympic LC / Eclipse 01 | 5 | 0.3 | 1000 | same filters as above |
 | PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
+| PNNL Standard RP — Olympic LC / Eclipse 01 | 5 | 0.2 | 20000 | same filters as above |
 
 Or as a module:
 
@@ -143,7 +147,7 @@ make test-workflow-targeted PYTHON=./venv/bin/python
 3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
 4. All subsequent samples reuse the persisted CSV.
 
-Packaged CoreMS TOML and QC CSVs live under `src/presets/{hilic_metab_pnnl,rp_metab_pnnl}/` (installed with the package).
+Packaged CoreMS TOML and QC CSVs live under `src/presets/<method_key>/` (installed with the package). QC retention times come from the Aug 2026 Olympic LC / Eclipse 01 list; general method keys use a wider RT window so the same list can be used on other LC/MS systems.
 
 ## Technical Documentation
 
