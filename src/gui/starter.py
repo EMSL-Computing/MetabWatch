@@ -197,7 +197,7 @@ def write_rp_starter_folder(
     existing = [path for path in planned if path.exists()]
     if existing and not overwrite:
         names = ", ".join(path.name for path in existing)
-        raise FileExistsError(f"Starter files already exist in {dest}: {names}")
+        raise FileExistsError(f"Config files already exist in {dest}: {names}")
 
     dest.mkdir(parents=True, exist_ok=True)
 

@@ -231,14 +231,14 @@ class MetabWatchApp(ttk.Frame):
         self.config_browse.grid(row=0, column=2, pady=2)
         ttk.Label(
             self.json_frame,
-            text="Need a different QC list or settings? Use Write starter "
-            "folder. Already have a config file? Use Browse.",
+            text="Need a different QC list or settings? Use Create custom "
+            "config. Already have a config file? Use Browse.",
             foreground="#444444",
             wraplength=640,
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self.starter_btn = ttk.Button(
             self.json_frame,
-            text="Write starter folder…",
+            text="Create custom config…",
             command=self._open_starter_dialog,
         )
         self.starter_btn.grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
@@ -372,8 +372,8 @@ class MetabWatchApp(ttk.Frame):
         self._prefill_config(str(result.config_path))
         names = "\n".join(f"  {path.name}" for path in result.written)
         messagebox.showinfo(
-            "Starter folder saved",
-            "Wrote:\n"
+            "Custom config saved",
+            "Saved:\n"
             f"{result.dest_dir}\n\n"
             f"{names}\n\n"
             "Config source is now Custom JSON. Edit the copied CSV or TOML "
@@ -572,7 +572,7 @@ class StarterConfigDialog(tk.Toplevel):
     ) -> None:
         super().__init__(master)
         self._on_saved = on_saved
-        self.title("Write starter custom JSON")
+        self.title("Create a custom config")
         self.transient(master)
         self.resizable(True, False)
 
@@ -599,9 +599,9 @@ class StarterConfigDialog(tk.Toplevel):
         ttk.Label(
             body,
             text=(
-                "Creates a folder with a config JSON and copies of the PNNL "
-                "Standard RP Metabolomics method files. Edit those copies in "
-                "Excel or a text editor; MetabWatch will use the copies."
+                "Creates a custom config and copies of the PNNL Standard RP "
+                "Metabolomics method files. Edit those copies in Excel or a "
+                "text editor; MetabWatch will use the copies."
             ),
             wraplength=520,
             foreground="#444444",
@@ -697,7 +697,7 @@ class StarterConfigDialog(tk.Toplevel):
         )
         ttk.Button(
             btn_frame,
-            text="Save starter folder…",
+            text="Save config…",
             command=self._on_save,
         ).pack(side=tk.RIGHT)
 
@@ -747,11 +747,11 @@ class StarterConfigDialog(tk.Toplevel):
                 top_n=self.top_n_var.get(),
             )
         except ValueError as exc:
-            messagebox.showerror("Starter form", str(exc), parent=self)
+            messagebox.showerror("Custom config", str(exc), parent=self)
             return
 
         dest = filedialog.askdirectory(
-            title="Select folder for starter files",
+            title="Choose a folder for your config files",
             parent=self,
         )
         if not dest:
@@ -761,8 +761,8 @@ class StarterConfigDialog(tk.Toplevel):
             result = write_rp_starter_folder(dest, settings, overwrite=False)
         except FileExistsError as exc:
             replace = messagebox.askyesno(
-                "Overwrite starter files?",
-                f"{exc}\n\nReplace the existing starter files?",
+                "Overwrite config files?",
+                f"{exc}\n\nReplace the existing config files?",
                 parent=self,
             )
             if not replace:
@@ -771,14 +771,14 @@ class StarterConfigDialog(tk.Toplevel):
                 result = write_rp_starter_folder(dest, settings, overwrite=True)
             except (OSError, ValueError) as write_exc:
                 messagebox.showerror(
-                    "Could not save starter folder",
+                    "Could not save custom config",
                     str(write_exc),
                     parent=self,
                 )
                 return
         except (OSError, ValueError) as exc:
             messagebox.showerror(
-                "Could not save starter folder",
+                "Could not save custom config",
                 str(exc),
                 parent=self,
             )

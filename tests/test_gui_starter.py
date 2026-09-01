@@ -266,6 +266,7 @@ def test_starter_button_stays_enabled_on_preset_source() -> None:
     try:
         app = MetabWatchApp(root)
         assert app.source_var.get() == "preset"
+        assert str(app.starter_btn.cget("text")) == "Create custom config…"
         assert str(app.starter_btn.cget("state")) == "normal"
         app.source_var.set("json")
         app._update_source_enabled()
