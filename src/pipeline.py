@@ -16,7 +16,7 @@ ensure_dotnet_runtime()
 from metabwatch.config import PipelineConfig, load_pipeline_config
 from metabwatch.output import OutputTracker
 from metabwatch.pipeline_queue import ProcessingQueue
-from metabwatch.presets import build_pipeline_config
+from metabwatch.presets import METHOD_KEYS, PRESET_SPECS, build_pipeline_config
 from metabwatch.processor import (
     ProcessResult,
     ProcessorOrchestrator,
@@ -767,14 +767,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Advanced JSON config path (simplified or legacy nested)",
     )
+    method_help = "; ".join(
+        f"{key} = {PRESET_SPECS[key]['display_name']}" for key in METHOD_KEYS
+    )
     parser.add_argument(
         "--method",
-        choices=["rp_metab_pnnl", "hilic_metab_pnnl"],
+        choices=list(METHOD_KEYS),
         default=None,
-        help=(
-            "Method preset: hilic_metab_pnnl = PNNL Standard HILIC Metabolomics Method; "
-            "rp_metab_pnnl = PNNL Standard RP Metabolomics Method"
-        ),
+        help=f"Method preset: {method_help}",
     )
     parser.add_argument(
         "--search",

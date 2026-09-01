@@ -12,11 +12,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex (`QC_Metab_` / `Pool`) still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
 - Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.
+- Olympic LC / Eclipse 01 method presets (`hilic_metab_olympic_eclipse01`, `rp_metab_olympic_eclipse01`) with tighter RT windows (0.3 min HILIC, 0.2 min RP).
 
 ### Changed
 
-- GUI label **Method** is now **LC Method**.
+- GUI **Method preset** is a dropdown of packaged presets (not radio buttons) so more presets can be added without growing the window.
 - Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
+- Packaged HILIC/RP QC presets: omit a compound from a method when the Aug 2026 list has no numeric RT for that method, and omit an ion type when that list has no numeric [M+H]+ or [M-H]-. Sulfanilamide dropped from HILIC (no RT(HILIC)); polarity rows were already aligned.
+- QC compound retention times in the packaged HILIC and RP search spaces now come from the Aug 2026 Olympic LC / Eclipse 01 list. General `*_metab_pnnl` keys keep the wider RT windows (0.8 / 0.4 min).
 
 ## [0.2.2] - 2026-08-04
 

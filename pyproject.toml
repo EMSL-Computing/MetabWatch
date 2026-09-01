@@ -62,7 +62,9 @@ packages = [
     "metabwatch.pipeline_queue",
     "metabwatch.presets",
     "metabwatch.presets.hilic_metab_pnnl",
+    "metabwatch.presets.hilic_metab_olympic_eclipse01",
     "metabwatch.presets.rp_metab_pnnl",
+    "metabwatch.presets.rp_metab_olympic_eclipse01",
     "metabwatch.processor",
     "metabwatch.state",
     "metabwatch.synthesis",
@@ -71,7 +73,9 @@ packages = [
 
 [tool.setuptools.package-data]
 "metabwatch.presets.hilic_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.presets.hilic_metab_olympic_eclipse01" = ["*.toml", "*.csv"]
 "metabwatch.presets.rp_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.presets.rp_metab_olympic_eclipse01" = ["*.toml", "*.csv"]
 "metabwatch.synthesis" = ["templates/*", "static/*"]
 
 [tool.pytest.ini_options]

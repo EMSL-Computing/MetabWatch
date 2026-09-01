@@ -26,6 +26,11 @@ def test_preset_summary_mentions_method_defaults() -> None:
     assert "20000" in rp
     assert "Pool" in rp
 
+    eclipse_h = preset_summary_text("hilic_metab_olympic_eclipse01", "targeted")
+    assert "0.3" in eclipse_h
+    eclipse_rp = preset_summary_text("rp_metab_olympic_eclipse01", "untargeted")
+    assert "0.2" in eclipse_rp
+
 
 def test_validate_preset_requires_existing_input(tmp_path: Path) -> None:
     req = GuiRunRequest(
@@ -46,6 +51,19 @@ def test_validate_preset_ok(tmp_path: Path) -> None:
     req = GuiRunRequest(
         source="preset",
         method="hilic_metab_pnnl",
+        search="targeted",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    assert validate_request(req) is None
+
+
+def test_validate_eclipse01_preset_ok(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_olympic_eclipse01",
         search="targeted",
         input_folder=str(raw),
         output_folder=str(tmp_path / "out"),

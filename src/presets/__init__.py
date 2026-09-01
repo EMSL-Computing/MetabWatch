@@ -1,14 +1,18 @@
 """Built-in PNNL Standard RP / HILIC metabolomics pipeline presets.
 
 Scientific assets (CoreMS TOML + QC compound CSVs) ship as package data under
-``metabwatch.presets.{hilic_metab_pnnl,rp_metab_pnnl}/``. Call
-:func:`build_pipeline_config` for the four common modes; the CLI and GUI both
-use this API.
+``metabwatch.presets.<method_key>/``. Call :func:`build_pipeline_config` for
+standard method × search modes; the CLI and GUI both use this API.
+
+General ``*_metab_pnnl`` keys use a wider RT window for any LC/MS system.
+``*_metab_olympic_eclipse01`` keys use the same QC RTs with a tighter window
+for Olympic LC / Eclipse 01.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 from metabwatch.config import (
     PipelineConfig,
@@ -18,21 +22,48 @@ from metabwatch.config import (
     _normalize_project_id,
 )
 
-_METHODS = frozenset({"rp_metab_pnnl", "hilic_metab_pnnl"})
-_SEARCHES = frozenset({"targeted", "untargeted"})
 
-_THRESHOLDS: dict[str, dict[str, float]] = {
+class PresetSpec(TypedDict):
+    display_name: str
+    mz_tolerance_ppm: float
+    rt_tolerance: float
+    min_area: float
+
+
+PRESET_SPECS: dict[str, PresetSpec] = {
     "hilic_metab_pnnl": {
+        "display_name": "PNNL Standard HILIC Metabolomics Method",
         "mz_tolerance_ppm": 5.0,
         "rt_tolerance": 0.8,
         "min_area": 1000.0,
     },
+    "hilic_metab_olympic_eclipse01": {
+        "display_name": (
+            "PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01"
+        ),
+        "mz_tolerance_ppm": 5.0,
+        "rt_tolerance": 0.3,
+        "min_area": 1000.0,
+    },
     "rp_metab_pnnl": {
+        "display_name": "PNNL Standard RP Metabolomics Method",
         "mz_tolerance_ppm": 5.0,
         "rt_tolerance": 0.4,
         "min_area": 20000.0,
     },
+    "rp_metab_olympic_eclipse01": {
+        "display_name": (
+            "PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01"
+        ),
+        "mz_tolerance_ppm": 5.0,
+        "rt_tolerance": 0.2,
+        "min_area": 20000.0,
+    },
 }
+
+METHOD_KEYS: tuple[str, ...] = tuple(PRESET_SPECS)
+_METHODS = frozenset(METHOD_KEYS)
+_SEARCHES = frozenset({"targeted", "untargeted"})
 
 _SAMPLE_REGEX = {
     "targeted": r"QC_Metab_(.+)",
@@ -61,7 +92,7 @@ def build_pipeline_config(
     Parameters
     ----------
     method
-        Chromatography method: ``"rp_metab_pnnl"`` or ``"hilic_metab_pnnl"``.
+        Chromatography / LC-MS preset key (see ``METHOD_KEYS``).
     search
         Search mode: ``"targeted"`` or ``"untargeted"``.
     input_folder
@@ -98,7 +129,7 @@ def build_pipeline_config(
             f"Unknown search {search!r}; expected one of {sorted(_SEARCHES)}"
         )
 
-    thr = _THRESHOLDS[method_key]
+    spec = PRESET_SPECS[method_key]
     params = _asset_path(method_key, "corems.toml")
     standards = (
         _asset_path(method_key, "qc_compounds.csv")
@@ -118,9 +149,9 @@ def build_pipeline_config(
         standards_csv=standards,
         sample_name_regex=_SAMPLE_REGEX[search_key],
         top_n=100,
-        mz_tolerance_ppm=thr["mz_tolerance_ppm"],
-        rt_tolerance=thr["rt_tolerance"],
-        min_area=thr["min_area"],
+        mz_tolerance_ppm=spec["mz_tolerance_ppm"],
+        rt_tolerance=spec["rt_tolerance"],
+        min_area=spec["min_area"],
         plot_eics=False,
         plot_tic=True,
         integrate_mass_features=True,

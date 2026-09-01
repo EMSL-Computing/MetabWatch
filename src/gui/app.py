@@ -13,6 +13,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from metabwatch.gui.runner import PipelineRunner, RunnerState
 from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
+from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
 
 class MetabWatchApp(ttk.Frame):
@@ -89,27 +90,26 @@ class MetabWatchApp(ttk.Frame):
         self.preset_frame.columnconfigure(1, weight=1)
         prow = 0
 
-        ttk.Label(self.preset_frame, text="LC Method").grid(
+        ttk.Label(self.preset_frame, text="Method preset").grid(
             row=prow, column=0, sticky="w", pady=2
         )
-        method_frame = ttk.Frame(self.preset_frame)
-        method_frame.grid(row=prow, column=1, sticky="w", pady=2)
-        self.method_hilic = ttk.Radiobutton(
-            method_frame,
-            text="PNNL Standard HILIC Metabolomics Method",
-            variable=self.method_var,
-            value="hilic_metab_pnnl",
-            command=self._update_summary,
+        self._method_labels = {
+            key: PRESET_SPECS[key]["display_name"] for key in METHOD_KEYS
+        }
+        self._method_keys_by_label = {
+            label: key for key, label in self._method_labels.items()
+        }
+        self.method_name_var = tk.StringVar(
+            value=self._method_labels[self.method_var.get()]
         )
-        self.method_hilic.pack(side=tk.TOP, anchor="w")
-        self.method_rp = ttk.Radiobutton(
-            method_frame,
-            text="PNNL Standard RP Metabolomics Method",
-            variable=self.method_var,
-            value="rp_metab_pnnl",
-            command=self._update_summary,
+        self.method_combo = ttk.Combobox(
+            self.preset_frame,
+            textvariable=self.method_name_var,
+            values=[self._method_labels[key] for key in METHOD_KEYS],
+            state="readonly",
         )
-        self.method_rp.pack(side=tk.TOP, anchor="w")
+        self.method_combo.grid(row=prow, column=1, columnspan=2, sticky="ew", pady=2)
+        self.method_combo.bind("<<ComboboxSelected>>", self._on_method_selected)
         prow += 1
 
         ttk.Label(self.preset_frame, text="Search").grid(
@@ -198,7 +198,7 @@ class MetabWatchApp(ttk.Frame):
             self.preset_frame,
             textvariable=self.summary_var,
             foreground="#444444",
-            wraplength=520,
+            wraplength=640,
         )
         self.summary_label.grid(row=prow, column=0, columnspan=3, sticky="w", pady=(4, 0))
         row += 1
@@ -221,7 +221,7 @@ class MetabWatchApp(ttk.Frame):
             text="Same schema as CLI --config (simplified or legacy). "
             "Input/output paths come from the JSON.",
             foreground="#444444",
-            wraplength=520,
+            wraplength=640,
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
         row += 1
 
@@ -291,14 +291,17 @@ class MetabWatchApp(ttk.Frame):
             preset_summary_text(self.method_var.get(), self.search_var.get())
         )
 
+    def _on_method_selected(self, _event: object | None = None) -> None:
+        key = self._method_keys_by_label.get(self.method_name_var.get())
+        if key:
+            self.method_var.set(key)
+
     def _update_source_enabled(self) -> None:
         preset = self.source_var.get() == "preset"
         preset_state = tk.NORMAL if preset else tk.DISABLED
         json_state = tk.DISABLED if preset else tk.NORMAL
 
         for widget in (
-            self.method_hilic,
-            self.method_rp,
             self.search_targeted,
             self.search_untargeted,
             self.project_id_entry,
@@ -312,6 +315,8 @@ class MetabWatchApp(ttk.Frame):
         ):
             widget.configure(state=preset_state)
 
+        # Combobox uses readonly (not normal) so the list cannot be typed over.
+        self.method_combo.configure(state="readonly" if preset else tk.DISABLED)
         self.config_entry.configure(state=json_state)
         self.config_browse.configure(state=json_state)
 
@@ -396,8 +401,7 @@ class MetabWatchApp(ttk.Frame):
         if running:
             # Lock form fields for the active source
             for widget in (
-                self.method_hilic,
-                self.method_rp,
+                self.method_combo,
                 self.search_targeted,
                 self.search_untargeted,
                 self.project_id_entry,
@@ -523,8 +527,8 @@ def main(argv: list[str] | None = None) -> int:
     version = get_version()
     root = tk.Tk()
     root.title(f"MetabWatch {version}")
-    root.minsize(640, 520)
-    root.geometry("720x640")
+    root.minsize(720, 720)
+    root.geometry("820x860")
 
     # Prefer native-ish ttk theme when available
     try:
