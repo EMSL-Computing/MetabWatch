@@ -575,6 +575,7 @@ class StarterConfigDialog(tk.Toplevel):
         self.title("Create a custom config")
         self.transient(master)
         self.resizable(True, False)
+        self.minsize(900, 400)
 
         self.input_var = tk.StringVar(value=initial_input)
         self.output_var = tk.StringVar(value=initial_output)
@@ -587,6 +588,9 @@ class StarterConfigDialog(tk.Toplevel):
 
         self._build()
         self._sync_mode_widgets()
+        self.update_idletasks()
+        height = max(self.winfo_reqheight(), 400)
+        self.geometry(f"960x{height}")
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.grab_set()
         self.focus_set()
@@ -603,7 +607,7 @@ class StarterConfigDialog(tk.Toplevel):
                 "Metabolomics method files. Edit those copies in Excel or a "
                 "text editor; MetabWatch will use the copies."
             ),
-            wraplength=520,
+            wraplength=780,
             foreground="#444444",
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
 
@@ -611,7 +615,7 @@ class StarterConfigDialog(tk.Toplevel):
         ttk.Label(body, text="Input folder (raw files)").grid(
             row=row, column=0, sticky="w", pady=2
         )
-        ttk.Entry(body, textvariable=self.input_var).grid(
+        ttk.Entry(body, textvariable=self.input_var, width=64).grid(
             row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
         )
         ttk.Button(body, text="Browse…", command=self._browse_input).grid(
@@ -622,7 +626,7 @@ class StarterConfigDialog(tk.Toplevel):
         ttk.Label(body, text="Output folder (results)").grid(
             row=row, column=0, sticky="w", pady=2
         )
-        ttk.Entry(body, textvariable=self.output_var).grid(
+        ttk.Entry(body, textvariable=self.output_var, width=64).grid(
             row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
         )
         ttk.Button(body, text="Browse…", command=self._browse_output).grid(
