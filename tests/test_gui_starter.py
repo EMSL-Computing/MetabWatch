@@ -9,10 +9,11 @@ import pytest
 
 from metabwatch.config import load_pipeline_config
 from metabwatch.gui.starter import (
+    COMPOUNDS_CSV_FILENAME,
     CONFIG_FILENAME,
     COREMS_FILENAME,
     DEFAULT_CONFIG_FOLDER_NAME,
-    QC_CSV_FILENAME,
+    PACKAGED_CSV_FILENAME,
     RP_MIN_AREA,
     RP_MZ_TOLERANCE_PPM,
     RP_RT_TOLERANCE,
@@ -59,7 +60,7 @@ def test_targeted_write_three_files_and_loads(tmp_path: Path) -> None:
 
     json_path = dest / CONFIG_FILENAME
     toml_path = dest / COREMS_FILENAME
-    csv_path = dest / QC_CSV_FILENAME
+    csv_path = dest / COMPOUNDS_CSV_FILENAME
     assert json_path.is_file()
     assert toml_path.is_file()
     assert csv_path.is_file()
@@ -101,7 +102,8 @@ def test_untargeted_write_skips_qc_csv_and_loads(tmp_path: Path) -> None:
 
     assert (dest / CONFIG_FILENAME).is_file()
     assert (dest / COREMS_FILENAME).is_file()
-    assert not (dest / QC_CSV_FILENAME).exists()
+    assert not (dest / COMPOUNDS_CSV_FILENAME).exists()
+    assert not (dest / PACKAGED_CSV_FILENAME).exists()
 
     payload = json.loads((dest / CONFIG_FILENAME).read_text(encoding="utf-8"))
     assert payload["targeted"] is False
@@ -132,7 +134,7 @@ def test_numeric_defaults_match_rp_thresholds(tmp_path: Path) -> None:
 def test_packaged_rp_assets_unchanged_after_write(tmp_path: Path) -> None:
     packaged = rp_packaged_dir()
     toml_src = packaged / COREMS_FILENAME
-    csv_src = packaged / QC_CSV_FILENAME
+    csv_src = packaged / PACKAGED_CSV_FILENAME
     toml_before = toml_src.read_bytes()
     csv_before = csv_src.read_bytes()
     toml_mtime = toml_src.stat().st_mtime_ns
@@ -146,7 +148,8 @@ def test_packaged_rp_assets_unchanged_after_write(tmp_path: Path) -> None:
     assert toml_src.stat().st_mtime_ns == toml_mtime
     assert csv_src.stat().st_mtime_ns == csv_mtime
     assert (dest / COREMS_FILENAME).read_bytes() == toml_before
-    assert (dest / QC_CSV_FILENAME).read_bytes() == csv_before
+    assert (dest / COMPOUNDS_CSV_FILENAME).read_bytes() == csv_before
+    assert not (dest / PACKAGED_CSV_FILENAME).exists()
 
 
 def test_gui_validation_accepts_written_json(tmp_path: Path) -> None:

@@ -234,8 +234,8 @@ class MetabWatchApp(ttk.Frame):
         self.config_browse.grid(row=0, column=2, pady=2)
         ttk.Label(
             self.json_frame,
-            text="Need a different QC list or settings? Use Create custom "
-            "config. Already have a config file? Use Browse.",
+            text="Need a different compound list or settings? Use Create "
+            "custom config. Already have a config file? Use Browse.",
             foreground="#444444",
             wraplength=640,
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
@@ -380,7 +380,7 @@ class MetabWatchApp(ttk.Frame):
             f"{result.dest_dir}\n\n"
             f"{names}\n\n"
             "Config source is now Custom JSON. Edit the copied CSV or TOML "
-            "if you need a different QC list or CoreMS settings, then Start.",
+            "if you need a different compound list or CoreMS settings, then Start.",
         )
 
     def _build_request(self) -> GuiRunRequest:

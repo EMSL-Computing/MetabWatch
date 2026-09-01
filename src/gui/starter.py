@@ -18,7 +18,8 @@ from metabwatch.presets import _asset_path
 
 CONFIG_FILENAME = "metabwatch_config.json"
 COREMS_FILENAME = "corems.toml"
-QC_CSV_FILENAME = "qc_compounds.csv"
+PACKAGED_CSV_FILENAME = "qc_compounds.csv"
+COMPOUNDS_CSV_FILENAME = "monitored_compounds.csv"
 
 RP_METHOD = "rp_metab_pnnl"
 RP_MZ_TOLERANCE_PPM = 5.0
@@ -197,7 +198,7 @@ def build_starter_payload(dest_dir: Path, settings: StarterSettings) -> dict[str
         "min_area": float(settings.min_area),
     }
     if settings.targeted:
-        payload["qc_compounds"] = str((dest / QC_CSV_FILENAME).resolve())
+        payload["qc_compounds"] = str((dest / COMPOUNDS_CSV_FILENAME).resolve())
     else:
         payload["top_n"] = int(settings.top_n)
     return payload
@@ -245,7 +246,7 @@ def write_rp_starter_folder(
 
     planned = [dest / CONFIG_FILENAME, dest / COREMS_FILENAME]
     if settings.targeted:
-        planned.append(dest / QC_CSV_FILENAME)
+        planned.append(dest / COMPOUNDS_CSV_FILENAME)
     existing = [path for path in planned if path.exists()]
     if existing and not overwrite:
         names = ", ".join(path.name for path in existing)
@@ -258,8 +259,8 @@ def write_rp_starter_folder(
     shutil.copy2(_asset_path(RP_METHOD, COREMS_FILENAME), toml_dest)
     written.append(toml_dest)
     if settings.targeted:
-        csv_dest = dest / QC_CSV_FILENAME
-        shutil.copy2(_asset_path(RP_METHOD, QC_CSV_FILENAME), csv_dest)
+        csv_dest = dest / COMPOUNDS_CSV_FILENAME
+        shutil.copy2(_asset_path(RP_METHOD, PACKAGED_CSV_FILENAME), csv_dest)
         written.append(csv_dest)
 
     config_path = dest / CONFIG_FILENAME
