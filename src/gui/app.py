@@ -194,7 +194,7 @@ class MetabWatchApp(ttk.Frame):
             self.preset_frame,
             textvariable=self.summary_var,
             foreground="#444444",
-            wraplength=520,
+            wraplength=640,
         )
         self.summary_label.grid(row=prow, column=0, columnspan=3, sticky="w", pady=(4, 0))
         row += 1
@@ -217,7 +217,7 @@ class MetabWatchApp(ttk.Frame):
             text="Same schema as CLI --config (simplified or legacy). "
             "Input/output paths come from the JSON.",
             foreground="#444444",
-            wraplength=520,
+            wraplength=640,
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
         row += 1
 
@@ -517,8 +517,8 @@ def main(argv: list[str] | None = None) -> int:
     version = get_version()
     root = tk.Tk()
     root.title(f"MetabWatch {version}")
-    root.minsize(640, 520)
-    root.geometry("720x640")
+    root.minsize(720, 720)
+    root.geometry("820x860")
 
     # Prefer native-ish ttk theme when available
     try:
