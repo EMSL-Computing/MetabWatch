@@ -61,7 +61,7 @@ python -m metabwatch.gui
 The window provides:
 
 - **Preset shortcuts** — Method preset dropdown (packaged HILIC / RP methods) × targeted or untargeted, optional polarity and project ID, plus input/output folder pickers
-- **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`)
+- **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`), or use **Write starter folder** to create one plus editable copies of the RP method files (CoreMS TOML, and QC CSV when targeted)
 - **Watch continuously** or **Process once**, optional force reprocess
 - **Start / Stop** (stop finishes the current file, then exits the watch loop)
 - Live log, **Open dashboard**, and **Open output**
