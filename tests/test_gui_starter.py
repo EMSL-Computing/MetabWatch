@@ -16,6 +16,7 @@ from metabwatch.gui.starter import (
     DEFAULT_CONFIG_FOLDER_NAME,
     PACKAGED_CSV_FILENAME,
     README_FILENAME,
+    README_TEMPLATE_FILENAME,
     RP_MIN_AREA,
     RP_MZ_TOLERANCE_PPM,
     RP_RT_TOLERANCE,
@@ -28,6 +29,7 @@ from metabwatch.gui.starter import (
     requested_config_dir,
     rp_packaged_dir,
     settings_from_form,
+    starter_readme_template_path,
     starter_readme_text,
     write_rp_starter_folder,
 )
@@ -72,7 +74,7 @@ def test_targeted_write_files_and_loads(tmp_path: Path) -> None:
     assert readme_path.is_file()
     assert result.config_path == json_path
     assert csv_path.read_text(encoding="utf-8") == blank_compounds_csv_text()
-    assert readme_path.read_text(encoding="utf-8") == starter_readme_text(True)
+    assert readme_path.read_text(encoding="utf-8") == starter_readme_text()
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload["targeted"] is True
@@ -111,9 +113,7 @@ def test_untargeted_write_skips_qc_csv_and_loads(tmp_path: Path) -> None:
     assert (dest / CONFIG_FILENAME).is_file()
     assert (dest / COREMS_FILENAME).is_file()
     assert (dest / README_FILENAME).is_file()
-    assert (dest / README_FILENAME).read_text(encoding="utf-8") == starter_readme_text(
-        False
-    )
+    assert (dest / README_FILENAME).read_text(encoding="utf-8") == starter_readme_text()
     assert not (dest / COMPOUNDS_CSV_FILENAME).exists()
     assert not (dest / PACKAGED_CSV_FILENAME).exists()
 
@@ -182,12 +182,26 @@ def test_starter_readme_tells_operator_to_fill_csv(tmp_path: Path) -> None:
     dest = tmp_path / "starter"
     write_rp_starter_folder(dest, _settings(tmp_path, targeted=True))
     text = (dest / README_FILENAME).read_text(encoding="utf-8")
+    assert dest.joinpath(README_FILENAME).name == "README.txt"
     assert COMPOUNDS_CSV_FILENAME in text
     assert "compound_name" in text
     assert "positive" in text
     assert "negative" in text
     assert "blank template" in text
     assert CONFIG_FILENAME in text
+    assert "sample_name_regex" in text
+    assert "QC_Metab_(.+)" in text
+    assert "(?i)Pool" in text
+    assert "mz_tolerance_ppm" in text
+    assert "Which .raw files to process" in text
+
+
+def test_starter_readme_template_is_the_repo_txt() -> None:
+    path = starter_readme_template_path()
+    assert path.name == README_TEMPLATE_FILENAME
+    assert path.is_file()
+    assert path.parent.name == "gui"
+    assert "blank template" in path.read_text(encoding="utf-8")
 
 
 def test_gui_validation_accepts_written_json(tmp_path: Path) -> None:

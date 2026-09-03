@@ -52,7 +52,7 @@ python -m metabwatch.pipeline --config <config.json>
 
 Simplified flat JSON and legacy nested schemas are both supported (see below).
 
-The GUI **Create custom config** button writes this simplified schema for you: a new folder (default name `metabwatch_config`; `_2`, `_3`, … if that name is already used) containing `metabwatch_config.json` with absolute paths, a copy of the packaged RP `corems.toml`, a `README.md` with operator steps, and (targeted only) a blank `monitored_compounds.csv` (header row only: `compound_name,ion_type,mz,retention_time,polarity`; the JSON `qc_compounds` key points at that file). Existing folders are not overwritten. Fill the compound list before a targeted Start; packaged presets under `src/presets/` are not modified. Untargeted starter files use the current RP pool regex `(?i)Pool` and include `top_n`.
+The GUI **Create custom config** button writes this simplified schema for you: a new folder (default name `metabwatch_config`; `_2`, `_3`, … if that name is already used) containing `metabwatch_config.json` with absolute paths, a copy of the packaged RP `corems.toml`, a `README.txt` with operator steps (from `src/gui/starter_readme.txt`), and (targeted only) a blank `monitored_compounds.csv` (header row only: `compound_name,ion_type,mz,retention_time,polarity`; the JSON `qc_compounds` key points at that file). Existing folders are not overwritten. Fill the compound list before a targeted Start; packaged presets under `src/presets/` are not modified. Untargeted starter files use the current RP pool regex `(?i)Pool` and include `top_n`.
 
 ## Built-in presets
 

@@ -19,7 +19,8 @@ from metabwatch.presets import _asset_path
 
 CONFIG_FILENAME = "metabwatch_config.json"
 COREMS_FILENAME = "corems.toml"
-README_FILENAME = "README.md"
+README_FILENAME = "README.txt"
+README_TEMPLATE_FILENAME = "starter_readme.txt"
 PACKAGED_CSV_FILENAME = "qc_compounds.csv"
 COMPOUNDS_CSV_FILENAME = "monitored_compounds.csv"
 COMPOUNDS_CSV_COLUMNS = (
@@ -198,97 +199,17 @@ def blank_compounds_csv_text() -> str:
     return ",".join(COMPOUNDS_CSV_COLUMNS) + "\n"
 
 
-def starter_readme_text(targeted: bool) -> str:
+def starter_readme_template_path() -> Path:
+    """Return the on-disk template copied into each starter folder as README.txt."""
+    path = Path(__file__).resolve().parent / README_TEMPLATE_FILENAME
+    if not path.is_file():
+        raise FileNotFoundError(f"Starter README template is missing: {path}")
+    return path
+
+
+def starter_readme_text() -> str:
     """Return operator instructions for a newly written starter folder."""
-    columns = ",".join(COMPOUNDS_CSV_COLUMNS)
-    if targeted:
-        compounds_section = f"""\
-## Fill the compound list before you Start
-
-`{COMPOUNDS_CSV_FILENAME}` is a blank template. Add one row per compound in
-Excel or a text editor. Keep the header row. Do not start a targeted run until
-this file has at least one compound for the polarity you are acquiring
-(`positive` or `negative`). An empty list fails when the first sample is
-processed.
-
-Required columns (in this order):
-
-```
-{columns}
-```
-
-Example row:
-
-```
-Caffeine,[M+H]+,195.0877,4.20,positive
-```
-
-- `polarity` must be `positive` or `negative` (lowercase).
-- `mz` and `retention_time` (minutes) must be numbers.
-- `ion_type` is a label such as `[M+H]+` or `[M-H]-`.
-- Do not put comment lines in the CSV.
-
-This file is not a copy of the packaged RP QC list. If you want those rows as
-a starting point, copy them from the packaged RP `qc_compounds.csv` yourself.
-"""
-        files_row = (
-            f"| `{COMPOUNDS_CSV_FILENAME}` | Compound list for targeted search "
-            "(header only until you add rows) |\n"
-        )
-        next_steps = f"""\
-1. Open `{COMPOUNDS_CSV_FILENAME}` and add your compounds (see below).
-2. Optionally edit `{COREMS_FILENAME}` if you need different CoreMS settings.
-   It is a copy of the PNNL Standard RP Metabolomics method.
-3. In MetabWatch, Config source should already be **Custom JSON** pointing at
-   `{CONFIG_FILENAME}`. Click **Start**.
-4. To reuse later: Custom JSON → Browse → this `{CONFIG_FILENAME}`.
-"""
-    else:
-        compounds_section = """\
-## Untargeted search
-
-This config is untargeted, so there is no compound list in this folder. The
-first sample that matches the sample-name filter builds the search space
-(`untargeted_search_space.csv` under the output folder). Later samples are
-matched against that list.
-"""
-        files_row = ""
-        next_steps = f"""\
-1. Optionally edit `{COREMS_FILENAME}` if you need different CoreMS settings.
-   It is a copy of the PNNL Standard RP Metabolomics method.
-2. In MetabWatch, Config source should already be **Custom JSON** pointing at
-   `{CONFIG_FILENAME}`. Click **Start**.
-3. To reuse later: Custom JSON → Browse → this `{CONFIG_FILENAME}`.
-"""
-
-    return f"""\
-# MetabWatch custom config
-
-This folder was created by **Create custom config** in the MetabWatch GUI.
-Edit the files here. Packaged presets that ship with MetabWatch are not
-changed.
-
-## What to do next
-
-{next_steps}
-## Files
-
-| File | Purpose |
-|------|---------|
-| `{CONFIG_FILENAME}` | Pipeline settings (folders, tolerances, targeted vs untargeted) |
-| `{COREMS_FILENAME}` | CoreMS processing parameters (RP starter copy) |
-{files_row}| `{README_FILENAME}` | These instructions |
-
-{compounds_section}
-## Other notes
-
-- Paths in `{CONFIG_FILENAME}` are absolute. If you move this folder, update
-  `corems_params` and (when targeted) `qc_compounds`. Update `input_folder`
-  and `output_folder` if those locations changed.
-- The sample-name filter is the JSON key `sample_name_regex`.
-- CLI equivalent: `metabwatch --config {CONFIG_FILENAME}` from a working
-  directory that can see those paths (absolute paths still work from anywhere).
-"""
+    return starter_readme_template_path().read_text(encoding="utf-8")
 
 
 def build_starter_payload(dest_dir: Path, settings: StarterSettings) -> dict[str, Any]:
@@ -320,7 +241,8 @@ def write_rp_starter_folder(
     """Copy the RP CoreMS TOML into ``dest_dir`` and write starter files.
 
     Targeted folders get a header-only ``monitored_compounds.csv`` (no packaged
-    RP compound rows). Every folder gets ``README.md`` with operator steps.
+    RP compound rows). Every folder gets ``README.txt`` from
+    ``starter_readme.txt``.
 
     Parameters
     ----------
@@ -374,7 +296,7 @@ def write_rp_starter_folder(
         written.append(csv_dest)
 
     readme_path = dest / README_FILENAME
-    readme_path.write_text(starter_readme_text(settings.targeted), encoding="utf-8")
+    readme_path.write_text(starter_readme_text(), encoding="utf-8")
     written.append(readme_path)
 
     config_path = dest / CONFIG_FILENAME

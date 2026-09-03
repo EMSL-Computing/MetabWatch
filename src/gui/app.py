@@ -379,7 +379,7 @@ class MetabWatchApp(ttk.Frame):
             "Saved:\n"
             f"{result.dest_dir}\n\n"
             f"{names}\n\n"
-            "Config source is now Custom JSON. Read README.md in that folder. "
+            "Config source is now Custom JSON. Read README.txt in that folder. "
             "For a targeted run, add compounds to monitored_compounds.csv "
             "before Start (it is blank on purpose).",
         )
@@ -609,9 +609,9 @@ class StarterConfigDialog(tk.Toplevel):
         ttk.Label(
             body,
             text=(
-                "Creates a new folder with a custom JSON, a copy of the RP "
-                "CoreMS TOML, and (targeted) a blank compound list to fill in. "
-                "A README in the folder has the next steps."
+                "Creates a new folder with a custom JSON, a copy of a "
+                "CoreMS TOML for starter use, and (targeted) a blank compound list to fill in. "
+                "A README.txt in the folder has the next steps."
             ),
             wraplength=780,
             foreground="#444444",
