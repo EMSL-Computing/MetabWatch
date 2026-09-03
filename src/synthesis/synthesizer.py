@@ -1249,10 +1249,8 @@ class HTMLSynthesizer:
             times = pd.to_numeric(trace_df["time"], errors="coerce")
             if trace_col and trace_col in trace_df.columns:
                 eic = pd.to_numeric(trace_df[trace_col], errors="coerce")
-                detected = True
             elif self._target_trace_col(compound["name"]) in trace_df.columns:
                 eic = pd.to_numeric(trace_df[self._target_trace_col(compound["name"])], errors="coerce")
-                detected = False
             else:
                 continue
 
@@ -1260,31 +1258,36 @@ class HTMLSynthesizer:
             if not mask.any():
                 continue
 
+            # Overlay style follows the match CSV, not whether the mf_* EIC column
+            # was exported. Target-m/z fallback chromatograms still get a solid
+            # line and apex marker when intensity / observed_rt exist.
+            match_detected = bool(row.get("detected")) and row.get("observed_rt") is not None
+
             eic_traces.append(
                 {
                     "x": times[mask].tolist(),
                     "y": eic[mask].tolist(),
                     "name": self._acquisition_label(row["acquisition_time_iso"]),
-                    "detected": detected,
+                    "detected": match_detected,
                     "hovertemplate": (
                         "Sample: " + row["sample"] + "<br>"
                         +
                         (
                             "RT: %{x:.3f} min<br>EIC: %{y:.4g}<extra></extra>"
-                            if detected
+                            if match_detected
                             else "RT: %{x:.3f} min<br>EIC: %{y:.4g} (no detected peak)<extra></extra>"
                         )
                     ),
                     "line": {
                         "color": line_color,
                         "width": 1.8,
-                        "dash": "dot" if not detected else "solid",
+                        "dash": "dot" if not match_detected else "solid",
                     },
                 }
             )
 
             picked_rt = row.get("observed_rt")
-            if picked_rt is None or not detected:
+            if picked_rt is None or not match_detected:
                 continue
 
             try:
@@ -1317,8 +1320,8 @@ class HTMLSynthesizer:
                     ),
                     "marker": {
                         "size": 8,
-                        "color": line_color,
-                        "line": {"color": "#4a4a4a", "width": 0.8},
+                        "color": "#f5f5f5",
+                        "line": {"color": "#1a1a1a", "width": 1.4},
                     },
                 }
             )
