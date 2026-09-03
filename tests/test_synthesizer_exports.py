@@ -414,6 +414,39 @@ def test_dashboard_uses_local_plotly_offline(tmp_path: Path) -> None:
     assert f'src="../{PLOTLY_JS_FILENAME}"' in compound_html
 
 
+def test_compound_page_eic_first_and_next_link(tmp_path: Path) -> None:
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {"mf_id": 0, "compound_name": "Alpha", "intensity": 100.0, "area": 1000.0},
+            {"mf_id": 1, "compound_name": "Beta", "intensity": 50.0, "area": 400.0},
+        ],
+    )
+
+    HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+    ).render()
+
+    alpha = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
+    beta = (output_dir / "compounds" / "beta.html").read_text(encoding="utf-8")
+    assert "Back to compound index" in alpha
+    assert "Next compound: Beta" in alpha
+    assert 'href="beta.html"' in alpha
+    assert "Next compound: Alpha" in beta
+    assert 'href="alpha.html"' in beta
+    assert alpha.index("EIC overlay") < alpha.index("Across-sample metrics")
+    assert beta.index("EIC overlay") < beta.index("Across-sample metrics")
+
+
 def test_eic_overlay_marks_apex_when_only_target_column_exists(tmp_path: Path) -> None:
     """A match with observed_rt gets a solid EIC and apex marker even without mf_*."""
     output_dir = tmp_path / "results"
