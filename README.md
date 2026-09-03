@@ -60,6 +60,7 @@ python -m metabwatch.gui
 
 The window provides:
 
+- **Hover notes** — pause on an option label (or Create custom config field) for a short explanation
 - **Preset shortcuts** — Method preset dropdown (packaged HILIC / RP methods) × targeted or untargeted, optional polarity and project ID, plus input/output folder pickers
 - **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`), or use **Create custom config** to make a new folder with JSON, an RP CoreMS TOML copy, a `README.txt`, and (targeted) a blank `monitored_compounds.csv` to fill in
 - **Watch continuously** or **Process once**, optional force reprocess

@@ -28,6 +28,7 @@ from metabwatch.gui.starter import (
     settings_from_form,
     write_rp_starter_folder,
 )
+from metabwatch.gui.tooltip import MAIN_HOVER, STARTER_HOVER, HoverTooltip, add_hover
 from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
 from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
@@ -39,6 +40,7 @@ class MetabWatchApp(ttk.Frame):
         super().__init__(master, padding=12)
         self.master = master
         self.runner = PipelineRunner()
+        self._tooltips: list[HoverTooltip] = []
 
         self.source_var = tk.StringVar(value="preset")
         self.method_var = tk.StringVar(value="hilic_metab_pnnl")
@@ -79,7 +81,8 @@ class MetabWatchApp(ttk.Frame):
         row = 0
 
         # Config source
-        ttk.Label(self, text="Config source").grid(row=row, column=0, sticky="w", pady=2)
+        self.config_source_label = ttk.Label(self, text="Config source")
+        self.config_source_label.grid(row=row, column=0, sticky="w", pady=2)
         src_frame = ttk.Frame(self)
         src_frame.grid(row=row, column=1, sticky="w", pady=2)
         self.source_preset_rb = ttk.Radiobutton(
@@ -106,9 +109,8 @@ class MetabWatchApp(ttk.Frame):
         self.preset_frame.columnconfigure(1, weight=1)
         prow = 0
 
-        ttk.Label(self.preset_frame, text="Method preset").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.method_preset_label = ttk.Label(self.preset_frame, text="Method preset")
+        self.method_preset_label.grid(row=prow, column=0, sticky="w", pady=2)
         self._method_labels = {
             key: PRESET_SPECS[key]["display_name"] for key in METHOD_KEYS
         }
@@ -128,9 +130,8 @@ class MetabWatchApp(ttk.Frame):
         self.method_combo.bind("<<ComboboxSelected>>", self._on_method_selected)
         prow += 1
 
-        ttk.Label(self.preset_frame, text="Search").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.search_label = ttk.Label(self.preset_frame, text="Search")
+        self.search_label.grid(row=prow, column=0, sticky="w", pady=2)
         search_frame = ttk.Frame(self.preset_frame)
         search_frame.grid(row=prow, column=1, sticky="w", pady=2)
         self.search_targeted = ttk.Radiobutton(
@@ -151,18 +152,16 @@ class MetabWatchApp(ttk.Frame):
         self.search_untargeted.pack(side=tk.LEFT)
         prow += 1
 
-        ttk.Label(self.preset_frame, text="Project ID").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.project_id_label = ttk.Label(self.preset_frame, text="Project ID")
+        self.project_id_label.grid(row=prow, column=0, sticky="w", pady=2)
         self.project_id_entry = ttk.Entry(
             self.preset_frame, textvariable=self.project_id_var
         )
         self.project_id_entry.grid(row=prow, column=1, sticky="ew", pady=2)
         prow += 1
 
-        ttk.Label(self.preset_frame, text="Polarity").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.polarity_label = ttk.Label(self.preset_frame, text="Polarity")
+        self.polarity_label.grid(row=prow, column=0, sticky="w", pady=2)
         polarity_frame = ttk.Frame(self.preset_frame)
         polarity_frame.grid(row=prow, column=1, sticky="w", pady=2)
         self.polarity_auto = ttk.Radiobutton(
@@ -188,9 +187,8 @@ class MetabWatchApp(ttk.Frame):
         self.polarity_negative.pack(side=tk.LEFT)
         prow += 1
 
-        ttk.Label(self.preset_frame, text="Input folder").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.input_folder_label = ttk.Label(self.preset_frame, text="Input folder")
+        self.input_folder_label.grid(row=prow, column=0, sticky="w", pady=2)
         self.input_entry = ttk.Entry(self.preset_frame, textvariable=self.input_var)
         self.input_entry.grid(row=prow, column=1, sticky="ew", pady=2, padx=(0, 6))
         self.input_browse = ttk.Button(
@@ -199,9 +197,8 @@ class MetabWatchApp(ttk.Frame):
         self.input_browse.grid(row=prow, column=2, pady=2)
         prow += 1
 
-        ttk.Label(self.preset_frame, text="Output folder").grid(
-            row=prow, column=0, sticky="w", pady=2
-        )
+        self.output_folder_label = ttk.Label(self.preset_frame, text="Output folder")
+        self.output_folder_label.grid(row=prow, column=0, sticky="w", pady=2)
         self.output_entry = ttk.Entry(self.preset_frame, textvariable=self.output_var)
         self.output_entry.grid(row=prow, column=1, sticky="ew", pady=2, padx=(0, 6))
         self.output_browse = ttk.Button(
@@ -223,9 +220,8 @@ class MetabWatchApp(ttk.Frame):
         self.json_frame = ttk.LabelFrame(self, text="Custom JSON", padding=8)
         self.json_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=6)
         self.json_frame.columnconfigure(1, weight=1)
-        ttk.Label(self.json_frame, text="Config file").grid(
-            row=0, column=0, sticky="w", pady=2
-        )
+        self.config_file_label = ttk.Label(self.json_frame, text="Config file")
+        self.config_file_label.grid(row=0, column=0, sticky="w", pady=2)
         self.config_entry = ttk.Entry(self.json_frame, textvariable=self.config_var)
         self.config_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(0, 6))
         self.config_browse = ttk.Button(
@@ -252,23 +248,26 @@ class MetabWatchApp(ttk.Frame):
         run_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=6)
         mode_frame = ttk.Frame(run_frame)
         mode_frame.pack(anchor="w")
-        ttk.Radiobutton(
+        self.watch_rb = ttk.Radiobutton(
             mode_frame,
             text="Watch continuously",
             variable=self.run_mode_var,
             value="watch",
-        ).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Radiobutton(
+        )
+        self.watch_rb.pack(side=tk.LEFT, padx=(0, 12))
+        self.once_rb = ttk.Radiobutton(
             mode_frame,
             text="Process once",
             variable=self.run_mode_var,
             value="once",
-        ).pack(side=tk.LEFT)
-        ttk.Checkbutton(
+        )
+        self.once_rb.pack(side=tk.LEFT)
+        self.force_cb = ttk.Checkbutton(
             run_frame,
             text="Force reprocess",
             variable=self.force_var,
-        ).pack(anchor="w", pady=(6, 0))
+        )
+        self.force_cb.pack(anchor="w", pady=(6, 0))
         row += 1
 
         # Buttons
@@ -303,6 +302,80 @@ class MetabWatchApp(ttk.Frame):
             log_frame, height=16, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 9)
         )
         self.log.grid(row=0, column=0, sticky="nsew")
+        self._attach_hover_notes()
+
+    def _attach_hover_notes(self) -> None:
+        """Delayed hover copy on option labels and matching controls."""
+        add_hover(
+            self._tooltips,
+            self.config_source_label,
+            text=MAIN_HOVER["config_source"],
+        )
+        add_hover(
+            self._tooltips,
+            self.source_preset_rb,
+            text=MAIN_HOVER["preset_shortcuts"],
+        )
+        add_hover(
+            self._tooltips,
+            self.source_json_rb,
+            text=MAIN_HOVER["custom_json"],
+        )
+        add_hover(
+            self._tooltips,
+            self.method_preset_label,
+            self.method_combo,
+            text=MAIN_HOVER["method_preset"],
+        )
+        add_hover(
+            self._tooltips,
+            self.search_label,
+            self.search_targeted,
+            self.search_untargeted,
+            text=MAIN_HOVER["search"],
+        )
+        add_hover(
+            self._tooltips,
+            self.project_id_label,
+            self.project_id_entry,
+            text=MAIN_HOVER["project_id"],
+        )
+        add_hover(
+            self._tooltips,
+            self.polarity_label,
+            self.polarity_auto,
+            self.polarity_positive,
+            self.polarity_negative,
+            text=MAIN_HOVER["polarity"],
+        )
+        add_hover(
+            self._tooltips,
+            self.input_folder_label,
+            self.input_entry,
+            text=MAIN_HOVER["input_folder"],
+        )
+        add_hover(
+            self._tooltips,
+            self.output_folder_label,
+            self.output_entry,
+            text=MAIN_HOVER["output_folder"],
+        )
+        add_hover(
+            self._tooltips,
+            self.config_file_label,
+            self.config_entry,
+            text=MAIN_HOVER["config_file"],
+        )
+        add_hover(
+            self._tooltips,
+            self.starter_btn,
+            text=MAIN_HOVER["create_custom_config"],
+        )
+        add_hover(self._tooltips, self.watch_rb, text=MAIN_HOVER["watch"])
+        add_hover(self._tooltips, self.once_rb, text=MAIN_HOVER["process_once"])
+        add_hover(
+            self._tooltips, self.force_cb, text=MAIN_HOVER["force_reprocess"]
+        )
 
     def _bind_traces(self) -> None:
         self.method_var.trace_add("write", lambda *_: self._update_summary())
@@ -576,6 +649,7 @@ class StarterConfigDialog(tk.Toplevel):
     ) -> None:
         super().__init__(master)
         self._on_saved = on_saved
+        self._tooltips: list[HoverTooltip] = []
         self.title("Create a custom config")
         self.transient(master)
         self.resizable(True, True)
@@ -615,79 +689,68 @@ class StarterConfigDialog(tk.Toplevel):
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
 
         row = 1
-        ttk.Label(body, text="Input folder (raw files)").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.input_var, width=64).grid(
-            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
-        )
+        self.input_folder_label = ttk.Label(body, text="Input folder (raw files)")
+        self.input_folder_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.input_entry = ttk.Entry(body, textvariable=self.input_var, width=64)
+        self.input_entry.grid(row=row, column=1, sticky="ew", pady=2, padx=(0, 6))
         ttk.Button(body, text="Browse…", command=self._browse_input).grid(
             row=row, column=2, pady=2
         )
         row += 1
 
-        ttk.Label(body, text="Output folder (results)").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.output_var, width=64).grid(
-            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
-        )
+        self.output_folder_label = ttk.Label(body, text="Output folder (results)")
+        self.output_folder_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.output_entry = ttk.Entry(body, textvariable=self.output_var, width=64)
+        self.output_entry.grid(row=row, column=1, sticky="ew", pady=2, padx=(0, 6))
         ttk.Button(body, text="Browse…", command=self._browse_output).grid(
             row=row, column=2, pady=2
         )
         row += 1
 
-        ttk.Label(body, text="Search mode").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
+        self.search_mode_label = ttk.Label(body, text="Search mode")
+        self.search_mode_label.grid(row=row, column=0, sticky="w", pady=2)
         mode_frame = ttk.Frame(body)
         mode_frame.grid(row=row, column=1, sticky="w", pady=2)
-        ttk.Radiobutton(
+        self.search_targeted = ttk.Radiobutton(
             mode_frame,
             text="Targeted",
             variable=self.search_var,
             value="targeted",
             command=self._sync_mode_widgets,
-        ).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Radiobutton(
+        )
+        self.search_targeted.pack(side=tk.LEFT, padx=(0, 12))
+        self.search_untargeted = ttk.Radiobutton(
             mode_frame,
             text="Untargeted",
             variable=self.search_var,
             value="untargeted",
             command=self._sync_mode_widgets,
-        ).pack(side=tk.LEFT)
+        )
+        self.search_untargeted.pack(side=tk.LEFT)
         row += 1
 
-        ttk.Label(body, text="m/z tolerance (ppm)").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.mz_var, width=12).grid(
-            row=row, column=1, sticky="w", pady=2
-        )
+        self.mz_label = ttk.Label(body, text="m/z tolerance (ppm)")
+        self.mz_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.mz_entry = ttk.Entry(body, textvariable=self.mz_var, width=12)
+        self.mz_entry.grid(row=row, column=1, sticky="w", pady=2)
         row += 1
 
-        ttk.Label(body, text="RT tolerance (minutes)").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.rt_var, width=12).grid(
-            row=row, column=1, sticky="w", pady=2
-        )
+        self.rt_label = ttk.Label(body, text="RT tolerance (minutes)")
+        self.rt_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.rt_entry = ttk.Entry(body, textvariable=self.rt_var, width=12)
+        self.rt_entry.grid(row=row, column=1, sticky="w", pady=2)
         row += 1
 
-        ttk.Label(body, text="Minimum peak area").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.min_area_var, width=12).grid(
-            row=row, column=1, sticky="w", pady=2
-        )
+        self.min_area_label = ttk.Label(body, text="Minimum peak area")
+        self.min_area_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.min_area_entry = ttk.Entry(body, textvariable=self.min_area_var, width=12)
+        self.min_area_entry.grid(row=row, column=1, sticky="w", pady=2)
         row += 1
 
-        ttk.Label(body, text="Sample-name filter (regex)").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.regex_var).grid(
-            row=row, column=1, columnspan=2, sticky="ew", pady=2
-        )
+        self.regex_label = ttk.Label(body, text="Sample-name filter (regex)")
+        self.regex_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.regex_entry = ttk.Entry(body, textvariable=self.regex_var)
+        self.regex_entry.grid(row=row, column=1, columnspan=2, sticky="ew", pady=2)
         row += 1
 
         self.top_n_label = ttk.Label(body, text="Top N peaks (untargeted)")
@@ -697,8 +760,10 @@ class StarterConfigDialog(tk.Toplevel):
         self._top_n_row = row
         row += 1
 
-        ttk.Label(body, text="Save in").grid(row=row, column=0, sticky="w", pady=2)
-        ttk.Entry(body, textvariable=self.save_in_var, width=64).grid(
+        self.save_in_label = ttk.Label(body, text="Save in")
+        self.save_in_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.save_in_entry = ttk.Entry(body, textvariable=self.save_in_var, width=64)
+        self.save_in_entry.grid(
             row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
         )
         ttk.Button(body, text="Browse…", command=self._browse_save_in).grid(
@@ -706,10 +771,10 @@ class StarterConfigDialog(tk.Toplevel):
         )
         row += 1
 
-        ttk.Label(body, text="New folder name").grid(
-            row=row, column=0, sticky="w", pady=2
-        )
-        ttk.Entry(body, textvariable=self.folder_name_var).grid(
+        self.folder_name_label = ttk.Label(body, text="New folder name")
+        self.folder_name_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.folder_name_entry = ttk.Entry(body, textvariable=self.folder_name_var)
+        self.folder_name_entry.grid(
             row=row, column=1, columnspan=2, sticky="ew", pady=2
         )
         row += 1
@@ -731,6 +796,64 @@ class StarterConfigDialog(tk.Toplevel):
             text="Save config",
             command=self._on_save,
         ).pack(side=tk.RIGHT)
+        self._attach_hover_notes()
+
+    def _attach_hover_notes(self) -> None:
+        add_hover(
+            self._tooltips,
+            self.input_folder_label,
+            self.input_entry,
+            text=STARTER_HOVER["input_folder"],
+        )
+        add_hover(
+            self._tooltips,
+            self.output_folder_label,
+            self.output_entry,
+            text=STARTER_HOVER["output_folder"],
+        )
+        add_hover(
+            self._tooltips,
+            self.search_mode_label,
+            self.search_targeted,
+            self.search_untargeted,
+            text=STARTER_HOVER["search_mode"],
+        )
+        add_hover(
+            self._tooltips, self.mz_label, self.mz_entry, text=STARTER_HOVER["mz"]
+        )
+        add_hover(
+            self._tooltips, self.rt_label, self.rt_entry, text=STARTER_HOVER["rt"]
+        )
+        add_hover(
+            self._tooltips,
+            self.min_area_label,
+            self.min_area_entry,
+            text=STARTER_HOVER["min_area"],
+        )
+        add_hover(
+            self._tooltips,
+            self.regex_label,
+            self.regex_entry,
+            text=STARTER_HOVER["sample_regex"],
+        )
+        add_hover(
+            self._tooltips,
+            self.top_n_label,
+            self.top_n_entry,
+            text=STARTER_HOVER["top_n"],
+        )
+        add_hover(
+            self._tooltips,
+            self.save_in_label,
+            self.save_in_entry,
+            text=STARTER_HOVER["save_in"],
+        )
+        add_hover(
+            self._tooltips,
+            self.folder_name_label,
+            self.folder_name_entry,
+            text=STARTER_HOVER["folder_name"],
+        )
 
     def _sync_mode_widgets(self) -> None:
         targeted = self.search_var.get() == "targeted"
