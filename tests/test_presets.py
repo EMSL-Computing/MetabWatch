@@ -218,6 +218,18 @@ def test_presets_omit_ions_without_numeric_mass() -> None:
             assert name not in rp_neg, source_name
 
 
+def test_hilic_umbelliferone_and_chlorogenic_acid_rts() -> None:
+    """HILIC watch lists use the updated Umbelliferone and Chlorogenic acid RTs."""
+    for method in _HILIC_METHODS:
+        by_name = {
+            row["compound_name"]: row
+            for row in _qc_rows(method)
+            if row["ion_type"].strip() == "[M+H]+"
+        }
+        assert float(by_name["Umbelliferone"]["retention_time"]) == pytest.approx(1.0)
+        assert float(by_name["Chlorogenic acid"]["retention_time"]) == pytest.approx(5.2)
+
+
 def test_preset_qc_rts_match_aug_2026_list() -> None:
     """Packaged QC retention times come from the Olympic LC / Eclipse 01 list."""
     source = _source_compounds()

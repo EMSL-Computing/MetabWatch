@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- HILIC QC retention times: Umbelliferone 1.0 min and Chlorogenic acid 5.2 min (both `hilic_metab_pnnl` and `hilic_metab_olympic_eclipse01`). RP values are unchanged.
 - GUI **Method preset** is a dropdown of packaged presets (not radio buttons) so more presets can be added without growing the window.
 - Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
 - Packaged HILIC/RP QC presets: omit a compound from a method when the Aug 2026 list has no numeric RT for that method, and omit an ion type when that list has no numeric [M+H]+ or [M-H]-. Sulfanilamide dropped from HILIC (no RT(HILIC)); polarity rows were already aligned.
