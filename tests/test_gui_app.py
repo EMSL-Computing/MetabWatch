@@ -42,6 +42,35 @@ def test_hover_tooltip_can_be_constructed() -> None:
         root.destroy()
 
 
+def test_hover_tooltip_shown_label_has_dark_text() -> None:
+    """Pale-yellow tip must not use macOS systemTextColor (white in dark mode)."""
+    from metabwatch.gui.tooltip import HoverTooltip
+
+    root = _tk_root()
+    try:
+        label = ttk.Label(root, text="Project ID")
+        label.pack()
+        root.update_idletasks()
+        tip = HoverTooltip(
+            label, "Optional. Only process files whose name contains this text."
+        )
+        tip._show()
+        root.update_idletasks()
+        assert tip._tip is not None
+        child = tip._tip.winfo_children()[0]
+        assert child.cget("text").startswith("Optional.")
+        r, g, b = child.winfo_rgb(str(child.cget("foreground")))
+        assert r < 20000 and g < 20000 and b < 20000, (
+            child.cget("foreground"),
+            r,
+            g,
+            b,
+        )
+        tip._hide()
+    finally:
+        root.destroy()
+
+
 def test_gui_app_builds_with_method_dropdown() -> None:
     """Method preset is a combobox of all packaged presets, not a stack of radios."""
     from metabwatch.gui.app import MetabWatchApp

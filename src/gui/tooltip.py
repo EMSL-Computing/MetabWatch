@@ -118,6 +118,7 @@ class HoverTooltip:
             text=self.text,
             justify=tk.LEFT,
             background="#ffffe0",
+            foreground="black",
             relief=tk.SOLID,
             borderwidth=1,
             wraplength=360,
