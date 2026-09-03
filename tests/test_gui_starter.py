@@ -406,3 +406,28 @@ def test_starter_button_stays_enabled_on_preset_source() -> None:
         assert str(app.config_entry.cget("state")) == "disabled"
     finally:
         root.destroy()
+
+
+def test_starter_dialog_fits_untargeted_top_n() -> None:
+    import tkinter as tk
+
+    from metabwatch.gui.app import StarterConfigDialog
+
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        pytest.skip("tkinter display required")
+    root.withdraw()
+    dialog = None
+    try:
+        dialog = StarterConfigDialog(root, on_saved=lambda _result: None)
+        dialog.search_var.set("untargeted")
+        dialog._sync_mode_widgets()
+        dialog.update_idletasks()
+        assert str(dialog.top_n_entry.winfo_manager()) == "grid"
+        assert dialog.winfo_height() >= dialog.winfo_reqheight()
+        assert dialog.winfo_height() >= 640
+    finally:
+        if dialog is not None:
+            dialog.destroy()
+        root.destroy()

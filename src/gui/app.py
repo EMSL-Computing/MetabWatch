@@ -578,8 +578,8 @@ class StarterConfigDialog(tk.Toplevel):
         self._on_saved = on_saved
         self.title("Create a custom config")
         self.transient(master)
-        self.resizable(True, False)
-        self.minsize(900, 400)
+        self.resizable(True, True)
+        self.minsize(900, 640)
 
         self.input_var = tk.StringVar(value=initial_input)
         self.output_var = tk.StringVar(value=initial_output)
@@ -594,9 +594,6 @@ class StarterConfigDialog(tk.Toplevel):
 
         self._build()
         self._sync_mode_widgets()
-        self.update_idletasks()
-        height = max(self.winfo_reqheight(), 400)
-        self.geometry(f"960x{height}")
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.grab_set()
         self.focus_set()
@@ -750,6 +747,14 @@ class StarterConfigDialog(tk.Toplevel):
             self.top_n_entry.grid(
                 row=self._top_n_row, column=1, sticky="w", pady=2
             )
+        self._fit_dialog()
+
+    def _fit_dialog(self) -> None:
+        """Grow the window so Save/Cancel stay visible after layout changes."""
+        self.update_idletasks()
+        width = max(self.winfo_width(), 960)
+        height = max(self.winfo_reqheight(), 640)
+        self.geometry(f"{width}x{height}")
 
     def _browse_input(self) -> None:
         path = filedialog.askdirectory(
