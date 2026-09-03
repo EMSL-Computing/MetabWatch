@@ -8,10 +8,26 @@ import subprocess
 import sys
 import tkinter as tk
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from metabwatch.gui.runner import PipelineRunner, RunnerState
+from metabwatch.gui.starter import (
+    DEFAULT_CONFIG_FOLDER_NAME,
+    RP_MIN_AREA,
+    RP_MZ_TOLERANCE_PPM,
+    RP_RT_TOLERANCE,
+    RP_TARGETED_REGEX,
+    RP_TOP_N,
+    RP_UNTARGETED_REGEX,
+    StarterWriteResult,
+    default_sample_name_regex,
+    next_available_config_dir,
+    requested_config_dir,
+    settings_from_form,
+    write_rp_starter_folder,
+)
 from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
 from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
@@ -218,11 +234,17 @@ class MetabWatchApp(ttk.Frame):
         self.config_browse.grid(row=0, column=2, pady=2)
         ttk.Label(
             self.json_frame,
-            text="Same schema as CLI --config (simplified or legacy). "
-            "Input/output paths come from the JSON.",
+            text="Need a different compound list or settings? Use Create "
+            "custom config. Already have a config file? Use Browse.",
             foreground="#444444",
             wraplength=640,
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        self.starter_btn = ttk.Button(
+            self.json_frame,
+            text="Create custom config…",
+            command=self._open_starter_dialog,
+        )
+        self.starter_btn.grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
         row += 1
 
         # Run options
@@ -319,6 +341,9 @@ class MetabWatchApp(ttk.Frame):
         self.method_combo.configure(state="readonly" if preset else tk.DISABLED)
         self.config_entry.configure(state=json_state)
         self.config_browse.configure(state=json_state)
+        # Starter writer stays available so lab users can discover it while
+        # still on Preset shortcuts.
+        self.starter_btn.configure(state=tk.NORMAL)
 
     def _browse_input(self) -> None:
         path = filedialog.askdirectory(title="Select input folder (Thermo .raw files)")
@@ -337,6 +362,27 @@ class MetabWatchApp(ttk.Frame):
         )
         if path:
             self.config_var.set(path)
+
+    def _open_starter_dialog(self) -> None:
+        StarterConfigDialog(
+            self.winfo_toplevel(),
+            initial_input=self.input_var.get(),
+            initial_output=self.output_var.get(),
+            on_saved=self._on_starter_saved,
+        )
+
+    def _on_starter_saved(self, result: StarterWriteResult) -> None:
+        self._prefill_config(str(result.config_path))
+        names = "\n".join(f"  {path.name}" for path in result.written)
+        messagebox.showinfo(
+            "Custom config saved",
+            "Saved:\n"
+            f"{result.dest_dir}\n\n"
+            f"{names}\n\n"
+            "Config source is now Custom JSON. Read README.txt in that folder. "
+            "For a targeted run, add compounds to monitored_compounds.csv "
+            "before Start (it is blank on purpose).",
+        )
 
     def _build_request(self) -> GuiRunRequest:
         return GuiRunRequest(
@@ -414,6 +460,7 @@ class MetabWatchApp(ttk.Frame):
                 self.output_browse,
                 self.config_entry,
                 self.config_browse,
+                self.starter_btn,
             ):
                 widget.configure(state=tk.DISABLED)
         else:
@@ -507,6 +554,281 @@ class MetabWatchApp(ttk.Frame):
             subprocess.run(["open", str(path)], check=False)
         else:
             subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def _fmt_starter_number(value: float) -> str:
+    """Format RP defaults without trailing .0 when the value is integral."""
+    if float(value).is_integer():
+        return str(int(value))
+    return str(value)
+
+
+class StarterConfigDialog(tk.Toplevel):
+    """Popup form that writes a simplified JSON plus RP starter copies."""
+
+    def __init__(
+        self,
+        master: tk.Misc,
+        *,
+        initial_input: str = "",
+        initial_output: str = "",
+        on_saved: Callable[[StarterWriteResult], None],
+    ) -> None:
+        super().__init__(master)
+        self._on_saved = on_saved
+        self.title("Create a custom config")
+        self.transient(master)
+        self.resizable(True, True)
+        self.minsize(900, 640)
+
+        self.input_var = tk.StringVar(value=initial_input)
+        self.output_var = tk.StringVar(value=initial_output)
+        self.search_var = tk.StringVar(value="targeted")
+        self.mz_var = tk.StringVar(value=_fmt_starter_number(RP_MZ_TOLERANCE_PPM))
+        self.rt_var = tk.StringVar(value=_fmt_starter_number(RP_RT_TOLERANCE))
+        self.min_area_var = tk.StringVar(value=_fmt_starter_number(RP_MIN_AREA))
+        self.regex_var = tk.StringVar(value=default_sample_name_regex(True))
+        self.top_n_var = tk.StringVar(value=str(RP_TOP_N))
+        self.save_in_var = tk.StringVar()
+        self.folder_name_var = tk.StringVar(value=DEFAULT_CONFIG_FOLDER_NAME)
+
+        self._build()
+        self._sync_mode_widgets()
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.grab_set()
+        self.focus_set()
+
+    def _build(self) -> None:
+        body = ttk.Frame(self, padding=12)
+        body.pack(fill=tk.BOTH, expand=True)
+        body.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            body,
+            text=(
+                "Creates a new folder with a custom JSON, a copy of a "
+                "CoreMS TOML for starter use, and (targeted) a blank compound list to fill in. "
+                "A README.txt in the folder has the next steps."
+            ),
+            wraplength=780,
+            foreground="#444444",
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+
+        row = 1
+        ttk.Label(body, text="Input folder (raw files)").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.input_var, width=64).grid(
+            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
+        )
+        ttk.Button(body, text="Browse…", command=self._browse_input).grid(
+            row=row, column=2, pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="Output folder (results)").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.output_var, width=64).grid(
+            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
+        )
+        ttk.Button(body, text="Browse…", command=self._browse_output).grid(
+            row=row, column=2, pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="Search mode").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        mode_frame = ttk.Frame(body)
+        mode_frame.grid(row=row, column=1, sticky="w", pady=2)
+        ttk.Radiobutton(
+            mode_frame,
+            text="Targeted",
+            variable=self.search_var,
+            value="targeted",
+            command=self._sync_mode_widgets,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Radiobutton(
+            mode_frame,
+            text="Untargeted",
+            variable=self.search_var,
+            value="untargeted",
+            command=self._sync_mode_widgets,
+        ).pack(side=tk.LEFT)
+        row += 1
+
+        ttk.Label(body, text="m/z tolerance (ppm)").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.mz_var, width=12).grid(
+            row=row, column=1, sticky="w", pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="RT tolerance (minutes)").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.rt_var, width=12).grid(
+            row=row, column=1, sticky="w", pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="Minimum peak area").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.min_area_var, width=12).grid(
+            row=row, column=1, sticky="w", pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="Sample-name filter (regex)").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.regex_var).grid(
+            row=row, column=1, columnspan=2, sticky="ew", pady=2
+        )
+        row += 1
+
+        self.top_n_label = ttk.Label(body, text="Top N peaks (untargeted)")
+        self.top_n_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.top_n_entry = ttk.Entry(body, textvariable=self.top_n_var, width=12)
+        self.top_n_entry.grid(row=row, column=1, sticky="w", pady=2)
+        self._top_n_row = row
+        row += 1
+
+        ttk.Label(body, text="Save in").grid(row=row, column=0, sticky="w", pady=2)
+        ttk.Entry(body, textvariable=self.save_in_var, width=64).grid(
+            row=row, column=1, sticky="ew", pady=2, padx=(0, 6)
+        )
+        ttk.Button(body, text="Browse…", command=self._browse_save_in).grid(
+            row=row, column=2, pady=2
+        )
+        row += 1
+
+        ttk.Label(body, text="New folder name").grid(
+            row=row, column=0, sticky="w", pady=2
+        )
+        ttk.Entry(body, textvariable=self.folder_name_var).grid(
+            row=row, column=1, columnspan=2, sticky="ew", pady=2
+        )
+        row += 1
+
+        ttk.Label(
+            body,
+            text="A new folder is created. Existing folders are not overwritten.",
+            foreground="#444444",
+        ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 4))
+        row += 1
+
+        btn_frame = ttk.Frame(body)
+        btn_frame.grid(row=row, column=0, columnspan=3, sticky="e", pady=(12, 0))
+        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(
+            side=tk.RIGHT, padx=(6, 0)
+        )
+        ttk.Button(
+            btn_frame,
+            text="Save config",
+            command=self._on_save,
+        ).pack(side=tk.RIGHT)
+
+    def _sync_mode_widgets(self) -> None:
+        targeted = self.search_var.get() == "targeted"
+        current = self.regex_var.get().strip()
+        if current in {"", RP_TARGETED_REGEX, RP_UNTARGETED_REGEX}:
+            self.regex_var.set(default_sample_name_regex(targeted))
+        if targeted:
+            self.top_n_label.grid_remove()
+            self.top_n_entry.grid_remove()
+        else:
+            self.top_n_label.grid(
+                row=self._top_n_row, column=0, sticky="w", pady=2
+            )
+            self.top_n_entry.grid(
+                row=self._top_n_row, column=1, sticky="w", pady=2
+            )
+        self._fit_dialog()
+
+    def _fit_dialog(self) -> None:
+        """Grow the window so Save/Cancel stay visible after layout changes."""
+        self.update_idletasks()
+        width = max(self.winfo_width(), 960)
+        height = max(self.winfo_reqheight(), 640)
+        self.geometry(f"{width}x{height}")
+
+    def _browse_input(self) -> None:
+        path = filedialog.askdirectory(
+            title="Select input folder (Thermo .raw files)",
+            parent=self,
+        )
+        if path:
+            self.input_var.set(path)
+
+    def _browse_output(self) -> None:
+        path = filedialog.askdirectory(
+            title="Select output folder",
+            parent=self,
+        )
+        if path:
+            self.output_var.set(path)
+
+    def _browse_save_in(self) -> None:
+        path = filedialog.askdirectory(
+            title="Choose where to create the new config folder",
+            parent=self,
+        )
+        if path:
+            self.save_in_var.set(path)
+
+    def _on_save(self) -> None:
+        targeted = self.search_var.get() == "targeted"
+        try:
+            settings = settings_from_form(
+                input_folder=self.input_var.get(),
+                output_folder=self.output_var.get(),
+                targeted=targeted,
+                mz_tolerance_ppm=self.mz_var.get(),
+                rt_tolerance=self.rt_var.get(),
+                min_area=self.min_area_var.get(),
+                sample_name_regex=self.regex_var.get(),
+                top_n=self.top_n_var.get(),
+            )
+            requested = requested_config_dir(
+                self.save_in_var.get(),
+                self.folder_name_var.get(),
+            )
+            dest = next_available_config_dir(
+                self.save_in_var.get(),
+                self.folder_name_var.get(),
+            )
+        except ValueError as exc:
+            messagebox.showerror("Custom config", str(exc), parent=self)
+            return
+
+        if dest != requested:
+            create_new = messagebox.askyesno(
+                "Folder already exists",
+                f"A folder named {requested.name} already exists in:\n"
+                f"{requested.parent}\n\n"
+                f"Create a new folder named {dest.name} instead?\n\n"
+                "Existing files will not be changed.",
+                parent=self,
+            )
+            if not create_new:
+                return
+
+        try:
+            result = write_rp_starter_folder(dest, settings, overwrite=False)
+        except (OSError, ValueError, FileExistsError) as exc:
+            messagebox.showerror(
+                "Could not save custom config",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._on_saved(result)
+        self.destroy()
 
 
 def main(argv: list[str] | None = None) -> int:

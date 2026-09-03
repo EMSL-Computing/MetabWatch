@@ -72,6 +72,7 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"metabwatch.gui" = ["starter_readme.txt"]
 "metabwatch.presets.hilic_metab_pnnl" = ["*.toml", "*.csv"]
 "metabwatch.presets.hilic_metab_olympic_eclipse01" = ["*.toml", "*.csv"]
 "metabwatch.presets.rp_metab_pnnl" = ["*.toml", "*.csv"]
