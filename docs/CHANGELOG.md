@@ -22,6 +22,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Packaged HILIC/RP QC presets: omit a compound from a method when the Aug 2026 list has no numeric RT for that method, and omit an ion type when that list has no numeric [M+H]+ or [M-H]-. Sulfanilamide dropped from HILIC (no RT(HILIC)); polarity rows were already aligned.
 - QC compound retention times in the packaged HILIC and RP search spaces now come from the Aug 2026 Olympic LC / Eclipse 01 list. General `*_metab_pnnl` keys keep the wider RT windows (0.8 / 0.4 min).
 
+### Fixed
+
+- Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects. Markers use a light fill and dark outline so they stay visible on newest-darkest traces.
+- Targeted MS1 export writes `mf_*` EIC columns with the same nearest-EIC fallback as target traces when the mass-feature EIC is missing.
+
 ## [0.2.2] - 2026-08-04
 
 ### Added
