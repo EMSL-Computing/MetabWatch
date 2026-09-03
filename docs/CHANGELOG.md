@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json` plus copies of the RP CoreMS TOML (and `monitored_compounds.csv` when targeted). Existing folders are not overwritten. The new JSON is selected as Custom JSON so Start can run immediately.
+- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json`, a copy of the RP CoreMS TOML, a README, and (targeted) a blank `monitored_compounds.csv` (header only, no packaged QC rows). Existing folders are not overwritten. The new JSON is selected as Custom JSON; fill the compound list before a targeted Start.
 - Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex (`QC_Metab_` / `Pool`) still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
 - Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.

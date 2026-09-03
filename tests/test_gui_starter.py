@@ -9,22 +9,26 @@ import pytest
 
 from metabwatch.config import load_pipeline_config
 from metabwatch.gui.starter import (
+    COMPOUNDS_CSV_COLUMNS,
     COMPOUNDS_CSV_FILENAME,
     CONFIG_FILENAME,
     COREMS_FILENAME,
     DEFAULT_CONFIG_FOLDER_NAME,
     PACKAGED_CSV_FILENAME,
+    README_FILENAME,
     RP_MIN_AREA,
     RP_MZ_TOLERANCE_PPM,
     RP_RT_TOLERANCE,
     RP_TARGETED_REGEX,
     RP_UNTARGETED_REGEX,
     StarterSettings,
+    blank_compounds_csv_text,
     next_available_config_dir,
     normalize_config_folder_name,
     requested_config_dir,
     rp_packaged_dir,
     settings_from_form,
+    starter_readme_text,
     write_rp_starter_folder,
 )
 from metabwatch.gui.validation import GuiRunRequest, resolve_config, validate_request
@@ -54,17 +58,21 @@ def _settings(
     )
 
 
-def test_targeted_write_three_files_and_loads(tmp_path: Path) -> None:
+def test_targeted_write_files_and_loads(tmp_path: Path) -> None:
     dest = tmp_path / "starter"
     result = write_rp_starter_folder(dest, _settings(tmp_path, targeted=True))
 
     json_path = dest / CONFIG_FILENAME
     toml_path = dest / COREMS_FILENAME
     csv_path = dest / COMPOUNDS_CSV_FILENAME
+    readme_path = dest / README_FILENAME
     assert json_path.is_file()
     assert toml_path.is_file()
     assert csv_path.is_file()
+    assert readme_path.is_file()
     assert result.config_path == json_path
+    assert csv_path.read_text(encoding="utf-8") == blank_compounds_csv_text()
+    assert readme_path.read_text(encoding="utf-8") == starter_readme_text(True)
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload["targeted"] is True
@@ -102,6 +110,10 @@ def test_untargeted_write_skips_qc_csv_and_loads(tmp_path: Path) -> None:
 
     assert (dest / CONFIG_FILENAME).is_file()
     assert (dest / COREMS_FILENAME).is_file()
+    assert (dest / README_FILENAME).is_file()
+    assert (dest / README_FILENAME).read_text(encoding="utf-8") == starter_readme_text(
+        False
+    )
     assert not (dest / COMPOUNDS_CSV_FILENAME).exists()
     assert not (dest / PACKAGED_CSV_FILENAME).exists()
 
@@ -148,8 +160,34 @@ def test_packaged_rp_assets_unchanged_after_write(tmp_path: Path) -> None:
     assert toml_src.stat().st_mtime_ns == toml_mtime
     assert csv_src.stat().st_mtime_ns == csv_mtime
     assert (dest / COREMS_FILENAME).read_bytes() == toml_before
-    assert (dest / COMPOUNDS_CSV_FILENAME).read_bytes() == csv_before
+    assert (dest / COMPOUNDS_CSV_FILENAME).read_bytes() != csv_before
+    assert (dest / COMPOUNDS_CSV_FILENAME).read_text(
+        encoding="utf-8"
+    ) == blank_compounds_csv_text()
     assert not (dest / PACKAGED_CSV_FILENAME).exists()
+
+
+def test_targeted_compound_list_is_header_only(tmp_path: Path) -> None:
+    dest = tmp_path / "starter"
+    write_rp_starter_folder(dest, _settings(tmp_path, targeted=True))
+    text = (dest / COMPOUNDS_CSV_FILENAME).read_text(encoding="utf-8")
+    lines = [line for line in text.splitlines() if line.strip()]
+    assert lines == [",".join(COMPOUNDS_CSV_COLUMNS)]
+    packaged = (rp_packaged_dir() / PACKAGED_CSV_FILENAME).read_text(encoding="utf-8")
+    assert "1,3-Diphenylurea" in packaged
+    assert "1,3-Diphenylurea" not in text
+
+
+def test_starter_readme_tells_operator_to_fill_csv(tmp_path: Path) -> None:
+    dest = tmp_path / "starter"
+    write_rp_starter_folder(dest, _settings(tmp_path, targeted=True))
+    text = (dest / README_FILENAME).read_text(encoding="utf-8")
+    assert COMPOUNDS_CSV_FILENAME in text
+    assert "compound_name" in text
+    assert "positive" in text
+    assert "negative" in text
+    assert "blank template" in text
+    assert CONFIG_FILENAME in text
 
 
 def test_gui_validation_accepts_written_json(tmp_path: Path) -> None:

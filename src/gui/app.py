@@ -379,8 +379,9 @@ class MetabWatchApp(ttk.Frame):
             "Saved:\n"
             f"{result.dest_dir}\n\n"
             f"{names}\n\n"
-            "Config source is now Custom JSON. Edit the copied CSV or TOML "
-            "if you need a different compound list or CoreMS settings, then Start.",
+            "Config source is now Custom JSON. Read README.md in that folder. "
+            "For a targeted run, add compounds to monitored_compounds.csv "
+            "before Start (it is blank on purpose).",
         )
 
     def _build_request(self) -> GuiRunRequest:
@@ -608,9 +609,9 @@ class StarterConfigDialog(tk.Toplevel):
         ttk.Label(
             body,
             text=(
-                "Creates a custom config and copies of the PNNL Standard RP "
-                "Metabolomics method files. Edit those copies in Excel or a "
-                "text editor; MetabWatch will use the copies."
+                "Creates a new folder with a custom JSON, a copy of the RP "
+                "CoreMS TOML, and (targeted) a blank compound list to fill in. "
+                "A README in the folder has the next steps."
             ),
             wraplength=780,
             foreground="#444444",

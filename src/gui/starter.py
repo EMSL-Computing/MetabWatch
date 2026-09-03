@@ -2,7 +2,8 @@
 
 Pure functions (no tkinter) so unit tests can run without a display.
 The packaged files under ``src/presets/rp_metab_pnnl/`` are only read, never
-modified.
+modified. Targeted compound lists are a blank header, not a copy of the
+packaged RP QC rows.
 """
 
 from __future__ import annotations
@@ -18,8 +19,16 @@ from metabwatch.presets import _asset_path
 
 CONFIG_FILENAME = "metabwatch_config.json"
 COREMS_FILENAME = "corems.toml"
+README_FILENAME = "README.md"
 PACKAGED_CSV_FILENAME = "qc_compounds.csv"
 COMPOUNDS_CSV_FILENAME = "monitored_compounds.csv"
+COMPOUNDS_CSV_COLUMNS = (
+    "compound_name",
+    "ion_type",
+    "mz",
+    "retention_time",
+    "polarity",
+)
 
 RP_METHOD = "rp_metab_pnnl"
 RP_MZ_TOLERANCE_PPM = 5.0
@@ -184,6 +193,104 @@ def validate_starter_settings(settings: StarterSettings) -> None:
         raise ValueError(f"Sample-name filter is not a valid regex: {exc}") from exc
 
 
+def blank_compounds_csv_text() -> str:
+    """Return a header-only standards CSV (no default compound rows)."""
+    return ",".join(COMPOUNDS_CSV_COLUMNS) + "\n"
+
+
+def starter_readme_text(targeted: bool) -> str:
+    """Return operator instructions for a newly written starter folder."""
+    columns = ",".join(COMPOUNDS_CSV_COLUMNS)
+    if targeted:
+        compounds_section = f"""\
+## Fill the compound list before you Start
+
+`{COMPOUNDS_CSV_FILENAME}` is a blank template. Add one row per compound in
+Excel or a text editor. Keep the header row. Do not start a targeted run until
+this file has at least one compound for the polarity you are acquiring
+(`positive` or `negative`). An empty list fails when the first sample is
+processed.
+
+Required columns (in this order):
+
+```
+{columns}
+```
+
+Example row:
+
+```
+Caffeine,[M+H]+,195.0877,4.20,positive
+```
+
+- `polarity` must be `positive` or `negative` (lowercase).
+- `mz` and `retention_time` (minutes) must be numbers.
+- `ion_type` is a label such as `[M+H]+` or `[M-H]-`.
+- Do not put comment lines in the CSV.
+
+This file is not a copy of the packaged RP QC list. If you want those rows as
+a starting point, copy them from the packaged RP `qc_compounds.csv` yourself.
+"""
+        files_row = (
+            f"| `{COMPOUNDS_CSV_FILENAME}` | Compound list for targeted search "
+            "(header only until you add rows) |\n"
+        )
+        next_steps = f"""\
+1. Open `{COMPOUNDS_CSV_FILENAME}` and add your compounds (see below).
+2. Optionally edit `{COREMS_FILENAME}` if you need different CoreMS settings.
+   It is a copy of the PNNL Standard RP Metabolomics method.
+3. In MetabWatch, Config source should already be **Custom JSON** pointing at
+   `{CONFIG_FILENAME}`. Click **Start**.
+4. To reuse later: Custom JSON → Browse → this `{CONFIG_FILENAME}`.
+"""
+    else:
+        compounds_section = """\
+## Untargeted search
+
+This config is untargeted, so there is no compound list in this folder. The
+first sample that matches the sample-name filter builds the search space
+(`untargeted_search_space.csv` under the output folder). Later samples are
+matched against that list.
+"""
+        files_row = ""
+        next_steps = f"""\
+1. Optionally edit `{COREMS_FILENAME}` if you need different CoreMS settings.
+   It is a copy of the PNNL Standard RP Metabolomics method.
+2. In MetabWatch, Config source should already be **Custom JSON** pointing at
+   `{CONFIG_FILENAME}`. Click **Start**.
+3. To reuse later: Custom JSON → Browse → this `{CONFIG_FILENAME}`.
+"""
+
+    return f"""\
+# MetabWatch custom config
+
+This folder was created by **Create custom config** in the MetabWatch GUI.
+Edit the files here. Packaged presets that ship with MetabWatch are not
+changed.
+
+## What to do next
+
+{next_steps}
+## Files
+
+| File | Purpose |
+|------|---------|
+| `{CONFIG_FILENAME}` | Pipeline settings (folders, tolerances, targeted vs untargeted) |
+| `{COREMS_FILENAME}` | CoreMS processing parameters (RP starter copy) |
+{files_row}| `{README_FILENAME}` | These instructions |
+
+{compounds_section}
+## Other notes
+
+- Paths in `{CONFIG_FILENAME}` are absolute. If you move this folder, update
+  `corems_params` and (when targeted) `qc_compounds`. Update `input_folder`
+  and `output_folder` if those locations changed.
+- The sample-name filter is the JSON key `sample_name_regex`.
+- CLI equivalent: `metabwatch --config {CONFIG_FILENAME}` from a working
+  directory that can see those paths (absolute paths still work from anywhere).
+"""
+
+
 def build_starter_payload(dest_dir: Path, settings: StarterSettings) -> dict[str, Any]:
     """Return the simplified-schema object that will be written as JSON."""
     dest = Path(dest_dir).expanduser().resolve()
@@ -210,12 +317,15 @@ def write_rp_starter_folder(
     *,
     overwrite: bool = False,
 ) -> StarterWriteResult:
-    """Copy RP assets into ``dest_dir`` and write ``metabwatch_config.json``.
+    """Copy the RP CoreMS TOML into ``dest_dir`` and write starter files.
+
+    Targeted folders get a header-only ``monitored_compounds.csv`` (no packaged
+    RP compound rows). Every folder gets ``README.md`` with operator steps.
 
     Parameters
     ----------
     dest_dir
-        Folder that will own the JSON and copied RP files. Created if missing.
+        Folder that will own the JSON and starter files. Created if missing.
     settings
         Pipeline folders, search mode, and tolerances from the form.
     overwrite
@@ -244,7 +354,7 @@ def write_rp_starter_folder(
     if dest.exists() and not dest.is_dir():
         raise ValueError(f"Starter destination is not a directory:\n{dest}")
 
-    planned = [dest / CONFIG_FILENAME, dest / COREMS_FILENAME]
+    planned = [dest / CONFIG_FILENAME, dest / COREMS_FILENAME, dest / README_FILENAME]
     if settings.targeted:
         planned.append(dest / COMPOUNDS_CSV_FILENAME)
     existing = [path for path in planned if path.exists()]
@@ -260,8 +370,12 @@ def write_rp_starter_folder(
     written.append(toml_dest)
     if settings.targeted:
         csv_dest = dest / COMPOUNDS_CSV_FILENAME
-        shutil.copy2(_asset_path(RP_METHOD, PACKAGED_CSV_FILENAME), csv_dest)
+        csv_dest.write_text(blank_compounds_csv_text(), encoding="utf-8")
         written.append(csv_dest)
+
+    readme_path = dest / README_FILENAME
+    readme_path.write_text(starter_readme_text(settings.targeted), encoding="utf-8")
+    written.append(readme_path)
 
     config_path = dest / CONFIG_FILENAME
     payload = build_starter_payload(dest, settings)
