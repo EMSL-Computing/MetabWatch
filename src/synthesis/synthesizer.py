@@ -93,15 +93,26 @@ class HTMLSynthesizer:
         )
 
     @staticmethod
-    def _next_compound_link_html(next_compound: dict | None) -> str:
-        """Return the top-right Next compound link, or an empty spacer."""
-        if not next_compound:
-            return '<span class="nav-next"></span>'
-        slug = escape(str(next_compound["slug"]))
-        name = escape(str(next_compound["name"]))
-        return (
-            f'<a class="nav-next" href="{slug}.html">Next compound: {name}</a>'
-        )
+    def _compound_step_link_html(label: str, compound: dict | None) -> str:
+        """Return one Previous/Next compound link, or an empty spacer."""
+        if not compound:
+            return ""
+        slug = escape(str(compound["slug"]))
+        name = escape(str(compound["name"]))
+        return f'<a href="{slug}.html">{escape(label)}: {name}</a>'
+
+    @classmethod
+    def _compound_step_nav_html(
+        cls,
+        previous_compound: dict | None,
+        next_compound: dict | None,
+    ) -> str:
+        """Return the stacked Previous-above-Next links on the right."""
+        previous = cls._compound_step_link_html("Previous compound", previous_compound)
+        nxt = cls._compound_step_link_html("Next compound", next_compound)
+        if not previous and not nxt:
+            return ""
+        return f'<div class="nav-steps">{previous}{nxt}</div>'
 
     @staticmethod
     def _safe_trace_col(mf_id: int, compound_name: str) -> str:
@@ -1229,6 +1240,7 @@ class HTMLSynthesizer:
         compound: dict,
         generated_at: str,
         polarity_label: str,
+        previous_compound: dict | None = None,
         next_compound: dict | None = None,
     ) -> str:
         series = compound["samples"]
@@ -1601,11 +1613,18 @@ class HTMLSynthesizer:
     .nav {{
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: flex-start;
       gap: 16px;
       margin-bottom: 8px;
     }}
-    .nav-next {{ margin-left: auto; text-align: right; }}
+    .nav-steps {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-left: auto;
+      text-align: right;
+    }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
   </style>
@@ -1614,7 +1633,7 @@ class HTMLSynthesizer:
   <section class=\"card\">
     <div class=\"nav\">
       <a href=\"../dashboard.html\">Back to compound index</a>
-      {self._next_compound_link_html(next_compound)}
+      {self._compound_step_nav_html(previous_compound, next_compound)}
     </div>
     <h1>{escape(compound['name'])}</h1>
     <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
@@ -1720,14 +1739,18 @@ class HTMLSynthesizer:
         ordered_names = sorted(compounds)
         for index, compound_name in enumerate(ordered_names):
             compound = compounds[compound_name]
+            previous_compound = None
             next_compound = None
             if len(ordered_names) > 1:
+                previous_name = ordered_names[(index - 1) % len(ordered_names)]
                 next_name = ordered_names[(index + 1) % len(ordered_names)]
+                previous_compound = compounds[previous_name]
                 next_compound = compounds[next_name]
             page_html = self._render_compound_page(
                 compound=compound,
                 generated_at=generated_at,
                 polarity_label=polarity_label,
+                previous_compound=previous_compound,
                 next_compound=next_compound,
             )
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)

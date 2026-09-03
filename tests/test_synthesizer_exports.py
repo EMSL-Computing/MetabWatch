@@ -439,8 +439,11 @@ def test_compound_page_eic_first_and_next_link(tmp_path: Path) -> None:
     alpha = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
     beta = (output_dir / "compounds" / "beta.html").read_text(encoding="utf-8")
     assert "Back to compound index" in alpha
+    assert "Previous compound: Beta" in alpha
     assert "Next compound: Beta" in alpha
+    assert alpha.index("Previous compound: Beta") < alpha.index("Next compound: Beta")
     assert 'href="beta.html"' in alpha
+    assert "Previous compound: Alpha" in beta
     assert "Next compound: Alpha" in beta
     assert 'href="alpha.html"' in beta
     assert alpha.index("EIC overlay") < alpha.index("Across-sample metrics")
