@@ -28,6 +28,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GUI hover notes use explicit black text so the copy is visible on macOS (dark mode `systemTextColor` was white on the pale yellow tip).
 - Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects. Markers use a light fill and dark outline so they stay visible on newest-darkest traces.
 - Targeted MS1 export writes `mf_*` EIC columns with the same nearest-EIC fallback as target traces when the mass-feature EIC is missing.
 
