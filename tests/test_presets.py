@@ -52,7 +52,7 @@ _RP_METHODS = ("rp_metab_pnnl", "rp_metab_olympic_eclipse01")
             "targeted",
             "targeted",
             5.0,
-            0.3,
+            0.6,
             1000.0,
             "QC_Metab_",
         ),
@@ -61,7 +61,7 @@ _RP_METHODS = ("rp_metab_pnnl", "rp_metab_olympic_eclipse01")
             "untargeted",
             "untargeted",
             5.0,
-            0.3,
+            0.6,
             1000.0,
             "Pool",
         ),
@@ -216,18 +216,6 @@ def test_presets_omit_ions_without_numeric_mass() -> None:
         if _parse_optional_float(src["mz_m_minus_h"]) is None:
             assert name not in hilic_neg, source_name
             assert name not in rp_neg, source_name
-
-
-def test_hilic_umbelliferone_and_chlorogenic_acid_rts() -> None:
-    """HILIC watch lists use the updated Umbelliferone and Chlorogenic acid RTs."""
-    for method in _HILIC_METHODS:
-        by_name = {
-            row["compound_name"]: row
-            for row in _qc_rows(method)
-            if row["ion_type"].strip() == "[M+H]+"
-        }
-        assert float(by_name["Umbelliferone"]["retention_time"]) == pytest.approx(1.0)
-        assert float(by_name["Chlorogenic acid"]["retention_time"]) == pytest.approx(5.2)
 
 
 def test_preset_qc_rts_match_aug_2026_list() -> None:

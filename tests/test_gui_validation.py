@@ -27,7 +27,7 @@ def test_preset_summary_mentions_method_defaults() -> None:
     assert "Pool" in rp
 
     eclipse_h = preset_summary_text("hilic_metab_olympic_eclipse01", "targeted")
-    assert "0.3" in eclipse_h
+    assert "0.6" in eclipse_h
     eclipse_rp = preset_summary_text("rp_metab_olympic_eclipse01", "untargeted")
     assert "0.2" in eclipse_rp
 

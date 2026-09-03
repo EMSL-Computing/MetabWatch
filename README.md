@@ -32,7 +32,7 @@ Built-in defaults (no extra flags needed):
 | Method | m/z ppm | RT (min) | min area | Sample name filter |
 |--------|---------|----------|----------|--------------------|
 | PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pool` (case-insensitive) |
-| PNNL Standard HILIC — Olympic LC / Eclipse 01 | 5 | 0.3 | 1000 | same filters as above |
+| PNNL Standard HILIC — Olympic LC / Eclipse 01 | 5 | 0.6 | 1000 | same filters as above |
 | PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
 | PNNL Standard RP — Olympic LC / Eclipse 01 | 5 | 0.2 | 20000 | same filters as above |
 

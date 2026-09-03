@@ -42,7 +42,7 @@ PRESET_SPECS: dict[str, PresetSpec] = {
             "PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01"
         ),
         "mz_tolerance_ppm": 5.0,
-        "rt_tolerance": 0.3,
+        "rt_tolerance": 0.6,
         "min_area": 1000.0,
     },
     "rp_metab_pnnl": {
