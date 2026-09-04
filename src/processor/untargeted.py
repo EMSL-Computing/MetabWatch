@@ -121,15 +121,10 @@ def build_untargeted_search_space(
                 "MetabWatch does not allow mixed polarities in one input folder / run."
             )
 
-    # Override CoreMS settings on the lcms_obj for this run only. We don't
-    # mutate the shared TOML — the targeted pipeline reads the same file and
-    # has its own preferences. Specifically:
-    #   * remove_mass_features_by_peak_metrics: enable in-place pruning of
-    #     poorly-integrated features after add_peak_metrics(), using the
-    #     mass_feature_attribute_filter_dict thresholds from the TOML.
-    #   * mass_feature_cluster_mz_tolerance_rel: bump to 1.5e-5 (15 ppm) so
-    #     the post-integration clustering pass collapses the residual ~5-13
-    #     ppm duplicates that survive the default 5 ppm window.
+    # Override cluster m/z on this object only (do not mutate the shared TOML).
+    # Targeted reads the same file and keeps the packaged window. Bump to
+    # 1.5e-5 (15 ppm) so post-integration clustering collapses residual ~5-13
+    # ppm duplicates that survive the default 5 ppm window.
     lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
 
     lcms_obj.find_mass_features()
@@ -138,6 +133,10 @@ def build_untargeted_search_space(
     lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
     # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
     lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+    # Packaged TOMLs set remove_mass_features_by_peak_metrics; targeted never
+    # calls this, so the flag is inert there. CoreMS default keep-rules are
+    # noise_score_max >= 0.8 and noise_score_min >= 0.5.
+    lcms_obj.add_peak_metrics()
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     required = {"mz", "scan_time", "area"}

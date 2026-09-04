@@ -10,6 +10,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - When polarity is set up front (GUI Positive/Negative, CLI `--polarity`, JSON `polarity`), a mixed input folder no longer hard-stops the rest of the batch after the first opposite-polarity file. Matching files still run. Auto polarity still hard-stops a mixed batch.
+- Packaged CoreMS TOMLs list only LC-MS overrides vs CoreMS 4.0.1 defaults that MetabWatch uses (peak picking, EIC integration, clustering). Formula-search, MS2, and FT-ICR dump keys are omitted.
+- Packaged HILIC and RP CoreMS presets set `ph_inten_min_rel` and `ph_persis_min_rel` to `0.003` (CoreMS default `0.001`). Persistence is raised with intensity because CoreMS requires `ph_persis_min_rel >= ph_inten_min_rel`. These floors apply to untargeted peak picking only.
+- Packaged CoreMS TOMLs enable `remove_mass_features_by_peak_metrics`. Untargeted bootstrap calls `add_peak_metrics()` after post-cluster integration (CoreMS default keep-rules: `noise_score_max >= 0.8`, `noise_score_min >= 0.5`). Targeted never calls that method, so the flag does not filter QC peaks.
 
 ## [0.3.0] - 2026-09-03
 

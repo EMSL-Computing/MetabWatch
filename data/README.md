@@ -12,7 +12,9 @@
    | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `src/presets/rp_metab_pnnl/corems.toml` | `src/presets/rp_metab_pnnl/qc_compounds.csv` |
    | `rp_metab_olympic_eclipse01` | PNNL Standard RP — Olympic LC / Eclipse 01 | `src/presets/rp_metab_olympic_eclipse01/corems.toml` | `src/presets/rp_metab_olympic_eclipse01/qc_compounds.csv` |
 
-   Prefer the CLI presets (`--method` / `--search`) so these paths are resolved automatically after `pip install`.
+   Packaged `corems.toml` files list only LC-MS overrides vs CoreMS 4.0.1 defaults
+   that MetabWatch uses. Prefer the CLI presets (`--method` / `--search`) so these
+   paths are resolved automatically after `pip install`.
 
 3. Example advanced JSON configs (optional `--config` path; repo-relative paths):
 

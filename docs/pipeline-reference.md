@@ -69,6 +69,9 @@ Assets ship with the package under `metabwatch.presets` (`src/presets/`). Method
 | `rp_metab_olympic_eclipse01` | PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01 | targeted | `rp_metab_olympic_eclipse01/corems.toml` | `rp_metab_olympic_eclipse01/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.2 | 20000 |
 | `rp_metab_olympic_eclipse01` | PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01 | untargeted | `rp_metab_olympic_eclipse01/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.2 | 20000 |
 
+Packaged `corems.toml` files are **overrides vs CoreMS 4.0.1 defaults**, not full dumps. They set only LC-MS keys MetabWatch uses (persistent-homology peak picking, EIC integration, clustering). Omitted `[LiquidChromatograph]` keys keep CoreMS defaults. An empty `[mass_spectrum]` table is required by CoreMS 4.0.1's loader; MetabWatch does not run formula search or MS2 from these files. Matching windows (`mz_tolerance_ppm`, `rt_tolerance`, `min_area`) live in the Python preset, not the TOML.
+
+All packaged methods set PH intensity/persistence floors to `0.003` (CoreMS default `0.001`; untargeted peak picking only — targeted search bypasses these thresholds). RP also tightens cluster m/z to 3 ppm (untargeted then overrides cluster m/z to 15 ppm at runtime). Standard HILIC enables `remove_redundant_mass_features`; Olympic HILIC leaves that CoreMS default (`false`). All packaged TOMLs set `remove_mass_features_by_peak_metrics = true`; untargeted calls `add_peak_metrics()` after integration (CoreMS default keep-rules `noise_score_max >= 0.8` and `noise_score_min >= 0.5`). Targeted does not call that method.
 
 ## Example Commands
 

@@ -1,8 +1,10 @@
 """Built-in PNNL Standard RP / HILIC metabolomics pipeline presets.
 
 Scientific assets (CoreMS TOML + QC compound CSVs) ship as package data under
-``metabwatch.presets.<method_key>/``. Call :func:`build_pipeline_config` for
-standard method × search modes; the CLI and GUI both use this API.
+``metabwatch.presets.<method_key>/``. Packaged ``corems.toml`` files list only
+LC-MS keys that differ from CoreMS 4.0.1 defaults and that MetabWatch uses
+(peak picking, EIC integration, clustering). Call :func:`build_pipeline_config`
+for standard method × search modes; the CLI and GUI both use this API.
 
 General ``*_metab_pnnl`` keys use a wider RT window for any LC/MS system.
 ``*_metab_olympic_eclipse01`` keys use the same QC RTs with a tighter window
