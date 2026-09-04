@@ -154,6 +154,17 @@ def _is_polarity_mismatch(error: str | None) -> bool:
     return bool(error) and "polarity mismatch" in error.lower()
 
 
+def abort_batch_on_polarity_mismatch(config: PipelineConfig) -> bool:
+    """Return True when a polarity mismatch should skip remaining batch files.
+
+    Auto (unset config polarity) still hard-stops the rest of the batch after
+    the first mismatch. When the operator pre-set polarity (GUI Positive /
+    Negative, CLI ``--polarity``, JSON ``polarity``), opposite-polarity files
+    fail one at a time and matching files still run.
+    """
+    return config.polarity is None
+
+
 def apply_configured_polarity(
     config: PipelineConfig, state_store: ManifestStateStore
 ) -> str | None:
@@ -569,8 +580,15 @@ def run_watch_mode(
                         f"[failed] {raw_file.name} untargeted search space build: {exc}"
                     )
                     if _is_polarity_mismatch(str(exc)):
-                        mismatch_in_batch = True
-                        polarity_hard_stop_once = True
+                        if abort_batch_on_polarity_mismatch(config):
+                            mismatch_in_batch = True
+                            polarity_hard_stop_once = True
+                        else:
+                            print(
+                                f"[polarity] {raw_file.name} does not match lock "
+                                f"{state_store.get_run_polarity()}; "
+                                "continuing with remaining files"
+                            )
                     continue
 
                 if bootstrap_polarity and state_store.get_run_polarity() is None:
@@ -589,8 +607,15 @@ def run_watch_mode(
                 )
 
                 if result.status != "completed" and _is_polarity_mismatch(result.error):
-                    mismatch_in_batch = True
-                    polarity_hard_stop_once = True
+                    if abort_batch_on_polarity_mismatch(config):
+                        mismatch_in_batch = True
+                        polarity_hard_stop_once = True
+                    else:
+                        print(
+                            f"[polarity] {raw_file.name} does not match lock "
+                            f"{state_store.get_run_polarity()}; "
+                            "continuing with remaining files"
+                        )
 
                 # Refresh HTML + wide CSV exports immediately after each completed
                 # sample (same artifacts the end-of-batch synthesizer would write).

@@ -7,6 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- When polarity is set up front (GUI Positive/Negative, CLI `--polarity`, JSON `polarity`), a mixed input folder no longer hard-stops the rest of the batch after the first opposite-polarity file. Matching files still run. Auto polarity still hard-stops a mixed batch.
+
 ## [0.3.0] - 2026-09-03
 
 ### Added

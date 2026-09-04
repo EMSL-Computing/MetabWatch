@@ -180,7 +180,7 @@ MetabWatch does **not** allow mixed ionization polarities in one output folder:
 1. Optionally declare polarity in the GUI (Auto / Positive / Negative), CLI `--polarity`, or JSON `polarity`. When set, the pipeline writes that value to `pipeline_manifest.json` at run start so the first file is also checked.
 2. If polarity is omitted (Auto), it is read from CoreMS (`lcms_obj.polarity`) after opening each Thermo `.raw` file, and the first successful completion stores it in `pipeline_manifest.json` as top-level `"polarity"` (and on that sample’s entry).
 3. Later samples pass `expected_polarity` from the manifest into processing; a mismatch fails with a non-retryable `Polarity mismatch` error. A config/GUI/CLI polarity that disagrees with an existing lock fails immediately, before processing.
-4. In a multi-file batch (bootstrap / `--once` / force-reprocess), remaining files after the first mismatch are **hard-stopped**. With `--once`, the process exits non-zero.
+4. In a multi-file batch (bootstrap / `--once` / force-reprocess): if polarity was **pre-set**, opposite-polarity files fail one at a time and matching files still run. If polarity is **Auto**, remaining files after the first mismatch are **hard-stopped** and `--once` exits non-zero.
 5. In continuous watch mode, a late opposite-polarity drop is rejected, but the watcher keeps running for matching-polarity files.
 6. The standards CSV may still list both polarities; only rows matching the sample’s polarity are searched.
 7. The dashboard shows **Polarity: …** from the match CSVs. Legacy mixed folders are labeled `mixed (...)` with a warning.

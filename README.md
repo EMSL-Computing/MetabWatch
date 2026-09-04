@@ -75,7 +75,7 @@ The watcher detects new files via filesystem notifications (`watchdog`) with a p
 
 ### One polarity per run
 
-Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). Optionally set it up front (GUI **Polarity** radios, CLI `--polarity`, or JSON `"polarity"`); otherwise the first successfully processed sample writes it into `pipeline_manifest.json`. Later samples must match. Opposite-polarity files are rejected; in multi-file batches the rest of the batch is hard-stopped. Use separate input/output folders for positive and negative acquisitions.
+Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). Optionally set it up front (GUI **Polarity** radios, CLI `--polarity`, or JSON `"polarity"`); otherwise the first successfully processed sample writes it into `pipeline_manifest.json`. Later samples must match. Opposite-polarity files are rejected. If polarity was set up front, matching files in the same batch still run. If polarity is Auto, the rest of a mixed batch is hard-stopped. Prefer separate input/output folders for positive and negative acquisitions.
 
 The dashboard header shows the run polarity (and warns if legacy mixed outputs are present).
 
