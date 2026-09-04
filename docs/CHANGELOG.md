@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- GUI delayed hover notes on main option labels (and Create custom config fields) so lab users can see what each field does without opening the docs.
 - GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json`, a copy of the RP CoreMS TOML, a `README.txt` (from `src/gui/starter_readme.txt`), and (targeted) a blank `monitored_compounds.csv` (header only, no packaged QC rows). Existing folders are not overwritten. The new JSON is selected as Custom JSON; fill the compound list before a targeted Start.
 - Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex (`QC_Metab_` / `Pool`) still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
@@ -27,6 +28,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GUI hover notes use explicit black text so the copy is visible on macOS (dark mode `systemTextColor` was white on the pale yellow tip).
 - Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects. Markers use a light fill and dark outline so they stay visible on newest-darkest traces.
 - Targeted MS1 export writes `mf_*` EIC columns with the same nearest-EIC fallback as target traces when the mass-feature EIC is missing.
 

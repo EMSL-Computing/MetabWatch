@@ -3,10 +3,72 @@
 from __future__ import annotations
 
 import tkinter as tk
+from tkinter import ttk
 
 import pytest
 
 from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
+
+
+def _tk_root() -> tk.Tk:
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:  # pragma: no cover - no display
+        pytest.skip(f"Tk not available: {exc}")
+    root.withdraw()
+    return root
+
+
+def _tooltip_texts(owner) -> set[str]:
+    return {tip.text for tip in owner._tooltips}
+
+
+def test_hover_tooltip_can_be_constructed() -> None:
+    """Delayed hover helper exists and binds without showing a window."""
+    from metabwatch.gui.tooltip import HoverTooltip
+
+    root = _tk_root()
+    try:
+        label = ttk.Label(root, text="Project ID")
+        tip = HoverTooltip(label, "Optional. Only process files whose name contains this text.")
+        assert tip.delay_ms == 500
+        assert tip._tip is None
+        tip._schedule()
+        assert tip._after_id is not None
+        tip._hide()
+        assert tip._after_id is None
+        assert tip._tip is None
+    finally:
+        root.destroy()
+
+
+def test_hover_tooltip_shown_label_has_dark_text() -> None:
+    """Pale-yellow tip must not use macOS systemTextColor (white in dark mode)."""
+    from metabwatch.gui.tooltip import HoverTooltip
+
+    root = _tk_root()
+    try:
+        label = ttk.Label(root, text="Project ID")
+        label.pack()
+        root.update_idletasks()
+        tip = HoverTooltip(
+            label, "Optional. Only process files whose name contains this text."
+        )
+        tip._show()
+        root.update_idletasks()
+        assert tip._tip is not None
+        child = tip._tip.winfo_children()[0]
+        assert child.cget("text").startswith("Optional.")
+        r, g, b = child.winfo_rgb(str(child.cget("foreground")))
+        assert r < 20000 and g < 20000 and b < 20000, (
+            child.cget("foreground"),
+            r,
+            g,
+            b,
+        )
+        tip._hide()
+    finally:
+        root.destroy()
 
 
 def test_gui_app_builds_with_method_dropdown() -> None:
@@ -41,5 +103,43 @@ def test_gui_app_builds_with_method_dropdown() -> None:
         assert str(app.method_combo.cget("state")) == "disabled"
         app._set_running_ui(False)
         assert str(app.method_combo.cget("state")) == "readonly"
+    finally:
+        root.destroy()
+
+
+def test_gui_app_attaches_hover_notes_to_option_labels() -> None:
+    """Main-window option labels keep delayed hover copy (not GC'd)."""
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    try:
+        app = MetabWatchApp(root)
+        texts = _tooltip_texts(app)
+        assert "Choose packaged method shortcuts, or a config file you already have." in texts
+        assert "Packaged chromatography / CoreMS / QC settings." in texts
+        assert any("Only process files whose name contains this text" in t for t in texts)
+        assert "Folder of Thermo `.raw` files." in texts
+        assert "Path to a pipeline JSON (same as CLI `--config`)." in texts
+        assert "Keep looking for new `.raw` files until Stop." in texts
+        assert any("new folder with a JSON" in t for t in texts)
+        assert app._tooltips, "tooltip objects must be stored on the app"
+    finally:
+        root.destroy()
+
+
+def test_starter_dialog_attaches_hover_notes() -> None:
+    """Create-custom-config fields have the same style of delayed hover notes."""
+    from metabwatch.gui.app import StarterConfigDialog
+
+    root = _tk_root()
+    try:
+        dialog = StarterConfigDialog(root, on_saved=lambda _result: None)
+        texts = _tooltip_texts(dialog)
+        assert "Folder of Thermo `.raw` files. Copied into the new JSON." in texts
+        assert "How close a peak's mass must be to a target (parts per million)." in texts
+        assert any("Parent folder" in t for t in texts)
+        assert any("numbered name" in t for t in texts)
+        assert any("largest peaks" in t for t in texts)
+        dialog.destroy()
     finally:
         root.destroy()
