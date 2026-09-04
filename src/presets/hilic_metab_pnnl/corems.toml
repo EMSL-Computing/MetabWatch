@@ -14,4 +14,20 @@ remove_redundant_mass_features = true
 remove_mass_features_by_peak_metrics = true
 verbose_processing = false
 
+[LiquidChromatograph.mass_feature_attribute_filter_dict.noise_score_max]
+value = 0.8
+operator = ">="
+
+[LiquidChromatograph.mass_feature_attribute_filter_dict.noise_score_min]
+value = 0.5
+operator = ">="
+
+[LiquidChromatograph.mass_feature_attribute_filter_dict.gaussian_similarity]
+value = 0.7
+operator = ">="
+
+[LiquidChromatograph.mass_feature_attribute_filter_dict.tailing_factor]
+value = 1.5
+operator = "<="
+
 [mass_spectrum]

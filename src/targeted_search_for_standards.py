@@ -25,6 +25,8 @@ from corems.encapsulation.input.parameter_from_json import load_and_set_toml_par
 from corems.mass_spectra.factory.chromat_data import EIC_Data
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
+from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
+
 
 REQUIRED_STANDARDS_COLUMNS = {
     "compound_name",
@@ -397,6 +399,8 @@ def process_raw_to_observed_features_df(
         "rt_tolerance": rt_tolerance,
         "type": "qc standard",
     }
+
+    align_peak_picking_to_ms1_format(lcms_obj)
 
     lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
     if integrate_mass_features:
