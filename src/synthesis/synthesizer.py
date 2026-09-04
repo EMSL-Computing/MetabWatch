@@ -93,6 +93,28 @@ class HTMLSynthesizer:
         )
 
     @staticmethod
+    def _compound_step_link_html(label: str, compound: dict | None) -> str:
+        """Return one Previous/Next compound link, or an empty spacer."""
+        if not compound:
+            return ""
+        slug = escape(str(compound["slug"]))
+        name = escape(str(compound["name"]))
+        return f'<a href="{slug}.html">{escape(label)}: {name}</a>'
+
+    @classmethod
+    def _compound_step_nav_html(
+        cls,
+        previous_compound: dict | None,
+        next_compound: dict | None,
+    ) -> str:
+        """Return the stacked Previous-above-Next links on the right."""
+        previous = cls._compound_step_link_html("Previous compound", previous_compound)
+        nxt = cls._compound_step_link_html("Next compound", next_compound)
+        if not previous and not nxt:
+            return ""
+        return f'<div class="nav-steps">{previous}{nxt}</div>'
+
+    @staticmethod
     def _safe_trace_col(mf_id: int, compound_name: str) -> str:
         safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
         return f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
@@ -1218,6 +1240,8 @@ class HTMLSynthesizer:
         compound: dict,
         generated_at: str,
         polarity_label: str,
+        previous_compound: dict | None = None,
+        next_compound: dict | None = None,
     ) -> str:
         series = compound["samples"]
         full_samples = [row["sample"] for row in series]
@@ -1586,22 +1610,40 @@ class HTMLSynthesizer:
     .meta {{ margin-bottom: 14px; color: #47524d; }}
     .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
     .section-title {{ margin: 20px 0 8px; }}
+    .nav {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }}
+    .nav-steps {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-left: auto;
+      text-align: right;
+    }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
   </style>
 </head>
 <body>
   <section class=\"card\">
-    <p><a href=\"../dashboard.html\">Back to compound index</a></p>
+    <div class=\"nav\">
+      <a href=\"../dashboard.html\">Back to compound index</a>
+      {self._compound_step_nav_html(previous_compound, next_compound)}
+    </div>
     <h1>{escape(compound['name'])}</h1>
     <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
     {self._polarity_meta_html(polarity_label)}
 
-    <h2 class=\"section-title\">Across-sample metrics</h2>
-    <div id=\"top-plot\"></div>
-
     <h2 class=\"section-title\">EIC overlay (most recent darkest)</h2>
     <div id=\"eic-plot\"></div>
+
+    <h2 class=\"section-title\">Across-sample metrics</h2>
+    <div id=\"top-plot\"></div>
   </section>
 
   <script>
@@ -1694,12 +1736,22 @@ class HTMLSynthesizer:
         self._write_atomic(self.html_output, index_html)
 
         compounds_dir = self.html_output.parent / "compounds"
-        for compound_name in sorted(compounds):
+        ordered_names = sorted(compounds)
+        for index, compound_name in enumerate(ordered_names):
             compound = compounds[compound_name]
+            previous_compound = None
+            next_compound = None
+            if len(ordered_names) > 1:
+                previous_name = ordered_names[(index - 1) % len(ordered_names)]
+                next_name = ordered_names[(index + 1) % len(ordered_names)]
+                previous_compound = compounds[previous_name]
+                next_compound = compounds[next_name]
             page_html = self._render_compound_page(
                 compound=compound,
                 generated_at=generated_at,
                 polarity_label=polarity_label,
+                previous_compound=previous_compound,
+                next_compound=next_compound,
             )
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)
 

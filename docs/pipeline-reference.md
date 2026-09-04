@@ -62,8 +62,8 @@ Assets ship with the package under `metabwatch.presets` (`src/presets/`). Method
 |------------|--------------|--------|--------|--------|-------------------|--------|--------|----------|
 | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | targeted | `hilic_metab_pnnl/corems.toml` | `hilic_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.8 | 1000 |
 | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | untargeted | `hilic_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.8 | 1000 |
-| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | targeted | `hilic_metab_olympic_eclipse01/corems.toml` | `hilic_metab_olympic_eclipse01/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.3 | 1000 |
-| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | untargeted | `hilic_metab_olympic_eclipse01/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.3 | 1000 |
+| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | targeted | `hilic_metab_olympic_eclipse01/corems.toml` | `hilic_metab_olympic_eclipse01/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.6 | 1000 |
+| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | untargeted | `hilic_metab_olympic_eclipse01/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.6 | 1000 |
 | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | targeted | `rp_metab_pnnl/corems.toml` | `rp_metab_pnnl/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.4 | 20000 |
 | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | untargeted | `rp_metab_pnnl/corems.toml` | _(bootstrap)_ | `(?i)Pool` | 5 | 0.4 | 20000 |
 | `rp_metab_olympic_eclipse01` | PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01 | targeted | `rp_metab_olympic_eclipse01/corems.toml` | `rp_metab_olympic_eclipse01/qc_compounds.csv` | `QC_Metab_(.+)` | 5 | 0.2 | 20000 |
