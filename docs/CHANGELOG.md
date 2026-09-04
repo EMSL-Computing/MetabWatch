@@ -7,29 +7,29 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-03
+
 ### Added
 
-- GUI delayed hover notes on main option labels (and Create custom config fields) so lab users can see what each field does without opening the docs.
-- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json`, a copy of the RP CoreMS TOML, a `README.txt` (from `src/gui/starter_readme.txt`), and (targeted) a blank `monitored_compounds.csv` (header only, no packaged QC rows). Existing folders are not overwritten. The new JSON is selected as Custom JSON; fill the compound list before a targeted Start.
-- Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex (`QC_Metab_` / `Pool`) still applies.
+- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json`, a copy of the RP CoreMS TOML, a `README.txt` (JSON keys and sample-name filter in plain language), and (targeted) a blank `monitored_compounds.csv`. Existing folders are not overwritten. Fill the compound list before a targeted Start. Packaged presets are not modified.
+- Delayed hover notes on main-window and Create custom config labels so each field can be read without opening the docs.
+- Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
-- Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to keep auto-detect from the first successful file.
-- Olympic LC / Eclipse 01 method presets (`hilic_metab_olympic_eclipse01`, `rp_metab_olympic_eclipse01`) with tighter RT windows (0.3 min HILIC, 0.2 min RP).
+- Optional run polarity (GUI Auto / Positive / Negative, CLI `--polarity`, JSON `polarity`). When set, the output folder locks before the first sample; omit to auto-detect from the first successful file.
+- Olympic LC / Eclipse 01 method presets (`hilic_metab_olympic_eclipse01`, `rp_metab_olympic_eclipse01`) with HILIC RT window 0.6 min and RP 0.2 min.
 
 ### Changed
 
-- HILIC QC retention times: Umbelliferone 1.0 min, Chlorogenic acid 5.2 min, and Astilbin 4.0 min (both `hilic_metab_pnnl` and `hilic_metab_olympic_eclipse01`). RP values are unchanged.
-- HILIC Olympic LC / Eclipse 01 RT window is 0.6 min (was 0.3).
-- Compound pages put the EIC overlay above across-sample metrics, with Previous and Next compound links stacked opposite Back to compound index.
-- GUI **Method preset** is a dropdown of packaged presets (not radio buttons) so more presets can be added without growing the window.
-- Untargeted preset sample filter is now `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
-- Packaged HILIC/RP QC presets: omit a compound from a method when the Aug 2026 list has no numeric RT for that method, and omit an ion type when that list has no numeric [M+H]+ or [M-H]-. Sulfanilamide dropped from HILIC (no RT(HILIC)); polarity rows were already aligned.
-- QC compound retention times in the packaged HILIC and RP search spaces now come from the Aug 2026 Olympic LC / Eclipse 01 list. General `*_metab_pnnl` keys keep the wider RT windows (0.8 / 0.4 min).
+- GUI **Method preset** is a dropdown of packaged presets (not radio buttons).
+- Untargeted preset sample filter is `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
+- Packaged HILIC/RP QC lists use Aug 2026 Olympic LC / Eclipse 01 retention times; compounds or ion types without numeric values in that list are omitted (Sulfanilamide dropped from HILIC). HILIC Umbelliferone 1.0 min, Chlorogenic acid 5.2 min, Astilbin 4.0 min. General `*_metab_pnnl` keys keep the wider RT windows (0.8 / 0.4 min).
+- Compound pages put the EIC overlay above across-sample metrics, with Previous and Next compound links stacked opposite Back to compound index (both wrap).
 
 ### Fixed
 
-- GUI hover notes use explicit black text so the copy is visible on macOS (dark mode `systemTextColor` was white on the pale yellow tip).
-- Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects. Markers use a light fill and dark outline so they stay visible on newest-darkest traces.
+- GUI hover notes use explicit black text so they stay visible on macOS dark mode.
+- Create custom config popup grows when switching to Untargeted so Top N does not cover Save/Cancel.
+- Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects.
 - Targeted MS1 export writes `mf_*` EIC columns with the same nearest-EIC fallback as target traces when the mass-feature EIC is missing.
 
 ## [0.2.2] - 2026-08-04
