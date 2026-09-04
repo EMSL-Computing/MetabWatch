@@ -1575,6 +1575,7 @@ class HTMLSynthesizer:
         _anchor_label = "Seed (untargeted)" if self.untargeted_mode else "Target"
         _target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
         _target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
+        detected_n = compound.get("detected_count", len(series))
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -1636,7 +1637,7 @@ class HTMLSynthesizer:
       {self._compound_step_nav_html(previous_compound, next_compound)}
     </div>
     <h1>{escape(compound['name'])}</h1>
-    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {detected_n} sample(s). Generated: {escape(generated_at)}</p>
     {self._polarity_meta_html(polarity_label)}
 
     <h2 class=\"section-title\">EIC overlay (most recent darkest)</h2>

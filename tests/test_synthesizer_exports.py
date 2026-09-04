@@ -450,6 +450,64 @@ def test_compound_page_eic_first_and_next_link(tmp_path: Path) -> None:
     assert beta.index("EIC overlay") < beta.index("Across-sample metrics")
 
 
+def test_compound_page_header_counts_detections_not_all_samples(tmp_path: Path) -> None:
+    """Header 'detected in N sample(s)' matches landing Detected Samples, not EIC overlays."""
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 100.0,
+                "area": 1000.0,
+                "observed_rt": 1.0,
+            }
+        ],
+        extra_trace_cols={"target_Alpha": [1.0, 10.0, 1.0]},
+    )
+    _write_sample(
+        output_dir,
+        "sample_b",
+        acquisition_time="2026-01-01T11:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 1,
+                "compound_name": "Gamma",
+                "intensity": 10.0,
+                "area": 20.0,
+                "target_mz": 200.0,
+                "target_rt": 2.0,
+                "observed_mz": 200.0,
+                "observed_rt": 2.0,
+            }
+        ],
+        extra_trace_cols={"target_Alpha": [1.0, 2.0, 1.0]},
+    )
+
+    HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+    ).render()
+
+    index_html = html_output.read_text(encoding="utf-8")
+    assert (
+        "<td><a href='compounds/alpha.html'>Alpha</a></td>"
+        "<td>100.0000</td><td>1.000</td><td>1</td>"
+    ) in index_html
+
+    compound_html = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
+    assert "detected in 1 sample(s)" in compound_html
+    assert "detected in 2 sample(s)" not in compound_html
+
+
 def test_eic_overlay_marks_apex_when_only_target_column_exists(tmp_path: Path) -> None:
     """A match with observed_rt gets a solid EIC and apex marker even without mf_*."""
     output_dir = tmp_path / "results"

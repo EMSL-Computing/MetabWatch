@@ -35,6 +35,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Create custom config popup grows when switching to Untargeted so Top N does not cover Save/Cancel.
 - Compound EIC overlay: apex markers follow the match CSV (`observed_rt` / detected), including when only the `target_*` chromatogram was exported; dotted lines are reserved for true non-detects.
 - Targeted MS1 export writes `mf_*` EIC columns with the same nearest-EIC fallback as target traces when the mass-feature EIC is missing.
+- Compound-page header now reports how many samples have a picked peak (`detected_count`), not how many EIC traces are overlaid. Dotted non-detect traces no longer inflate the count.
 
 ## [0.2.2] - 2026-08-04
 
