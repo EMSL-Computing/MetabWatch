@@ -7,19 +7,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
-
-- When polarity is set up front (GUI Positive/Negative, CLI `--polarity`, JSON `polarity`), a mixed input folder no longer hard-stops the rest of the batch after the first opposite-polarity file. Matching files still run. Auto polarity still hard-stops a mixed batch.
-- Packaged CoreMS TOMLs list only LC-MS overrides vs CoreMS 4.0.1 defaults that MetabWatch uses (peak picking, EIC integration, clustering). Formula-search, MS2, and FT-ICR dump keys are omitted.
-- Packaged HILIC and RP CoreMS presets set `ph_inten_min_rel` and `ph_persis_min_rel` to `0.003` (CoreMS default `0.001`). Persistence is raised with intensity because CoreMS requires `ph_persis_min_rel >= ph_inten_min_rel`. These floors apply to untargeted peak picking only.
-- Packaged CoreMS TOMLs enable `remove_mass_features_by_peak_metrics`. Untargeted bootstrap applies keep-rules after post-cluster integration: `noise_score_max >= 0.8`, `noise_score_min >= 0.5`, `gaussian_similarity >= 0.7`, `tailing_factor <= 1.5`. Gaussian similarity is read from CoreMS 4.0.1's private `_gaussian_similarity` (the public name is missing and would drop every feature). Targeted never calls this path.
-- Targeted and untargeted peak picking follow MetaMS: if all MS1 scans are centroided, switch to `centroided_persistent_homology` (and relative-abundance MS1 noise); if all are profile, use `persistent homology`. Mixed MS1 formats raise.
-
-## [0.3.0] - 2026-09-03
+## [0.3.0] - 2026-09-08
 
 ### Added
 
-- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json`, a copy of the RP CoreMS TOML, a `README.txt` (JSON keys and sample-name filter in plain language), and (targeted) a blank `monitored_compounds.csv`. Existing folders are not overwritten. Fill the compound list before a targeted Start. Packaged presets are not modified.
+- GUI **Create custom config** helper: collect input/output folders, targeted vs untargeted, optional polarity (Auto / Positive / Negative) and Project ID, and RP thresholds, then write a new folder (`metabwatch_config`, or `_2` if that name is taken) with a simplified `metabwatch_config.json` (polarity and `project_id` written only when not Auto / empty), a copy of the RP CoreMS TOML, a `README.txt` (JSON keys and sample-name filter in plain language), and (targeted) a blank `monitored_compounds.csv`. Existing folders are not overwritten. Fill the compound list before a targeted Start. Packaged presets are not modified.
 - Delayed hover notes on main-window and Create custom config labels so each field can be read without opening the docs.
 - Optional project / batch filename filter (`project_id`, CLI `--project-id`, GUI Project ID). Empty means no extra filter; the preset regex still applies.
 - Landing-page summary of compounds below 20% and 30% CV (count and percent) for Intensity and Area, under the reproducibility overview.
@@ -32,6 +24,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Untargeted preset sample filter is `Pool` (case-insensitive) instead of `Pooled`, so lab pool filenames match.
 - Packaged HILIC/RP QC lists use Aug 2026 Olympic LC / Eclipse 01 retention times; compounds or ion types without numeric values in that list are omitted (Sulfanilamide dropped from HILIC). HILIC Umbelliferone 1.0 min, Chlorogenic acid 5.2 min, Astilbin 4.0 min. General `*_metab_pnnl` keys keep the wider RT windows (0.8 / 0.4 min).
 - Compound pages put the EIC overlay above across-sample metrics, with Previous and Next compound links stacked opposite Back to compound index (both wrap).
+- When polarity is set up front (GUI Positive/Negative, CLI `--polarity`, JSON `polarity`), a mixed input folder no longer hard-stops the rest of the batch after the first opposite-polarity file. Matching files still run. Auto polarity still hard-stops a mixed batch.
+- Packaged CoreMS TOMLs list only LC-MS overrides vs CoreMS 4.0.1 defaults that MetabWatch uses (peak picking, EIC integration, clustering). Formula-search, MS2, and FT-ICR dump keys are omitted.
+- Packaged HILIC and RP CoreMS presets set `ph_inten_min_rel` and `ph_persis_min_rel` to `0.003` (CoreMS default `0.001`). Persistence is raised with intensity because CoreMS requires `ph_persis_min_rel >= ph_inten_min_rel`. These floors apply to untargeted peak picking only.
+- Packaged CoreMS TOMLs enable `remove_mass_features_by_peak_metrics`. Untargeted bootstrap applies keep-rules after post-cluster integration: `noise_score_max >= 0.8`, `noise_score_min >= 0.5`, `gaussian_similarity >= 0.7`, `tailing_factor <= 1.5`. Gaussian similarity is read from CoreMS 4.0.1's private `_gaussian_similarity` (the public name is missing and would drop every feature). Targeted never calls this path.
+- Targeted and untargeted peak picking follow MetaMS: if all MS1 scans are centroided, switch to `centroided_persistent_homology` (and relative-abundance MS1 noise); if all are profile, use `persistent homology`. Mixed MS1 formats raise.
 
 ### Fixed
 

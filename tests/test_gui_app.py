@@ -140,6 +140,11 @@ def test_starter_dialog_attaches_hover_notes() -> None:
         assert any("Parent folder" in t for t in texts)
         assert any("numbered name" in t for t in texts)
         assert any("largest peaks" in t for t in texts)
+        assert any("Only process files whose name contains this text" in t for t in texts)
+        assert any("Auto locks from the first successful file" in t for t in texts)
+        assert str(dialog.polarity_auto.cget("value")) == "auto"
+        assert str(dialog.polarity_positive.cget("value")) == "positive"
+        assert str(dialog.polarity_negative.cget("value")) == "negative"
         dialog.destroy()
     finally:
         root.destroy()

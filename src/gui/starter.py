@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from metabwatch.config import POLARITIES
 from metabwatch.presets import _asset_path
 
 CONFIG_FILENAME = "metabwatch_config.json"
@@ -54,6 +55,8 @@ class StarterSettings:
     min_area: float = RP_MIN_AREA
     sample_name_regex: str = ""
     top_n: int = RP_TOP_N
+    polarity: str | None = None
+    project_id: str = ""
 
     def resolved_regex(self) -> str:
         """Return the form regex, or the RP default for the search mode."""
@@ -142,6 +145,8 @@ def settings_from_form(
     min_area: str,
     sample_name_regex: str,
     top_n: str = "",
+    polarity: str = "auto",
+    project_id: str = "",
 ) -> StarterSettings:
     """Parse starter-form strings into :class:`StarterSettings`.
 
@@ -166,6 +171,8 @@ def settings_from_form(
         min_area=_parse_float(min_area, "Minimum peak area"),
         sample_name_regex=sample_name_regex.strip(),
         top_n=_parse_int(top_n, "Top N peaks") if not targeted else RP_TOP_N,
+        polarity=_parse_optional_polarity(polarity),
+        project_id=str(project_id or "").strip(),
     )
     validate_starter_settings(settings)
     return settings
@@ -192,6 +199,8 @@ def validate_starter_settings(settings: StarterSettings) -> None:
         re.compile(regex)
     except re.error as exc:
         raise ValueError(f"Sample-name filter is not a valid regex: {exc}") from exc
+    if settings.polarity is not None and settings.polarity not in POLARITIES:
+        raise ValueError("Polarity must be Auto, Positive, or Negative.")
 
 
 def blank_compounds_csv_text() -> str:
@@ -225,6 +234,11 @@ def build_starter_payload(dest_dir: Path, settings: StarterSettings) -> dict[str
         "rt_tolerance": float(settings.rt_tolerance),
         "min_area": float(settings.min_area),
     }
+    if settings.polarity:
+        payload["polarity"] = settings.polarity
+    project_id = str(settings.project_id or "").strip()
+    if project_id:
+        payload["project_id"] = project_id
     if settings.targeted:
         payload["qc_compounds"] = str((dest / COMPOUNDS_CSV_FILENAME).resolve())
     else:
@@ -309,6 +323,16 @@ def write_rp_starter_folder(
         config_path=config_path,
         written=tuple(written),
     )
+
+
+def _parse_optional_polarity(text: str) -> str | None:
+    """Return ``positive`` / ``negative``, or ``None`` for Auto / empty."""
+    key = str(text or "auto").strip().lower()
+    if key in {"", "auto"}:
+        return None
+    if key not in POLARITIES:
+        raise ValueError("Polarity must be Auto, Positive, or Negative.")
+    return key
 
 
 def _parse_float(text: str, label: str) -> float:

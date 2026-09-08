@@ -126,6 +126,72 @@ def test_untargeted_write_skips_qc_csv_and_loads(tmp_path: Path) -> None:
     cfg = load_pipeline_config(dest / CONFIG_FILENAME)
     assert cfg.search_space.mode == "untargeted"
     assert cfg.search_space.top_n == 100
+    assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
+
+
+def test_starter_writes_polarity_and_project_id(tmp_path: Path) -> None:
+    dest = tmp_path / "starter"
+    settings = _settings(tmp_path, targeted=False)
+    settings = StarterSettings(
+        input_folder=settings.input_folder,
+        output_folder=settings.output_folder,
+        targeted=False,
+        polarity="negative",
+        project_id=" 25-02 ",
+    )
+    write_rp_starter_folder(dest, settings)
+    payload = json.loads((dest / CONFIG_FILENAME).read_text(encoding="utf-8"))
+    assert payload["polarity"] == "negative"
+    assert payload["project_id"] == "25-02"
+
+    cfg = load_pipeline_config(dest / CONFIG_FILENAME)
+    assert cfg.polarity == "negative"
+    assert cfg.watcher.project_id == "25-02"
+
+
+def test_settings_from_form_polarity_and_project_id(tmp_path: Path) -> None:
+    raw = str(tmp_path / "raw")
+    out = str(tmp_path / "out")
+    ok = settings_from_form(
+        input_folder=raw,
+        output_folder=out,
+        targeted=True,
+        mz_tolerance_ppm="5",
+        rt_tolerance="0.4",
+        min_area="20000",
+        sample_name_regex="",
+        polarity="POSITIVE",
+        project_id="  batchA ",
+    )
+    assert ok.polarity == "positive"
+    assert ok.project_id == "batchA"
+
+    auto = settings_from_form(
+        input_folder=raw,
+        output_folder=out,
+        targeted=True,
+        mz_tolerance_ppm="5",
+        rt_tolerance="0.4",
+        min_area="20000",
+        sample_name_regex="",
+        polarity="auto",
+        project_id="",
+    )
+    assert auto.polarity is None
+    assert auto.project_id == ""
+
+    with pytest.raises(ValueError, match="Polarity"):
+        settings_from_form(
+            input_folder=raw,
+            output_folder=out,
+            targeted=True,
+            mz_tolerance_ppm="5",
+            rt_tolerance="0.4",
+            min_area="20000",
+            sample_name_regex="",
+            polarity="both",
+        )
 
 
 def test_numeric_defaults_match_rp_thresholds(tmp_path: Path) -> None:

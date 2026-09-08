@@ -658,6 +658,8 @@ class StarterConfigDialog(tk.Toplevel):
         self.input_var = tk.StringVar(value=initial_input)
         self.output_var = tk.StringVar(value=initial_output)
         self.search_var = tk.StringVar(value="targeted")
+        self.polarity_var = tk.StringVar(value="auto")
+        self.project_id_var = tk.StringVar()
         self.mz_var = tk.StringVar(value=_fmt_starter_number(RP_MZ_TOLERANCE_PPM))
         self.rt_var = tk.StringVar(value=_fmt_starter_number(RP_RT_TOLERANCE))
         self.min_area_var = tk.StringVar(value=_fmt_starter_number(RP_MIN_AREA))
@@ -727,6 +729,39 @@ class StarterConfigDialog(tk.Toplevel):
             command=self._sync_mode_widgets,
         )
         self.search_untargeted.pack(side=tk.LEFT)
+        row += 1
+
+        self.project_id_label = ttk.Label(body, text="Project ID")
+        self.project_id_label.grid(row=row, column=0, sticky="w", pady=2)
+        self.project_id_entry = ttk.Entry(body, textvariable=self.project_id_var)
+        self.project_id_entry.grid(row=row, column=1, sticky="ew", pady=2)
+        row += 1
+
+        self.polarity_label = ttk.Label(body, text="Polarity")
+        self.polarity_label.grid(row=row, column=0, sticky="w", pady=2)
+        polarity_frame = ttk.Frame(body)
+        polarity_frame.grid(row=row, column=1, sticky="w", pady=2)
+        self.polarity_auto = ttk.Radiobutton(
+            polarity_frame,
+            text="Auto",
+            variable=self.polarity_var,
+            value="auto",
+        )
+        self.polarity_auto.pack(side=tk.LEFT, padx=(0, 12))
+        self.polarity_positive = ttk.Radiobutton(
+            polarity_frame,
+            text="Positive",
+            variable=self.polarity_var,
+            value="positive",
+        )
+        self.polarity_positive.pack(side=tk.LEFT, padx=(0, 12))
+        self.polarity_negative = ttk.Radiobutton(
+            polarity_frame,
+            text="Negative",
+            variable=self.polarity_var,
+            value="negative",
+        )
+        self.polarity_negative.pack(side=tk.LEFT)
         row += 1
 
         self.mz_label = ttk.Label(body, text="m/z tolerance (ppm)")
@@ -817,6 +852,20 @@ class StarterConfigDialog(tk.Toplevel):
             self.search_targeted,
             self.search_untargeted,
             text=STARTER_HOVER["search_mode"],
+        )
+        add_hover(
+            self._tooltips,
+            self.project_id_label,
+            self.project_id_entry,
+            text=STARTER_HOVER["project_id"],
+        )
+        add_hover(
+            self._tooltips,
+            self.polarity_label,
+            self.polarity_auto,
+            self.polarity_positive,
+            self.polarity_negative,
+            text=STARTER_HOVER["polarity"],
         )
         add_hover(
             self._tooltips, self.mz_label, self.mz_entry, text=STARTER_HOVER["mz"]
@@ -915,6 +964,8 @@ class StarterConfigDialog(tk.Toplevel):
                 min_area=self.min_area_var.get(),
                 sample_name_regex=self.regex_var.get(),
                 top_n=self.top_n_var.get(),
+                polarity=self.polarity_var.get(),
+                project_id=self.project_id_var.get(),
             )
             requested = requested_config_dir(
                 self.save_in_var.get(),

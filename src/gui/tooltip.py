@@ -47,6 +47,8 @@ STARTER_HOVER = {
     "input_folder": "Folder of Thermo `.raw` files. Copied into the new JSON.",
     "output_folder": "Where the dashboard, CSVs, and manifest will be written.",
     "search_mode": MAIN_HOVER["search"],
+    "project_id": MAIN_HOVER["project_id"],
+    "polarity": MAIN_HOVER["polarity"],
     "mz": "How close a peak's mass must be to a target (parts per million).",
     "rt": "How close retention time must be to a target.",
     "min_area": "Ignore peaks smaller than this.",

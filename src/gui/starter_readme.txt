@@ -56,6 +56,16 @@ targeted
     true  = look for the compounds listed in monitored_compounds.csv
     false = untargeted: build a peak list from the first matching file
 
+polarity  (optional)
+    positive or negative. When set, the run locks before the first sample.
+    Omit this key (or leave it blank) to lock from the first successful file.
+    Auto in Create custom config does not write this key.
+
+project_id  (optional)
+    Only process files whose name contains this text (not case-sensitive).
+    Omit this key, or use an empty string, for no extra filter. The
+    sample-name filter still applies.
+
 qc_compounds  (targeted only)
     Path to monitored_compounds.csv in this folder. Fill that CSV
     before a targeted run.
