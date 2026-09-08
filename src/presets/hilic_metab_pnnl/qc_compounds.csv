@@ -4,10 +4,8 @@ Thidiazuron,[M+H]+,221.0491586,1.13,positive
 5-Hydroxy-L-Tryptophan,[M+H]+,221.0920688,6.66,positive
 Astilbin,[M+H]+,451.123488,4,positive
 Galangin,[M+H]+,271.0600999,1,positive
-Hesperetin,[M+H]+,303.0863147,1.04,positive
 Chlorogenic acid,[M+H]+,355.1023587,5.2,positive
 Naringin,[M+H]+,581.1864822,5.11,positive
-Syringaldehide,[M+H]+,183.0651853,7.26,positive
 Umbelliferone,[M+H]+,163.0389705,1,positive
 D-Tryptophan,[M+H]+,205.0971541,6.21,positive
 Alanine,[M+H]+,90.05495492,7.07,positive
@@ -21,18 +19,15 @@ N-Ethylglycine,[M+H]+,104.070605,6.6,positive
 Thidiazuron,[M-H]-,219.0346056,1.13,negative
 Astilbin,[M-H]-,449.108935,4,negative
 Galangin,[M-H]-,269.0455469,1,negative
-Hesperetin,[M-H]-,301.0717617,1.04,negative
 "2,3,5-Triiodobenzoic acid",[M-H]-,498.7194235,1.32,negative
 Malic acid,[M-H]-,133.0142468,7.02,negative
 Naringin,[M-H]-,579.1719292,5.11,negative
 Pentadecanoic acid,[M-H]-,241.2173037,1.01,negative
-Syringaldehide,[M-H]-,181.0506323,7.26,negative
 D-Tryptophan,[M-H]-,203.0826011,6.21,negative
 3-Hydroxybutyric acid,[M-H]-,103.0400676,4.68,negative
 Cytidine,[M-H]-,242.078244,5.75,negative
 D-Leucine,[M-H]-,130.0873522,6.17,negative
 L-Asparagine,[M-H]-,131.0462156,7.29,negative
-L-Glutamine,[M-H]-,145.0618657,7.26,negative
 Maltitol,[M-H]-,343.1245851,7.28,negative
 N-Ethylglycine,[M-H]-,102.056052,6.6,negative
 Tartaric acid,[M-H]-,149.0091614,7.11,negative
