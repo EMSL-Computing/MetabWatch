@@ -234,6 +234,29 @@ def test_preset_qc_rts_match_aug_2026_list() -> None:
             assert float(row["retention_time"]) == pytest.approx(expected, abs=0.005)
 
 
+def test_hilic_presets_omit_problematic_qc_compounds() -> None:
+    """HILIC targeted lists drop Hesperetin, Syringaldehide, and negative L-Glutamine."""
+    for method in _HILIC_METHODS:
+        rows = _qc_rows(method)
+        names_by_polarity = {
+            "positive": {row["compound_name"] for row in rows if row["polarity"] == "positive"},
+            "negative": {row["compound_name"] for row in rows if row["polarity"] == "negative"},
+        }
+        assert "Hesperetin" not in names_by_polarity["positive"]
+        assert "Hesperetin" not in names_by_polarity["negative"]
+        assert "Syringaldehide" not in names_by_polarity["positive"]
+        assert "Syringaldehide" not in names_by_polarity["negative"]
+        assert "L-Glutamine" not in names_by_polarity["negative"]
+        assert "L-Glutamine" in names_by_polarity["positive"]
+
+
+def test_rp_presets_keep_hilic_omitted_qc_compounds() -> None:
+    """RP targeted lists are unchanged by the HILIC-only QC trim."""
+    for method in _RP_METHODS:
+        names = {row["compound_name"] for row in _qc_rows(method)}
+        assert {"Hesperetin", "Syringaldehide", "L-Glutamine"} <= names
+
+
 def test_eclipse01_presets_use_own_asset_folders() -> None:
     hilic = build_pipeline_config(
         "hilic_metab_olympic_eclipse01", "targeted", Path("/tmp/in"), Path("/tmp/out")

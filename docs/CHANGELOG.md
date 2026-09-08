@@ -7,6 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Packaged HILIC targeted QC lists no longer monitor Hesperetin (pos/neg), Syringaldehide (pos/neg), or L-Glutamine (neg). L-Glutamine remains on HILIC pos. RP lists are unchanged.
+
 ## [0.3.0] - 2026-09-08
 
 ### Added
