@@ -9,6 +9,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from metabwatch.output.layout import (
+    collect_match_csvs,
+    relocate_legacy_outputs,
+    resolve_trace_csv,
+    results_root_for,
+)
+
 # Vendored Plotly.js (offline dashboards). Copied next to dashboard.html on render.
 PLOTLY_JS_FILENAME = "plotly-2.35.2.min.js"
 _PLOTLY_PACKAGE_PATH = Path(__file__).resolve().parent / "static" / PLOTLY_JS_FILENAME
@@ -246,7 +253,7 @@ class HTMLSynthesizer:
         for output_dir in self.output_dirs:
             if not output_dir.exists():
                 continue
-            paths.extend(sorted(output_dir.glob("*_targeted_matches.csv")))
+            paths.extend(collect_match_csvs(output_dir))
         return sorted(set(paths))
 
     def _collect_manifest_acquisition_times(self) -> dict[str, str]:
@@ -265,6 +272,7 @@ class HTMLSynthesizer:
                 acq = entry.get("acquisition_time")
                 if out_csv and acq:
                     mapping[str(Path(out_csv).resolve())] = str(acq)
+                    mapping[Path(out_csv).name] = str(acq)
         return mapping
 
     def _build_dataset(self) -> tuple[list[dict], dict[str, dict], set[str]]:
@@ -289,8 +297,8 @@ class HTMLSynthesizer:
                 continue
 
             sample_name = match_csv.name.replace("_targeted_matches.csv", "")
-            trace_csv = match_csv.with_name(f"{sample_name}_ms1_traces.csv")
-            if not trace_csv.exists():
+            trace_csv = resolve_trace_csv(results_root_for(match_csv), sample_name)
+            if trace_csv is None:
                 continue
 
             if "polarity" in df.columns and not df.empty:
@@ -303,7 +311,9 @@ class HTMLSynthesizer:
             if "acquisition_time" in df.columns and not df.empty:
                 acq_value = str(df["acquisition_time"].iloc[0])
             if not acq_value:
-                acq_value = manifest_times.get(str(match_csv.resolve()))
+                acq_value = manifest_times.get(
+                    str(match_csv.resolve())
+                ) or manifest_times.get(match_csv.name)
             if not acq_value:
                 self.last_skipped_samples += 1
                 continue
@@ -1722,6 +1732,8 @@ class HTMLSynthesizer:
             Path to the generated landing dashboard HTML.
         """
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        for output_dir in self.output_dirs:
+            relocate_legacy_outputs(output_dir)
         samples, compounds, polarities = self._build_dataset()
         polarity_label = self.format_run_polarity_label(polarities)
         self.last_polarity_label = polarity_label

@@ -259,8 +259,8 @@ The pipeline:
 
 ## Output Artifacts
 
-- `*_targeted_matches.csv`
-- `*_ms1_traces.csv`
+- `matches/*_targeted_matches.csv` (older runs with this file in the results root are moved here on the next process or dashboard rebuild)
+- `traces/*_ms1_traces.csv` and `traces/*_tic.png` (per-sample traces and TIC plots; older root-level files are moved here the same way)
 - `dashboard.html`
 - `compounds/<compound-slug>.html`
 - `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv` (wide pivots: one row per mass feature, one column per sample; area requires `integrate_mass_features`)

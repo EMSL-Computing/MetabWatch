@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from metabwatch.output.layout import (
+    relocate_legacy_outputs,
+    sample_match_csv,
+    sample_trace_csv,
+)
 from metabwatch.targeted_search_for_standards import (
     process_raw_to_observed_features_df,
 )
@@ -137,6 +142,7 @@ class ProcessorOrchestrator:
         ProcessResult
             Summary including artifact paths or error information.
         """
+        relocate_legacy_outputs(self.output_dir)
         try:
             results_df = process_raw_to_observed_features_df(
                 raw_file=raw_file,
@@ -162,8 +168,8 @@ class ProcessorOrchestrator:
             return ProcessResult(
                 raw_file=raw_file,
                 status="completed",
-                output_csv=self.output_dir / f"{stem}_targeted_matches.csv",
-                trace_csv=self.output_dir / f"{stem}_ms1_traces.csv",
+                output_csv=sample_match_csv(self.output_dir, stem),
+                trace_csv=sample_trace_csv(self.output_dir, stem),
                 rows=len(results_df),
                 retryable=False,
                 acquisition_time=acquisition_time,

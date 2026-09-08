@@ -4,8 +4,8 @@ Processor module: `metabwatch.targeted_search_for_standards` (`src/targeted_sear
 
 This module uses **CoreMS 4.0.1** to process one Thermo `.raw` file at a time and writes:
 
-- `<sample>_targeted_matches.csv`
-- `<sample>_ms1_traces.csv`
+- `matches/<sample>_targeted_matches.csv`
+- `traces/<sample>_ms1_traces.csv`
 
 When multiple matched features satisfy tolerance for a compound, the output keeps the highest-intensity feature per `compound_name`.
 

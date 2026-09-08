@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Packaged HILIC targeted QC lists no longer monitor Hesperetin (pos/neg), Syringaldehide (pos/neg), or L-Glutamine (neg). L-Glutamine remains on HILIC pos. RP lists are unchanged.
+- Per-sample files leave the results root: match CSVs go to `matches/`, TIC plots and MS1 traces to `traces/`. The root keeps the dashboard, wide exports, and `compounds/`. Existing root-level `*_targeted_matches.csv` / `*_tic.png` / `*_ms1_traces.csv` / `*_eics.pdf` are moved on the next process or dashboard rebuild.
 
 ## [0.3.0] - 2026-09-08
 

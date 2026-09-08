@@ -25,6 +25,12 @@ from corems.encapsulation.input.parameter_from_json import load_and_set_toml_par
 from corems.mass_spectra.factory.chromat_data import EIC_Data
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
+from metabwatch.output.layout import (
+    sample_eics_pdf,
+    sample_match_csv,
+    sample_tic_png,
+    sample_trace_csv,
+)
 from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
 
 
@@ -350,10 +356,10 @@ def process_raw_to_observed_features_df(
     )
 
     raw_tag = raw_file.stem
-    output_csv = output_dir / f"{raw_tag}_targeted_matches.csv"
-    trace_csv = output_dir / f"{raw_tag}_ms1_traces.csv"
-    plot_pdf = output_dir / f"{raw_tag}_eics.pdf"
-    tic_png = output_dir / f"{raw_tag}_tic.png"
+    output_csv = sample_match_csv(output_dir, raw_tag)
+    trace_csv = sample_trace_csv(output_dir, raw_tag)
+    plot_pdf = sample_eics_pdf(output_dir, raw_tag)
+    tic_png = sample_tic_png(output_dir, raw_tag)
 
     standards_df = _load_and_validate_standards(standards_csv)
 
@@ -602,6 +608,7 @@ def process_raw_to_observed_features_df(
     ms1_df.to_csv(trace_csv, index=False)
     print(f"MS1 EIC/TIC trace table saved to: {trace_csv}")
 
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(output_csv, index=False)
 
     print("=" * 60)
