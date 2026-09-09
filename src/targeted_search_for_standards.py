@@ -25,6 +25,14 @@ from corems.encapsulation.input.parameter_from_json import load_and_set_toml_par
 from corems.mass_spectra.factory.chromat_data import EIC_Data
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
+from metabwatch.output.layout import (
+    sample_eics_pdf,
+    sample_match_csv,
+    sample_tic_png,
+    sample_trace_csv,
+)
+from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
+
 
 REQUIRED_STANDARDS_COLUMNS = {
     "compound_name",
@@ -39,6 +47,44 @@ def _target_trace_col(compound_name: str) -> str:
     """Return deterministic trace column name for target-based EIC extraction."""
     safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
     return f"target_{safe_name}" if safe_name else "target_compound"
+
+
+def _eic_data_for_mz(lcms_obj: object, mz: float, mz_tolerance_ppm: float):
+    """Return EIC data for ``mz``: exact CoreMS key, else nearest ``eics`` key.
+
+    Matches can exist without a mass-feature EIC column when CoreMS does not
+    attach ``_eic_data`` and the exact m/z key is missing. The target-m/z
+    export already uses this nearest-key fallback; mass-feature export uses
+    the same lookup so a hit still writes ``mf_*``.
+    """
+    key = None
+    abs_tolerance = mz * mz_tolerance_ppm / 1e6
+    getter = getattr(lcms_obj, "get_eic_mz_for_mass_feature", None)
+    if callable(getter):
+        try:
+            key = getter(mz, tolerance=abs_tolerance)
+        except Exception:
+            key = None
+
+    eics = getattr(lcms_obj, "eics", None) or {}
+    eic_keys = list(eics.keys())
+    if key is None and eic_keys:
+        key = min(eic_keys, key=lambda candidate: abs(float(candidate) - mz))
+    if key is None or key not in eics:
+        return None
+    return eics[key]
+
+
+def _eic_data_for_mass_feature(lcms_obj: object, mf_id: int, mz_tolerance_ppm: float):
+    """Prefer the mass feature's own EIC, else look up by observed m/z."""
+    mass_features = getattr(lcms_obj, "mass_features", None) or {}
+    if mf_id not in mass_features:
+        return None
+    feature = mass_features[mf_id]
+    eic_data = getattr(feature, "_eic_data", None)
+    if eic_data is not None:
+        return eic_data
+    return _eic_data_for_mz(lcms_obj, float(feature.mz), mz_tolerance_ppm)
 
 
 def _normalize_acquisition_time(value: object) -> str | None:
@@ -310,10 +356,10 @@ def process_raw_to_observed_features_df(
     )
 
     raw_tag = raw_file.stem
-    output_csv = output_dir / f"{raw_tag}_targeted_matches.csv"
-    trace_csv = output_dir / f"{raw_tag}_ms1_traces.csv"
-    plot_pdf = output_dir / f"{raw_tag}_eics.pdf"
-    tic_png = output_dir / f"{raw_tag}_tic.png"
+    output_csv = sample_match_csv(output_dir, raw_tag)
+    trace_csv = sample_trace_csv(output_dir, raw_tag)
+    plot_pdf = sample_eics_pdf(output_dir, raw_tag)
+    tic_png = sample_tic_png(output_dir, raw_tag)
 
     standards_df = _load_and_validate_standards(standards_csv)
 
@@ -359,6 +405,8 @@ def process_raw_to_observed_features_df(
         "rt_tolerance": rt_tolerance,
         "type": "qc standard",
     }
+
+    align_peak_picking_to_ms1_format(lcms_obj)
 
     lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
     if integrate_mass_features:
@@ -521,13 +569,7 @@ def process_raw_to_observed_features_df(
             safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
             col_name = f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
 
-            eic_data = lcms_obj.mass_features[mf_id]._eic_data
-            if eic_data is None:
-                mf_mz = float(lcms_obj.mass_features[mf_id].mz)
-                mz_tol = mf_mz * mz_tolerance_ppm / 1e6
-                key = lcms_obj.get_eic_mz_for_mass_feature(mf_mz, tolerance=mz_tol)
-                if key is not None and key in lcms_obj.eics:
-                    eic_data = lcms_obj.eics[key]
+            eic_data = _eic_data_for_mass_feature(lcms_obj, mf_id, mz_tolerance_ppm)
             if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
                 continue
             if eic_data.scans is None or eic_data.eic is None:
@@ -545,26 +587,12 @@ def process_raw_to_observed_features_df(
         .dropna(subset=["compound_name", "mz"])
         .drop_duplicates(subset=["compound_name"], keep="first")
     )
-    eic_keys = list(lcms_obj.eics.keys()) if getattr(lcms_obj, "eics", None) else []
     for _, row in target_export.iterrows():
         compound_name = str(row["compound_name"])
         target_mz = float(row["mz"])
         col_name = _target_trace_col(compound_name)
 
-        key = None
-        abs_tolerance = target_mz * mz_tolerance_ppm / 1e6
-        try:
-            key = lcms_obj.get_eic_mz_for_mass_feature(target_mz, tolerance=abs_tolerance)
-        except Exception:
-            key = None
-
-        if key is None and eic_keys:
-            key = min(eic_keys, key=lambda candidate: abs(float(candidate) - target_mz))
-
-        if key is None or key not in lcms_obj.eics:
-            continue
-
-        eic_data = lcms_obj.eics[key]
+        eic_data = _eic_data_for_mz(lcms_obj, target_mz, mz_tolerance_ppm)
         if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
             continue
         if eic_data.scans is None or eic_data.eic is None:
@@ -580,6 +608,7 @@ def process_raw_to_observed_features_df(
     ms1_df.to_csv(trace_csv, index=False)
     print(f"MS1 EIC/TIC trace table saved to: {trace_csv}")
 
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(output_csv, index=False)
 
     print("=" * 60)

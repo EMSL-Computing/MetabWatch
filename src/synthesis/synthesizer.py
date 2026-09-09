@@ -9,6 +9,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from metabwatch.output.layout import (
+    collect_match_csvs,
+    relocate_legacy_outputs,
+    resolve_trace_csv,
+    results_root_for,
+)
+
 # Vendored Plotly.js (offline dashboards). Copied next to dashboard.html on render.
 PLOTLY_JS_FILENAME = "plotly-2.35.2.min.js"
 _PLOTLY_PACKAGE_PATH = Path(__file__).resolve().parent / "static" / PLOTLY_JS_FILENAME
@@ -91,6 +98,28 @@ class HTMLSynthesizer:
             f"<p class=\"meta-polarity\"{style}>"
             f"<strong>Polarity:</strong> {escape(polarity_label)}{note}</p>"
         )
+
+    @staticmethod
+    def _compound_step_link_html(label: str, compound: dict | None) -> str:
+        """Return one Previous/Next compound link, or an empty spacer."""
+        if not compound:
+            return ""
+        slug = escape(str(compound["slug"]))
+        name = escape(str(compound["name"]))
+        return f'<a href="{slug}.html">{escape(label)}: {name}</a>'
+
+    @classmethod
+    def _compound_step_nav_html(
+        cls,
+        previous_compound: dict | None,
+        next_compound: dict | None,
+    ) -> str:
+        """Return the stacked Previous-above-Next links on the right."""
+        previous = cls._compound_step_link_html("Previous compound", previous_compound)
+        nxt = cls._compound_step_link_html("Next compound", next_compound)
+        if not previous and not nxt:
+            return ""
+        return f'<div class="nav-steps">{previous}{nxt}</div>'
 
     @staticmethod
     def _safe_trace_col(mf_id: int, compound_name: str) -> str:
@@ -224,7 +253,7 @@ class HTMLSynthesizer:
         for output_dir in self.output_dirs:
             if not output_dir.exists():
                 continue
-            paths.extend(sorted(output_dir.glob("*_targeted_matches.csv")))
+            paths.extend(collect_match_csvs(output_dir))
         return sorted(set(paths))
 
     def _collect_manifest_acquisition_times(self) -> dict[str, str]:
@@ -243,6 +272,7 @@ class HTMLSynthesizer:
                 acq = entry.get("acquisition_time")
                 if out_csv and acq:
                     mapping[str(Path(out_csv).resolve())] = str(acq)
+                    mapping[Path(out_csv).name] = str(acq)
         return mapping
 
     def _build_dataset(self) -> tuple[list[dict], dict[str, dict], set[str]]:
@@ -267,8 +297,8 @@ class HTMLSynthesizer:
                 continue
 
             sample_name = match_csv.name.replace("_targeted_matches.csv", "")
-            trace_csv = match_csv.with_name(f"{sample_name}_ms1_traces.csv")
-            if not trace_csv.exists():
+            trace_csv = resolve_trace_csv(results_root_for(match_csv), sample_name)
+            if trace_csv is None:
                 continue
 
             if "polarity" in df.columns and not df.empty:
@@ -281,7 +311,9 @@ class HTMLSynthesizer:
             if "acquisition_time" in df.columns and not df.empty:
                 acq_value = str(df["acquisition_time"].iloc[0])
             if not acq_value:
-                acq_value = manifest_times.get(str(match_csv.resolve()))
+                acq_value = manifest_times.get(
+                    str(match_csv.resolve())
+                ) or manifest_times.get(match_csv.name)
             if not acq_value:
                 self.last_skipped_samples += 1
                 continue
@@ -879,15 +911,16 @@ class HTMLSynthesizer:
 
         return mz_plot, rt_plot
 
-    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
-        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+    def _collect_landing_cvs(
+        self, compounds: dict[str, dict]
+    ) -> tuple[list[float], list[float]]:
+        """Return per-compound Intensity and Area CVs used on the landing page.
 
-        Uses the same ``_mean_cv`` definition as the compound index table.
-        Compounds missing area values contribute only to the intensity series.
+        Same ``_mean_cv`` definition as the compound index table. Compounds
+        missing area values contribute only to the intensity series.
         """
         intensity_cvs: list[float] = []
         area_cvs: list[float] = []
-
         for compound_name in sorted(compounds):
             series = compounds[compound_name]["samples"]
             if not series:
@@ -898,6 +931,51 @@ class HTMLSynthesizer:
                 intensity_cvs.append(float(intensity_cv))
             if area_cv is not None:
                 area_cvs.append(float(area_cv))
+        return intensity_cvs, area_cvs
+
+    @staticmethod
+    def _count_cv_below(cvs: list[float], threshold: float) -> tuple[int, int]:
+        """Return (n below threshold, N with a computable CV)."""
+        return sum(1 for cv in cvs if cv < threshold), len(cvs)
+
+    @staticmethod
+    def _format_cv_below_cell(n: int, total: int) -> str:
+        """Return HTML: bold percent, then ``(n/N)``."""
+        if total == 0:
+            return "<strong>0%</strong> (0/0)"
+        return f"<strong>{100.0 * n / total:.0f}%</strong> ({n}/{total})"
+
+    def _render_cv_threshold_table(
+        self, intensity_cvs: list[float], area_cvs: list[float]
+    ) -> str:
+        """HTML summary of compounds below 20% and 30% CV."""
+        rows: list[str] = []
+        for label, cvs in (("Intensity", intensity_cvs), ("Area", area_cvs)):
+            n20, n_total = self._count_cv_below(cvs, 20.0)
+            n30, _ = self._count_cv_below(cvs, 30.0)
+            rows.append(
+                "<tr>"
+                f"<th scope='row'>{label}</th>"
+                f"<td>{self._format_cv_below_cell(n20, n_total)}</td>"
+                f"<td>{self._format_cv_below_cell(n30, n_total)}</td>"
+                "</tr>"
+            )
+        body = "\n".join(rows)
+        return (
+            '<table class="cv-summary" id="landing-cv-summary">'
+            "<thead><tr>"
+            "<th></th><th>&lt; 20% CV</th><th>&lt; 30% CV</th>"
+            "</tr></thead>"
+            f"<tbody>{body}</tbody></table>"
+        )
+
+    def _build_landing_cv_histogram(self, compounds: dict[str, dict]) -> dict:
+        """Build a dual overlaid histogram of per-compound Intensity and Area CV.
+
+        Uses the same ``_mean_cv`` definition as the compound index table.
+        Compounds missing area values contribute only to the intensity series.
+        """
+        intensity_cvs, area_cvs = self._collect_landing_cvs(compounds)
 
         all_cvs = intensity_cvs + area_cvs
         bin_size = 5.0
@@ -1030,6 +1108,8 @@ class HTMLSynthesizer:
                 samples=samples, compounds=compounds
             )
         cv_plot = self._build_landing_cv_histogram(compounds)
+        intensity_cvs, area_cvs = self._collect_landing_cvs(compounds)
+        cv_summary_html = self._render_cv_threshold_table(intensity_cvs, area_cvs)
         cv_json = json.dumps(cv_plot)
         mz_json = json.dumps(mz_plot)
         rt_json = json.dumps(rt_plot)
@@ -1077,7 +1157,7 @@ class HTMLSynthesizer:
       border-radius: 14px;
       padding: 20px;
       box-shadow: 0 8px 22px rgba(17, 24, 39, 0.08);
-      max-width: 980px;
+      max-width: 1280px;
       margin: 0 auto;
     }}
     a {{ color: var(--accent); text-decoration: none; }}
@@ -1085,6 +1165,23 @@ class HTMLSynthesizer:
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ padding: 10px; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ background: #f0f4ef; }}
+    .cv-overview {{
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }}
+    #landing-cv {{ flex: 1 1 0; min-width: 0; }}
+    table.cv-summary {{
+      width: auto;
+      flex: 0 0 auto;
+      margin: 0;
+      white-space: nowrap;
+    }}
+    table.cv-summary th[scope="row"] {{ background: #f0f4ef; font-weight: 600; }}
+    @media (max-width: 900px) {{
+      .cv-overview {{ flex-direction: column; align-items: stretch; }}
+      table.cv-summary {{ align-self: flex-start; }}
+    }}
         .section-title {{ margin: 22px 0 10px; }}
         .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
   </style>
@@ -1096,7 +1193,10 @@ class HTMLSynthesizer:
     {self._polarity_meta_html(polarity_label)}
 
         <h2 class=\"section-title\">Reproducibility overview (CV)</h2>
-        <div id=\"landing-cv\"></div>
+        <div class=\"cv-overview\">
+          <div id=\"landing-cv\"></div>
+          {cv_summary_html}
+        </div>
 
         <h2 class=\"section-title\">Mass accuracy overview</h2>
         <div id=\"landing-mz\"></div>
@@ -1150,6 +1250,8 @@ class HTMLSynthesizer:
         compound: dict,
         generated_at: str,
         polarity_label: str,
+        previous_compound: dict | None = None,
+        next_compound: dict | None = None,
     ) -> str:
         series = compound["samples"]
         full_samples = [row["sample"] for row in series]
@@ -1181,10 +1283,8 @@ class HTMLSynthesizer:
             times = pd.to_numeric(trace_df["time"], errors="coerce")
             if trace_col and trace_col in trace_df.columns:
                 eic = pd.to_numeric(trace_df[trace_col], errors="coerce")
-                detected = True
             elif self._target_trace_col(compound["name"]) in trace_df.columns:
                 eic = pd.to_numeric(trace_df[self._target_trace_col(compound["name"])], errors="coerce")
-                detected = False
             else:
                 continue
 
@@ -1192,31 +1292,36 @@ class HTMLSynthesizer:
             if not mask.any():
                 continue
 
+            # Overlay style follows the match CSV, not whether the mf_* EIC column
+            # was exported. Target-m/z fallback chromatograms still get a solid
+            # line and apex marker when intensity / observed_rt exist.
+            match_detected = bool(row.get("detected")) and row.get("observed_rt") is not None
+
             eic_traces.append(
                 {
                     "x": times[mask].tolist(),
                     "y": eic[mask].tolist(),
                     "name": self._acquisition_label(row["acquisition_time_iso"]),
-                    "detected": detected,
+                    "detected": match_detected,
                     "hovertemplate": (
                         "Sample: " + row["sample"] + "<br>"
                         +
                         (
                             "RT: %{x:.3f} min<br>EIC: %{y:.4g}<extra></extra>"
-                            if detected
+                            if match_detected
                             else "RT: %{x:.3f} min<br>EIC: %{y:.4g} (no detected peak)<extra></extra>"
                         )
                     ),
                     "line": {
                         "color": line_color,
                         "width": 1.8,
-                        "dash": "dot" if not detected else "solid",
+                        "dash": "dot" if not match_detected else "solid",
                     },
                 }
             )
 
             picked_rt = row.get("observed_rt")
-            if picked_rt is None or not detected:
+            if picked_rt is None or not match_detected:
                 continue
 
             try:
@@ -1249,8 +1354,8 @@ class HTMLSynthesizer:
                     ),
                     "marker": {
                         "size": 8,
-                        "color": line_color,
-                        "line": {"color": "#4a4a4a", "width": 0.8},
+                        "color": "#f5f5f5",
+                        "line": {"color": "#1a1a1a", "width": 1.4},
                     },
                 }
             )
@@ -1480,6 +1585,7 @@ class HTMLSynthesizer:
         _anchor_label = "Seed (untargeted)" if self.untargeted_mode else "Target"
         _target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
         _target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
+        detected_n = compound.get("detected_count", len(series))
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -1515,22 +1621,40 @@ class HTMLSynthesizer:
     .meta {{ margin-bottom: 14px; color: #47524d; }}
     .meta-polarity {{ margin: 4px 0 12px; color: #47524d; }}
     .section-title {{ margin: 20px 0 8px; }}
+    .nav {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }}
+    .nav-steps {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-left: auto;
+      text-align: right;
+    }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
   </style>
 </head>
 <body>
   <section class=\"card\">
-    <p><a href=\"../dashboard.html\">Back to compound index</a></p>
+    <div class=\"nav\">
+      <a href=\"../dashboard.html\">Back to compound index</a>
+      {self._compound_step_nav_html(previous_compound, next_compound)}
+    </div>
     <h1>{escape(compound['name'])}</h1>
-    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {len(series)} sample(s). Generated: {escape(generated_at)}</p>
+    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {detected_n} sample(s). Generated: {escape(generated_at)}</p>
     {self._polarity_meta_html(polarity_label)}
-
-    <h2 class=\"section-title\">Across-sample metrics</h2>
-    <div id=\"top-plot\"></div>
 
     <h2 class=\"section-title\">EIC overlay (most recent darkest)</h2>
     <div id=\"eic-plot\"></div>
+
+    <h2 class=\"section-title\">Across-sample metrics</h2>
+    <div id=\"top-plot\"></div>
   </section>
 
   <script>
@@ -1608,6 +1732,8 @@ class HTMLSynthesizer:
             Path to the generated landing dashboard HTML.
         """
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        for output_dir in self.output_dirs:
+            relocate_legacy_outputs(output_dir)
         samples, compounds, polarities = self._build_dataset()
         polarity_label = self.format_run_polarity_label(polarities)
         self.last_polarity_label = polarity_label
@@ -1623,12 +1749,22 @@ class HTMLSynthesizer:
         self._write_atomic(self.html_output, index_html)
 
         compounds_dir = self.html_output.parent / "compounds"
-        for compound_name in sorted(compounds):
+        ordered_names = sorted(compounds)
+        for index, compound_name in enumerate(ordered_names):
             compound = compounds[compound_name]
+            previous_compound = None
+            next_compound = None
+            if len(ordered_names) > 1:
+                previous_name = ordered_names[(index - 1) % len(ordered_names)]
+                next_name = ordered_names[(index + 1) % len(ordered_names)]
+                previous_compound = compounds[previous_name]
+                next_compound = compounds[next_name]
             page_html = self._render_compound_page(
                 compound=compound,
                 generated_at=generated_at,
                 polarity_label=polarity_label,
+                previous_compound=previous_compound,
+                next_compound=next_compound,
             )
             self._write_atomic(compounds_dir / f"{compound['slug']}.html", page_html)
 

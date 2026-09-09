@@ -8,6 +8,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from metabwatch.pipeline import (
+    apply_configured_polarity,
+    abort_batch_on_polarity_mismatch,
+)
+from metabwatch.presets import build_pipeline_config
 from metabwatch.processor.orchestrator import ProcessResult, ProcessorOrchestrator
 from metabwatch.state.manifest_store import ManifestStateStore
 from metabwatch.synthesis.synthesizer import HTMLSynthesizer
@@ -258,3 +263,68 @@ def test_dashboard_html_warns_on_mixed_polarity(tmp_path):
 def test_process_result_defaults():
     result = ProcessResult(raw_file=Path("x.raw"), status="completed")
     assert result.polarity is None
+
+
+def test_apply_configured_polarity_locks_before_samples(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        tmp_path / "raw",
+        tmp_path / "out",
+        polarity="negative",
+    )
+    store = ManifestStateStore(tmp_path / "out" / "pipeline_manifest.json")
+    assert store.get_run_polarity() is None
+    locked = apply_configured_polarity(cfg, store)
+    assert locked == "negative"
+    assert store.get_run_polarity() == "negative"
+    payload = json.loads(store.manifest_json.read_text(encoding="utf-8"))
+    assert payload["polarity"] == "negative"
+
+
+def test_apply_configured_polarity_unset_leaves_unlocked(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        tmp_path / "raw",
+        tmp_path / "out",
+    )
+    store = ManifestStateStore(tmp_path / "out" / "pipeline_manifest.json")
+    assert apply_configured_polarity(cfg, store) is None
+    assert store.get_run_polarity() is None
+
+
+def test_apply_configured_polarity_conflicts_with_manifest(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        tmp_path / "raw",
+        tmp_path / "out",
+        polarity="positive",
+    )
+    store = ManifestStateStore(tmp_path / "out" / "pipeline_manifest.json")
+    store.set_run_polarity("negative")
+    with pytest.raises(ValueError, match="config requests"):
+        apply_configured_polarity(cfg, store)
+    assert store.get_run_polarity() == "negative"
+
+
+def test_predeclared_polarity_does_not_abort_remaining_batch(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        tmp_path / "raw",
+        tmp_path / "out",
+        polarity="positive",
+    )
+    assert abort_batch_on_polarity_mismatch(cfg) is False
+
+
+def test_auto_polarity_still_aborts_remaining_batch(tmp_path: Path) -> None:
+    cfg = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        tmp_path / "raw",
+        tmp_path / "out",
+    )
+    assert abort_batch_on_polarity_mismatch(cfg) is True

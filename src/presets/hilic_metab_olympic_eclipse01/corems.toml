@@ -9,9 +9,7 @@ min_peak_datapoints = 2.0
 ph_smooth_it = 0
 ph_inten_min_rel = 0.003
 ph_persis_min_rel = 0.003
-mass_feature_cluster_mz_tolerance_rel = 3e-6
 mass_feature_cluster_rt_tolerance = 0.1
-remove_redundant_mass_features = true
 remove_mass_features_by_peak_metrics = true
 verbose_processing = false
 

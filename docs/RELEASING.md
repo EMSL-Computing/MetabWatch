@@ -54,7 +54,7 @@ How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin`
    ```
    Optionally create a GitLab **Release** from the tag in the UI (notes = the changelog section). Tags alone are enough if you do not use Releases.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
-9. Lab machines: `git pull`, **always** reinstall into the lab venv (`pip install -e .`) so package data (presets **and** vendored Plotly under `src/synthesis/static/`) is present, then create a new versioned desktop shortcut per [MAINTAINER.md](MAINTAINER.md) (e.g. `MetabWatch X.Y.Z`). Offline dashboards depend on that static file being installed; a `git pull` alone is not enough if the editable install is stale.
+9. Lab machines: `git pull`, **always** reinstall into the lab venv (`pip install .` or `pip install -e .`) so package data is present, then create a new versioned desktop shortcut per [INSTALL.md](INSTALL.md) (e.g. `MetabWatch X.Y.Z`). A `git pull` alone is not enough if the install is stale.
 
 ### Offline dashboard assets (when relevant)
 
@@ -103,4 +103,4 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 - [ ] MR into `main` opened and merged
 - [ ] Annotated tag `vX.Y.Z` pushed to `origin`
 - [ ] `dev` updated from `main` if needed
-- [ ] Lab machines: `git pull` + `pip install -e .` (refreshes Plotly static asset) + versioned shortcut updated
+- [ ] Lab machines: `git pull` + `pip install .` (or `pip install -e .`) + versioned shortcut per [INSTALL.md](INSTALL.md)

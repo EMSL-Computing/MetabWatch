@@ -24,7 +24,12 @@ def test_preset_summary_mentions_method_defaults() -> None:
     rp = preset_summary_text("rp_metab_pnnl", "untargeted")
     assert "0.4" in text or "0.4" in rp
     assert "20000" in rp
-    assert "Pooled" in rp
+    assert "Pool" in rp
+
+    eclipse_h = preset_summary_text("hilic_metab_olympic_eclipse01", "targeted")
+    assert "0.6" in eclipse_h
+    eclipse_rp = preset_summary_text("rp_metab_olympic_eclipse01", "untargeted")
+    assert "0.2" in eclipse_rp
 
 
 def test_validate_preset_requires_existing_input(tmp_path: Path) -> None:
@@ -46,6 +51,19 @@ def test_validate_preset_ok(tmp_path: Path) -> None:
     req = GuiRunRequest(
         source="preset",
         method="hilic_metab_pnnl",
+        search="targeted",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    assert validate_request(req) is None
+
+
+def test_validate_eclipse01_preset_ok(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_olympic_eclipse01",
         search="targeted",
         input_folder=str(raw),
         output_folder=str(tmp_path / "out"),
@@ -89,6 +107,56 @@ def test_resolve_preset_builds_config(tmp_path: Path) -> None:
     assert cfg.processor.output_dir == out.resolve()
     assert cfg.processor.params_path.is_file()
     assert cfg.processor.min_area == 20000.0
+    assert cfg.polarity is None
+    assert cfg.watcher.project_id == ""
+
+
+def test_resolve_preset_project_id(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_pnnl",
+        search="untargeted",
+        project_id=" 25-02 ",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    cfg = resolve_config(req)
+    assert cfg.watcher.project_id == "25-02"
+    assert "(?i)Pool" in (cfg.watcher.sample_name_regex or "")
+
+
+def test_resolve_preset_polarity_positive(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="rp_metab_pnnl",
+        search="untargeted",
+        polarity="positive",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    assert validate_request(req) is None
+    cfg = resolve_config(req)
+    assert cfg.polarity == "positive"
+
+
+def test_validate_preset_rejects_bad_polarity(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    req = GuiRunRequest(
+        source="preset",
+        method="hilic_metab_pnnl",
+        search="targeted",
+        polarity="both",
+        input_folder=str(raw),
+        output_folder=str(tmp_path / "out"),
+    )
+    err = validate_request(req)
+    assert err is not None
+    assert "polarity" in err.lower()
 
 
 def test_resolve_json_loads_config(tmp_path: Path) -> None:

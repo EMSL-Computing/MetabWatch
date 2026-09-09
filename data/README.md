@@ -1,15 +1,20 @@
 # Files in data folder
 
-1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026). The shipped search space is packaged as `metabwatch.presets.hilic_metab_pnnl` (`src/presets/hilic_metab_pnnl/qc_compounds.csv`).
+1. `original_QC_list.xlsx`: Source list of HILIC QC standards (from W. Kew, April 2026).
+   `QC_Metab_26-06.csv`: Olympic LC / Eclipse 01 QC list (from Priscila Lalli, 26 August 2026). Packaged HILIC/RP search spaces use these retention times, omit a compound when this list has no numeric RT for that method, and omit an ion type when [M+H]+ or [M-H]- is not numeric. HILIC targeted lists also omit Hesperetin (both polarities), Syringaldehide (both polarities), and L-Glutamine (negative only).
 
 2. **Built-in scientific presets** live in the package (not under `data/`):
 
    | Method key | Display name | CoreMS params | QC compounds CSV |
    |------------|--------------|---------------|------------------|
    | `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `src/presets/hilic_metab_pnnl/corems.toml` | `src/presets/hilic_metab_pnnl/qc_compounds.csv` |
+   | `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC — Olympic LC / Eclipse 01 | `src/presets/hilic_metab_olympic_eclipse01/corems.toml` | `src/presets/hilic_metab_olympic_eclipse01/qc_compounds.csv` |
    | `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `src/presets/rp_metab_pnnl/corems.toml` | `src/presets/rp_metab_pnnl/qc_compounds.csv` |
+   | `rp_metab_olympic_eclipse01` | PNNL Standard RP — Olympic LC / Eclipse 01 | `src/presets/rp_metab_olympic_eclipse01/corems.toml` | `src/presets/rp_metab_olympic_eclipse01/qc_compounds.csv` |
 
-   Prefer the CLI presets (`--method` / `--search`) so these paths are resolved automatically after `pip install`.
+   Packaged `corems.toml` files list only LC-MS overrides vs CoreMS 4.0.1 defaults
+   that MetabWatch uses. Prefer the CLI presets (`--method` / `--search`) so these
+   paths are resolved automatically after `pip install`.
 
 3. Example advanced JSON configs (optional `--config` path; repo-relative paths):
 

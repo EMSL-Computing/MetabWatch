@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metabwatch"
-version = "0.2.2"
+version = "0.3.0"
 description = "MetabWatch: automated LC–MS metabolomics QC watcher for Thermo .raw files"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -62,7 +62,9 @@ packages = [
     "metabwatch.pipeline_queue",
     "metabwatch.presets",
     "metabwatch.presets.hilic_metab_pnnl",
+    "metabwatch.presets.hilic_metab_olympic_eclipse01",
     "metabwatch.presets.rp_metab_pnnl",
+    "metabwatch.presets.rp_metab_olympic_eclipse01",
     "metabwatch.processor",
     "metabwatch.state",
     "metabwatch.synthesis",
@@ -70,8 +72,11 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"metabwatch.gui" = ["starter_readme.txt"]
 "metabwatch.presets.hilic_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.presets.hilic_metab_olympic_eclipse01" = ["*.toml", "*.csv"]
 "metabwatch.presets.rp_metab_pnnl" = ["*.toml", "*.csv"]
+"metabwatch.presets.rp_metab_olympic_eclipse01" = ["*.toml", "*.csv"]
 "metabwatch.synthesis" = ["templates/*", "static/*"]
 
 [tool.pytest.ini_options]

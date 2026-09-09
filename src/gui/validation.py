@@ -9,29 +9,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from metabwatch.config import PipelineConfig, load_pipeline_config
-from metabwatch.presets import build_pipeline_config
+from metabwatch.config import POLARITIES, PipelineConfig, load_pipeline_config
+from metabwatch.presets import METHOD_KEYS, PRESET_SPECS, build_pipeline_config
 
 ConfigSource = Literal["preset", "json"]
 
-
-# Read-only preset summary for the GUI (mirrors presets._THRESHOLDS / regex).
-PRESET_SUMMARIES: dict[str, dict[str, str]] = {
-    "hilic_metab_pnnl": {
-        "mz_tolerance_ppm": "5",
-        "rt_tolerance": "0.8",
-        "min_area": "1000",
-    },
-    "rp_metab_pnnl": {
-        "mz_tolerance_ppm": "5",
-        "rt_tolerance": "0.4",
-        "min_area": "20000",
-    },
-}
-
 SAMPLE_FILTER_LABELS = {
     "targeted": "QC_Metab_(.+)",
-    "untargeted": "Pooled (case-insensitive)",
+    "untargeted": "Pool (case-insensitive)",
 }
 
 
@@ -42,6 +27,8 @@ class GuiRunRequest:
     source: ConfigSource
     method: str | None = None
     search: str | None = None
+    polarity: str | None = None
+    project_id: str | None = None
     input_folder: str | None = None
     output_folder: str | None = None
     config_path: str | None = None
@@ -51,12 +38,16 @@ class GuiRunRequest:
 
 def preset_summary_text(method: str, search: str) -> str:
     """Return a one-line description of built-in preset defaults."""
-    thr = PRESET_SUMMARIES.get(method.lower(), PRESET_SUMMARIES["hilic_metab_pnnl"])
+    spec = PRESET_SPECS.get(method.lower(), PRESET_SPECS["hilic_metab_pnnl"])
     filt = SAMPLE_FILTER_LABELS.get(search.lower(), SAMPLE_FILTER_LABELS["targeted"])
+    rt = spec["rt_tolerance"]
+    rt_text = str(int(rt)) if float(rt).is_integer() else str(rt)
+    area = spec["min_area"]
+    area_text = str(int(area)) if float(area).is_integer() else str(area)
     return (
-        f"Defaults: m/z {thr['mz_tolerance_ppm']} ppm · "
-        f"RT {thr['rt_tolerance']} min · "
-        f"min area {thr['min_area']} · "
+        f"Defaults: m/z {spec['mz_tolerance_ppm']:g} ppm · "
+        f"RT {rt_text} min · "
+        f"min area {area_text} · "
         f"sample filter: {filt}"
     )
 
@@ -64,10 +55,13 @@ def preset_summary_text(method: str, search: str) -> str:
 def validate_request(req: GuiRunRequest) -> str | None:
     """Return an error message if the request is invalid, else None."""
     if req.source == "preset":
-        if not req.method or req.method not in {"hilic_metab_pnnl", "rp_metab_pnnl"}:
+        if not req.method or req.method not in METHOD_KEYS:
             return "Select a method (PNNL Standard HILIC or RP Metabolomics)."
         if not req.search or req.search not in {"targeted", "untargeted"}:
             return "Select a search mode (Targeted or Untargeted)."
+        polarity_key = (req.polarity or "auto").strip().lower()
+        if polarity_key not in {"auto", *POLARITIES}:
+            return "Select a polarity (Auto, Positive, or Negative)."
         input_text = (req.input_folder or "").strip()
         output_text = (req.output_folder or "").strip()
         if not input_text:
@@ -112,9 +106,13 @@ def resolve_config(req: GuiRunRequest) -> PipelineConfig:
     assert req.search is not None
     assert req.input_folder is not None
     assert req.output_folder is not None
+    polarity_key = (req.polarity or "auto").strip().lower()
+    polarity = None if polarity_key == "auto" else polarity_key
     return build_pipeline_config(
         req.method,
         req.search,
         Path(req.input_folder.strip()).expanduser(),
         Path(req.output_folder.strip()).expanduser(),
+        polarity=polarity,
+        project_id=req.project_id or "",
     )

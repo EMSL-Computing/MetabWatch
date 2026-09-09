@@ -20,6 +20,86 @@ import pandas as pd
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
+from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
+
+_PEAK_METRIC_OPERATORS = {
+    ">": lambda value, threshold: value > threshold,
+    "<": lambda value, threshold: value < threshold,
+    ">=": lambda value, threshold: value >= threshold,
+    "<=": lambda value, threshold: value <= threshold,
+    "greater": lambda value, threshold: value > threshold,
+    "less": lambda value, threshold: value < threshold,
+    "greater_equal": lambda value, threshold: value >= threshold,
+    "less_equal": lambda value, threshold: value <= threshold,
+}
+
+
+def _peak_metric_value(mass_feature, name: str):
+    """Return a peak-metric attribute, including CoreMS 4.0.1 private aliases.
+
+    CoreMS 4.0.1 stores Gaussian similarity as ``_gaussian_similarity`` and does
+    not expose a public ``gaussian_similarity`` property. Its own filter treats
+    a missing attribute as a failed keep-rule and would drop every feature.
+    """
+    candidates = (name,) if name.startswith("_") else (name, f"_{name}")
+    for candidate in candidates:
+        try:
+            value = getattr(mass_feature, candidate)
+        except AttributeError:
+            continue
+        if callable(value):
+            continue
+        return value
+    return None
+
+
+def _passes_peak_metric(value, operator: str, threshold: float) -> bool:
+    if value is None:
+        return False
+    if hasattr(value, "__len__") and not isinstance(value, (str, bytes)):
+        try:
+            value = float(sum(value) / len(value))
+        except TypeError:
+            return False
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    if number != number:  # NaN
+        return False
+    compare = _PEAK_METRIC_OPERATORS.get(str(operator).strip().lower())
+    if compare is None:
+        raise ValueError(f"Unsupported peak-metric operator: {operator!r}")
+    return bool(compare(number, float(threshold)))
+
+
+def _apply_peak_metric_filters(lcms_obj) -> None:
+    """Drop mass features that fail ``mass_feature_attribute_filter_dict``."""
+    filter_dict = getattr(
+        lcms_obj.parameters.lc_ms, "mass_feature_attribute_filter_dict", None
+    )
+    if not filter_dict:
+        return
+    features = lcms_obj.mass_features
+    if not features:
+        return
+    before = len(features)
+    kept = {}
+    for mf_id, mass_feature in features.items():
+        if all(
+            _passes_peak_metric(
+                _peak_metric_value(mass_feature, name),
+                spec["operator"],
+                spec["value"],
+            )
+            for name, spec in filter_dict.items()
+        ):
+            kept[mf_id] = mass_feature
+    lcms_obj.mass_features = kept
+    print(
+        f"[untargeted] peak-metric filter: kept {len(kept)} of {before} features"
+    )
+
 
 SEARCH_SPACE_COLUMNS = [
     "compound_name",
@@ -121,15 +201,12 @@ def build_untargeted_search_space(
                 "MetabWatch does not allow mixed polarities in one input folder / run."
             )
 
-    # Override CoreMS settings on the lcms_obj for this run only. We don't
-    # mutate the shared TOML — the targeted pipeline reads the same file and
-    # has its own preferences. Specifically:
-    #   * remove_mass_features_by_peak_metrics: enable in-place pruning of
-    #     poorly-integrated features after add_peak_metrics(), using the
-    #     mass_feature_attribute_filter_dict thresholds from the TOML.
-    #   * mass_feature_cluster_mz_tolerance_rel: bump to 1.5e-5 (15 ppm) so
-    #     the post-integration clustering pass collapses the residual ~5-13
-    #     ppm duplicates that survive the default 5 ppm window.
+    align_peak_picking_to_ms1_format(lcms_obj)
+
+    # Override cluster m/z on this object only (do not mutate the shared TOML).
+    # Targeted reads the same file and keeps the packaged window. Bump to
+    # 1.5e-5 (15 ppm) so post-integration clustering collapses residual ~5-13
+    # ppm duplicates that survive the default 5 ppm window.
     lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
 
     lcms_obj.find_mass_features()
@@ -138,8 +215,19 @@ def build_untargeted_search_space(
     lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
     # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
     lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+    # Compute metrics without CoreMS's remover: CoreMS 4.0.1 has no public
+    # gaussian_similarity attribute, so its filter would drop every feature.
+    # Targeted never calls this path.
+    lcms_obj.add_peak_metrics(remove_by_metrics=False)
+    if lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics:
+        _apply_peak_metric_filters(lcms_obj)
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
+    if mf_df.empty:
+        raise RuntimeError(
+            f"CoreMS produced 0 untargeted mass features for {raw_file.name} "
+            "(after integration / quality filter / clustering)"
+        )
     required = {"mz", "scan_time", "area"}
     missing = sorted(required - set(mf_df.columns))
     if missing:
@@ -147,12 +235,6 @@ def build_untargeted_search_space(
             "CoreMS untargeted features missing required columns: "
             + ", ".join(missing)
             + " (integration may have failed)"
-        )
-
-    if mf_df.empty:
-        raise RuntimeError(
-            f"CoreMS produced 0 untargeted mass features for {raw_file.name} "
-            "(after integration / quality filter / clustering)"
         )
 
     ranked = mf_df.sort_values("area", ascending=False).reset_index(drop=True)
