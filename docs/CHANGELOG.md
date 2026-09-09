@@ -7,13 +7,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
-
-- Packaged HILIC targeted QC lists no longer monitor Hesperetin (pos/neg), Syringaldehide (pos/neg), or L-Glutamine (neg). L-Glutamine remains on HILIC pos. RP lists are unchanged.
-- Per-sample files leave the results root: match CSVs go to `matches/`, TIC plots and MS1 traces to `traces/`. The root keeps the dashboard, wide exports, and `compounds/`. Existing root-level `*_targeted_matches.csv` / `*_tic.png` / `*_ms1_traces.csv` / `*_eics.pdf` are moved on the next process or dashboard rebuild.
-- Docs: landing README is GUI-first. CLI flags and JSON live in `docs/cli.md`. Lab Windows setup is `docs/INSTALL.md`. `docs/MAINTAINER.md` is the short development page (CoreMS for Thermo/pythonnet; macOS is developers only). Removed `docs/pipeline-reference.md` and `docs/single-file-search.md`.
-
-## [0.3.0] - 2026-09-08
+## [0.3.0] - 2026-09-09
 
 ### Added
 
@@ -35,6 +29,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Packaged HILIC and RP CoreMS presets set `ph_inten_min_rel` and `ph_persis_min_rel` to `0.003` (CoreMS default `0.001`). Persistence is raised with intensity because CoreMS requires `ph_persis_min_rel >= ph_inten_min_rel`. These floors apply to untargeted peak picking only.
 - Packaged CoreMS TOMLs enable `remove_mass_features_by_peak_metrics`. Untargeted bootstrap applies keep-rules after post-cluster integration: `noise_score_max >= 0.8`, `noise_score_min >= 0.5`, `gaussian_similarity >= 0.7`, `tailing_factor <= 1.5`. Gaussian similarity is read from CoreMS 4.0.1's private `_gaussian_similarity` (the public name is missing and would drop every feature). Targeted never calls this path.
 - Targeted and untargeted peak picking follow MetaMS: if all MS1 scans are centroided, switch to `centroided_persistent_homology` (and relative-abundance MS1 noise); if all are profile, use `persistent homology`. Mixed MS1 formats raise.
+- Packaged HILIC targeted QC lists no longer monitor Hesperetin (pos/neg), Syringaldehide (pos/neg), or L-Glutamine (neg). L-Glutamine remains on HILIC pos. RP lists are unchanged.
+- Per-sample files leave the results root: match CSVs go to `matches/`, TIC plots and MS1 traces to `traces/`. The root keeps the dashboard, wide exports, and `compounds/`. Existing root-level `*_targeted_matches.csv` / `*_tic.png` / `*_ms1_traces.csv` / `*_eics.pdf` are moved on the next process or dashboard rebuild.
+- Docs: landing README is GUI-first. CLI flags and JSON live in `docs/cli.md`. Lab Windows setup is `docs/INSTALL.md`. `docs/MAINTAINER.md` is the short development page (CoreMS for Thermo/pythonnet; macOS is developers only). Removed `docs/pipeline-reference.md` and `docs/single-file-search.md`.
 
 ### Fixed
 
