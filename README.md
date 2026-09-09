@@ -1,180 +1,73 @@
 # MetabWatch
 
-**MetabWatch** (package: `metabwatch`) is an automated LC–MS metabolomics quality-control workflow. Point it at a raw-data folder, leave it running, and it will process each new stable Thermo `.raw` file and refresh an HTML compound dashboard.
+**MetabWatch** watches a folder of Thermo `.raw` files, matches QC compounds
+(or a peak list from the first matching sample), and refreshes an HTML dashboard.
 
-## Quick Start (Non-Coder)
+Lab use is the **MetabWatch** window. Command line: [docs/cli.md](docs/cli.md).
 
-1. Install (editable) from the repository root:
+## Open MetabWatch
 
-```bash
-pip install -e .
-```
+### **Windows (recommended):** 
 
-2. Start a standard run with **method**, **search mode**, **input folder**, and **output folder** only:
+Double-click the desktop shortcut (named with the version,
+e.g. `MetabWatch 0.3.0`), or `Start-MetabWatch.ps1` in the repo folder.
 
-```bash
-metabwatch --method hilic_metab_pnnl --search targeted \
-  --input /path/to/raw_folder \
-  --output /path/to/results
-```
+Or run `metabwatch-gui` from the command line within an appropriately configured Python environment.
 
-| `--method` | Display name | `--search` | What it uses |
-|------------|--------------|------------|--------------|
-| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `targeted` | HILIC CoreMS params + HILIC QC compounds (general RT window) |
-| `hilic_metab_pnnl` | PNNL Standard HILIC Metabolomics Method | `untargeted` | HILIC CoreMS params (bootstrap search space) |
-| `hilic_metab_olympic_eclipse01` | PNNL Standard HILIC Metabolomics Method — Olympic LC / Eclipse 01 | `targeted` | Same HILIC QC list, tighter RT window |
-| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `targeted` | RP CoreMS params + RP QC compounds (general RT window) |
-| `rp_metab_pnnl` | PNNL Standard RP Metabolomics Method | `untargeted` | RP CoreMS params (bootstrap search space) |
-| `rp_metab_olympic_eclipse01` | PNNL Standard RP Metabolomics Method — Olympic LC / Eclipse 01 | `targeted` | Same RP QC list, tighter RT window |
+Instructions for **Windows** installation: [Windows install](docs/INSTALL.md).
 
-Built-in defaults (no extra flags needed):
+### **macOS (developers only):**
 
-| Method | m/z ppm | RT (min) | min area | Sample name filter |
-|--------|---------|----------|----------|--------------------|
-| PNNL Standard HILIC Metabolomics Method | 5 | 0.8 | 1000 | Targeted: `QC_Metab_(.+)` · Untargeted: `Pool` (case-insensitive) |
-| PNNL Standard HILIC — Olympic LC / Eclipse 01 | 5 | 0.6 | 1000 | same filters as above |
-| PNNL Standard RP Metabolomics Method | 5 | 0.4 | 20000 | same filters as above |
-| PNNL Standard RP — Olympic LC / Eclipse 01 | 5 | 0.2 | 20000 | same filters as above |
+Lab use is Windows. macOS is for developers only. Run `metabwatch-gui`
+from a configured Python environment. Setup: [Maintainer / development](docs/MAINTAINER.md)
+(points at [CoreMS](https://github.com/EMSL-Computing/CoreMS) for Thermo `.raw` / pythonnet).
 
-Or as a module:
+## Quick Start (from GUI)
 
-```bash
-python -m metabwatch.pipeline --method hilic_metab_pnnl --search targeted \
-  -i /path/to/raw_folder -o /path/to/results
-```
+1. **Choose Preset Method** — packaged HILIC or RP method.
+2. **Search** — Targeted (packaged QC list) or Untargeted (peak list from the
+   first matching sample).
+3. **Polarity** — Auto (detects from first sample and locks in the rest), Positive, or Negative.
+4. **Project ID** (optional) — only files whose name contains this text.
+5. **Input folder** / **Output folder**.
+6. **Process once** (what is already there) or **Watch continuously** (new files
+   until Stop).
+7. **Start**.
+8. **Open dashboard**
 
-3. Drop new `.raw` files into the input folder.
-4. Open the generated dashboard at `<output>/dashboard.html`.
+### What the options mean
 
-### GUI (Windows)
+- **Targeted** matches the method’s compound list. **Untargeted** builds a list
+  from the first sample whose name matches the usual filter (`QC_Metab_` or
+  `Pool`).
+- **Polarity:** Auto locks from the first successful file; Positive/Negative
+  lock before the first sample. One polarity per output folder.
+- **Project ID:** extra file-name filter. Leave empty to keep only the usual
+  sample filter.
+- **Force reprocess:** run again even if that file was already done.
 
-**Recommended for non-coders:** double-click **`Start-MetabWatch.ps1`** in the repo root, or use a desktop shortcut created by a maintainer (named with the version, e.g. `MetabWatch 0.2.0`). Setup and shortcut steps: [docs/MAINTAINER.md](docs/MAINTAINER.md).
+Do not mix positive and negative into one output folder. If polarity is set up
+front, matching files in a mixed input folder still run. If polarity is Auto, a
+mixed batch stops after the first mismatch.
 
-For developers, after `pip install -e .`:
+## Custom compound list
 
-```bash
-metabwatch-gui
-# or:
-python -m metabwatch.gui
-```
+**Create custom config** writes a new folder (`metabwatch_config`, or `_2` if
+that name is taken) with JSON, a copy of CoreMS settings, a `README.txt`,
+and (targeted) a blank `monitored_compounds.csv`. Existing folders are not
+overwritten. *Fill the CSV of monitored_compounds before a targeted Start for targeted runs*. More details can be found in folder’s `README.txt`.
 
-The window provides:
+## Results
 
-- **Hover notes** — pause on an option label (or Create custom config field) for a short explanation
-- **Preset shortcuts** — Method preset dropdown (packaged HILIC / RP methods) × targeted or untargeted, optional polarity and project ID, plus input/output folder pickers
-- **Custom JSON** — browse to a pipeline config file (same schema as `metabwatch --config`), or use **Create custom config** to make a new folder with JSON, an RP CoreMS TOML copy, a `README.txt`, and (targeted) a blank `monitored_compounds.csv` to fill in
-- **Watch continuously** or **Process once**, optional force reprocess
-- **Start / Stop** (stop finishes the current file, then exits the watch loop)
-- Live log, **Open dashboard**, and **Open output**
+- `dashboard.html` — compound table and plots (offline; no internet needed)
+- `compounds/` — one page per compound
+- `matches/` — per-sample match CSVs
+- `traces/` — per-sample MS1 traces and TIC plots
+- `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv`
 
-Requires a Python install that includes **tkinter** (the official [python.org](https://www.python.org/downloads/) Windows installer does). Thermo `.raw` support needs `pythonnet` (and Mono on macOS/Linux).
+## More
 
-**macOS note:** TIC plots use a non-interactive matplotlib backend so the GUI does not freeze after the first sample. Prefer **Process once** for a single batch; **Watch continuously** keeps running (idle between files) until you press Stop.
-
-The watcher detects new files via filesystem notifications (`watchdog`) with a periodic directory-scan fallback (`discovery_mode`: `hybrid` by default). Files are processed only after they remain unchanged for `stability_wait_sec` (Thermo creation events fire before writing finishes). Duplicate processing is avoided via `pipeline_manifest.json`.
-
-### One polarity per run
-
-Each output folder is locked to a **single ionization polarity** (`positive` or `negative`). Optionally set it up front (GUI **Polarity** radios, CLI `--polarity`, or JSON `"polarity"`); otherwise the first successfully processed sample writes it into `pipeline_manifest.json`. Later samples must match. Opposite-polarity files are rejected. If polarity was set up front, matching files in the same batch still run. If polarity is Auto, the rest of a mixed batch is hard-stopped. Prefer separate input/output folders for positive and negative acquisitions.
-
-The dashboard header shows the run polarity (and warns if legacy mixed outputs are present).
-
-## What You Get
-
-- A per-sample matches CSV (`matches/*_targeted_matches.csv`)
-- A per-sample MS1 trace CSV (`traces/*_ms1_traces.csv`) and TIC plot (`traces/*_tic.png`)
-- A compound dashboard (`dashboard.html`) with polarity labeled (plots work offline; Plotly.js is copied into the results folder). A waiting page is written at run start so you can open the dashboard while the first sample is still processing
-- Per-compound pages in `compounds/`
-- Wide pivot CSV exports (feature rows × sample columns): `export_mz.csv`, `export_rt.csv`, `export_height.csv`, `export_area.csv`
-
-## Common Commands
-
-One-pass watch cycle (useful for scheduled runs):
-
-```bash
-metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT --once
-```
-
-Force reprocessing of already completed files:
-
-```bash
-metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT --once --force-reprocess
-```
-
-Process one explicit raw file:
-
-```bash
-metabwatch --method hilic_metab_pnnl --search targeted -i RAW -o OUT \
-  --mode process --raw /path/to/file.raw
-```
-
-### Advanced: JSON config
-
-For custom tolerances, sample filters, or CoreMS files, pass a JSON config instead of the preset flags (do not mix both):
-
-```bash
-metabwatch --config data/hilic_pipeline_config.json
-```
-
-Simplified flat JSON and legacy nested (`processor` / `watcher` / …) schemas are both supported. See [docs/pipeline-reference.md](docs/pipeline-reference.md).
-
-### Local smoke tests (Makefile) for developers
-
-End-to-end regression checks: always `--once --force-reprocess`, then verify dashboard / exports exist.
-
-Put Thermo `.raw` files in `data/raw_positive/` (gitignored), or use `make get-test-data` once a download URL is configured.
-
-```bash
-make test-unit                  # unit tests (pytest)
-make test-workflow-targeted     # PNNL HILIC targeted via preset CLI
-make test-workflow-untargeted   # advanced JSON (QC_Metab fixtures)
-make test-workflow              # both
-make get-test-data              # download test .raw files when URL is set; else check local
-make help                       # list targets and override variables
-```
-
-```bash
-make test-workflow-targeted PYTHON=./venv/bin/python
-```
-
-## Search-space modes
-
-**Targeted** (`--search targeted`) matches against the packaged QC compound list for the method.
-
-**Untargeted** (`--search untargeted`) seeds the search space from the first sample whose name matches the untargeted filter (`Pool` by default):
-
-1. CoreMS untargeted peak picking + integration runs on that sample.
-2. The top `top_n` peaks (ranked by integrated area, descending) are written to `<output_folder>/untargeted_search_space.csv` with synthetic compound names `feature_001`, `feature_002`, …, `unknown` ion types, and the sample's polarity.
-3. The same sample is then processed against that search space (so it appears in the dashboard alongside every other sample).
-4. All subsequent samples reuse the persisted CSV.
-
-Packaged CoreMS TOML and QC CSVs live under `src/presets/<method_key>/` (installed with the package). QC retention times come from the Aug 2026 Olympic LC / Eclipse 01 list; general method keys use a wider RT window so the same list can be used on other LC/MS systems.
-
-## Technical Documentation
-
-- Pipeline configuration and runtime details: [docs/pipeline-reference.md](docs/pipeline-reference.md)
-- Single-file processor details: [docs/single-file-search.md](docs/single-file-search.md)
-- Windows lab setup and desktop shortcut: [docs/MAINTAINER.md](docs/MAINTAINER.md)
-- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
-- Cutting a release (maintainers): [docs/RELEASING.md](docs/RELEASING.md)
-
-## Requirements
-
-Install the package (and its dependencies) from the repository root:
-
-```bash
-pip install -e .
-```
-
-This installs the `metabwatch` console command.
-
-### CoreMS
-
-This workflow requires **[CoreMS](https://pypi.org/project/CoreMS)** (declared in `pyproject.toml`). It is installed automatically with `pip install -e .`.
-
-CoreMS provides LC-MS peak picking, integration, and Thermo `.raw` file reading used by the single-file processor and untargeted bootstrap path.
-
-**Thermo `.raw` access:** CoreMS needs `pythonnet` for Thermo raw files.
-
-- Windows: `pip install pythonnet`
-- macOS / Linux: install Mono (`brew install mono` on macOS), then `pip install pythonnet`
+- [Windows install](docs/INSTALL.md) — lab PC, shortcut
+- [Command line](docs/cli.md) — `metabwatch` flags and JSON
+- [Maintainer / development](docs/MAINTAINER.md) — Python, macOS, CoreMS
+- [Changelog](docs/CHANGELOG.md)

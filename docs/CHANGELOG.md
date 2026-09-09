@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - Packaged HILIC targeted QC lists no longer monitor Hesperetin (pos/neg), Syringaldehide (pos/neg), or L-Glutamine (neg). L-Glutamine remains on HILIC pos. RP lists are unchanged.
 - Per-sample files leave the results root: match CSVs go to `matches/`, TIC plots and MS1 traces to `traces/`. The root keeps the dashboard, wide exports, and `compounds/`. Existing root-level `*_targeted_matches.csv` / `*_tic.png` / `*_ms1_traces.csv` / `*_eics.pdf` are moved on the next process or dashboard rebuild.
+- Docs: landing README is GUI-first. CLI flags and JSON live in `docs/cli.md`. Lab Windows setup is `docs/INSTALL.md`. `docs/MAINTAINER.md` is the short development page (CoreMS for Thermo/pythonnet; macOS is developers only). Removed `docs/pipeline-reference.md` and `docs/single-file-search.md`.
 
 ## [0.3.0] - 2026-09-08
 
