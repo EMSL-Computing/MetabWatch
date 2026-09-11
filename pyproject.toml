@@ -7,6 +7,7 @@ name = "metabwatch"
 version = "0.3.0"
 description = "MetabWatch: automated LC–MS metabolomics QC watcher for Thermo .raw files"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 authors = [
     { name = "kheal" },
@@ -22,6 +23,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

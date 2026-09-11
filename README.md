@@ -71,3 +71,4 @@ overwritten. *Fill the CSV of monitored_compounds before a targeted Start for ta
 - [Command line](docs/cli.md) — `metabwatch` flags and JSON
 - [Maintainer / development](docs/MAINTAINER.md) — Python, macOS, CoreMS
 - [Changelog](docs/CHANGELOG.md)
+- [License](LICENSE) — Battelle Memorial Institute 2026; BSD-style terms and DOE / PNNL disclaimer
