@@ -157,3 +157,4 @@ make help
 ```
 
 Thermo `.raw` fixtures go in `data/raw_positive/` (gitignored). See `data/README.md`.
+Untargeted workflow smoke uses `tests/data/hilic_pipeline_config_untargeted.json`.
