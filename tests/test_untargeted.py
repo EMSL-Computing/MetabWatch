@@ -11,8 +11,6 @@ from types import SimpleNamespace
 from corems.encapsulation.factory.parameters import LCMSParameters
 from metabwatch.processor.untargeted import (
     _apply_peak_metric_filters,
-    _drop_c13_isotopologues,
-    _isotopologue_type,
     _peak_metric_value,
     build_untargeted_search_space,
 )
@@ -171,34 +169,6 @@ def test_apply_peak_metric_filters_keeps_passing_private_gaussian() -> None:
         mass_features={1: passing, 2: failing},
     )
     _apply_peak_metric_filters(lcms)
-    assert set(lcms.mass_features) == {1}
-
-
-def test_isotopologue_type_treats_blank_as_unmarked() -> None:
-    assert _isotopologue_type(SimpleNamespace()) is None
-    assert _isotopologue_type(SimpleNamespace(isotopologue_type=None)) is None
-    assert _isotopologue_type(SimpleNamespace(isotopologue_type="")) is None
-    assert _isotopologue_type(SimpleNamespace(isotopologue_type="  ")) is None
-    assert _isotopologue_type(SimpleNamespace(isotopologue_type="13C1")) == "13C1"
-
-
-def test_drop_c13_isotopologues_keeps_mono_and_unmarked() -> None:
-    mono = _FakeFeature(100.0, 1.0, 2.0e6)
-    satellite = _FakeFeature(101.0034, 1.0, 8.0e5, mark_as_c13=True)
-    other = _FakeFeature(200.0, 2.0, 1.0e6)
-    lcms = _FakeLcms(mass_features={1: mono, 2: satellite, 3: other})
-
-    _drop_c13_isotopologues(lcms)
-
-    assert lcms.calls == ["c13"]
-    assert set(lcms.mass_features) == {1, 3}
-    assert satellite.isotopologue_type == "13C1"
-
-
-def test_drop_c13_isotopologues_skips_when_fewer_than_two_features() -> None:
-    lcms = _FakeLcms(mass_features={1: _FakeFeature(100.0, 1.0, 1.0e6)})
-    _drop_c13_isotopologues(lcms)
-    assert lcms.calls == []
     assert set(lcms.mass_features) == {1}
 
 

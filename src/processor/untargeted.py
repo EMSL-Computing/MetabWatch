@@ -4,11 +4,10 @@ from __future__ import annotations
 
 Runs CoreMS untargeted peak picking + integration on one Thermo `.raw` file,
 applies in-place peak-metric filtering to drop poorly-integrated features,
-clusters duplicate mass features in mz/rt space, marks likely 13C
-isotopologues with CoreMS ``find_c13_mass_features``, drops those marked
-features, ranks the survivors by integrated area (descending), keeps the
-top-N, and writes a standards-shaped CSV that the rest of the pipeline can
-consume just like a hand-curated standards file.
+clusters duplicate mass features in mz/rt space, drops CoreMS-marked 13C
+isotopologues, ranks the survivors by integrated area (descending), keeps
+the top-N, and writes a standards-shaped CSV that the rest of the pipeline
+can consume just like a hand-curated standards file.
 
 This module has a single responsibility: write
 `<output_dir>/untargeted_search_space.csv`. It does NOT write per-sample
@@ -102,43 +101,6 @@ def _apply_peak_metric_filters(lcms_obj) -> None:
     )
 
 
-def _isotopologue_type(mass_feature) -> str | None:
-    """Return a cleaned CoreMS ``isotopologue_type``, or None if unmarked."""
-    value = getattr(mass_feature, "isotopologue_type", None)
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text or text.lower() in {"nan", "none"}:
-        return None
-    return text
-
-
-def _drop_c13_isotopologues(lcms_obj) -> None:
-    """Mark 13C satellites with CoreMS, then drop them from the live feature set.
-
-    CoreMS ``find_c13_mass_features`` pairs +1.003355 Da (C13-C12) within the
-    LC cluster m/z window and half the cluster RT window, then sets
-    ``isotopologue_type`` (e.g. ``13C1``) on the satellite. Monoisotopic
-    parents and unmarked features are kept. Needs at least two features with
-    area; pairing uses the current ``mass_features`` dict (after clustering
-    and peak-metric filters).
-    """
-    features = getattr(lcms_obj, "mass_features", None)
-    if not features or len(features) < 2:
-        return
-    lcms_obj.find_c13_mass_features()
-    before = len(lcms_obj.mass_features)
-    kept = {
-        mf_id: mass_feature
-        for mf_id, mass_feature in lcms_obj.mass_features.items()
-        if _isotopologue_type(mass_feature) is None
-    }
-    lcms_obj.mass_features = kept
-    print(
-        f"[untargeted] 13C filter: dropped {before - len(kept)} of {before} features"
-    )
-
-
 SEARCH_SPACE_COLUMNS = [
     "compound_name",
     "ion_type",
@@ -189,8 +151,7 @@ def build_untargeted_search_space(
         Destination for the standards-shaped CSV
         (typically `<output_dir>/untargeted_search_space.csv`).
     top_n : int
-        Maximum number of peaks to keep, ranked by integrated area descending,
-        after dropping features CoreMS marked as 13C isotopologues.
+        Maximum number of peaks to keep, ranked by integrated area descending.
     mz_tolerance_ppm : float
         Reserved for future use; validated > 0 for consistency with the
         targeted pipeline. Not currently consumed by CoreMS in the untargeted
@@ -260,13 +221,18 @@ def build_untargeted_search_space(
     lcms_obj.add_peak_metrics(remove_by_metrics=False)
     if lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics:
         _apply_peak_metric_filters(lcms_obj)
-    _drop_c13_isotopologues(lcms_obj)
+    lcms_obj.find_c13_mass_features()
+    lcms_obj.mass_features = {
+        mf_id: mf
+        for mf_id, mf in lcms_obj.mass_features.items()
+        if not getattr(mf, "isotopologue_type", None)
+    }
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     if mf_df.empty:
         raise RuntimeError(
             f"CoreMS produced 0 untargeted mass features for {raw_file.name} "
-            "(after integration / quality filter / clustering / 13C filter)"
+            "(after integration / quality filter / clustering)"
         )
     required = {"mz", "scan_time", "area"}
     missing = sorted(required - set(mf_df.columns))
