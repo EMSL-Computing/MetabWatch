@@ -4,10 +4,10 @@ from __future__ import annotations
 
 Runs CoreMS untargeted peak picking + integration on one Thermo `.raw` file,
 applies in-place peak-metric filtering to drop poorly-integrated features,
-clusters duplicate mass features in mz/rt space, ranks the survivors by
-integrated area (descending), keeps the top-N, and writes a standards-shaped
-CSV that the rest of the pipeline can consume just like a hand-curated
-standards file.
+clusters duplicate mass features in mz/rt space, drops CoreMS-marked 13C
+isotopologues, ranks the survivors by integrated area (descending), keeps
+the top-N, and writes a standards-shaped CSV that the rest of the pipeline
+can consume just like a hand-curated standards file.
 
 This module has a single responsibility: write
 `<output_dir>/untargeted_search_space.csv`. It does NOT write per-sample
@@ -221,6 +221,12 @@ def build_untargeted_search_space(
     lcms_obj.add_peak_metrics(remove_by_metrics=False)
     if lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics:
         _apply_peak_metric_filters(lcms_obj)
+    lcms_obj.find_c13_mass_features()
+    lcms_obj.mass_features = {
+        mf_id: mf
+        for mf_id, mf in lcms_obj.mass_features.items()
+        if not getattr(mf, "isotopologue_type", None)
+    }
 
     mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
     if mf_df.empty:

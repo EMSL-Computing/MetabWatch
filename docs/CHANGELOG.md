@@ -11,6 +11,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - Repository `LICENSE`: Battelle Memorial Institute 2026 BSD-style terms and DOE / PNNL disclaimer.
 
+### Changed
+
+- Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues (`find_c13_mass_features`).
+
 ## [0.3.0] - 2026-09-09
 
 ### Added

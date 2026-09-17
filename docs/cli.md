@@ -73,7 +73,7 @@ folder’s `README.txt` for operator help; this section is the field list.
 | `mz_tolerance_ppm` | `5.0` | How close mass must be (ppm) |
 | `rt_tolerance` | `0.5` | How close retention time must be (minutes) |
 | `min_area` | `5000` | Ignore smaller peaks |
-| `top_n` | `100` | How many largest peaks to keep when untargeted |
+| `top_n` | `100` | How many largest peaks to keep when untargeted (after dropping 13C isotopologues) |
 | `polarity` | unset | `positive` or `negative`. Omit to lock from the first successful file. |
 | `project_id` | `""` | Extra file-name substring filter. Empty = no extra filter. |
 
@@ -106,8 +106,9 @@ Example: `Caffeine,[M+H]+,195.0877,4.20,positive`
 
 Untargeted: set `"targeted": false`, omit `qc_compounds`, add `"top_n": 100` and
 a pool filter such as `"(?i)Pool"`. The first matching file builds
-`untargeted_search_space.csv` in the results folder (largest `top_n` peaks).
-Later files reuse that list. Delete the CSV to rebuild.
+`untargeted_search_space.csv` in the results folder (largest `top_n` peaks
+after dropping likely 13C isotopologues). Later files reuse that list. Delete
+the CSV to rebuild.
 
 ## One polarity per results folder
 
