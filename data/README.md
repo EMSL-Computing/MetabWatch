@@ -19,7 +19,6 @@
 3. Example advanced JSON configs (optional `--config` path; repo-relative paths):
 
    - `hilic_pipeline_config.json` — PNNL Standard HILIC targeted
-   - `hilic_pipeline_config_untargeted.json` — PNNL Standard HILIC untargeted (uses `QC_Metab_(.+)` for local smoke fixtures)
    - `hilic_pipeline_config_mixed.json` — mixed-polarity input folder (for polarity-policy demos)
 
 4. `raw_positive/`, `raw_negative/`, `raw_mixed/` — local Thermo `.raw` fixtures (gitignored / large files).

@@ -264,12 +264,12 @@ def test_mixed_formats_rejected(tmp_path: Path, project_root: Path) -> None:
 
 
 def test_example_configs_load(project_root: Path) -> None:
-    """Smoke-load the shipped example configs from data/."""
+    """Smoke-load the shipped example config and untargeted workflow JSON."""
     targeted = load_pipeline_config(
         project_root / "data/hilic_pipeline_config.json", project_root
     )
     untargeted = load_pipeline_config(
-        project_root / "data/hilic_pipeline_config_untargeted.json",
+        project_root / "tests/data/hilic_pipeline_config_untargeted.json",
         project_root,
     )
 
