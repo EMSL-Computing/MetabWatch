@@ -590,3 +590,93 @@ def test_eic_overlay_marks_apex_when_only_target_column_exists(tmp_path: Path) -
         assert marker["marker"]["line"]["color"] == "#1a1a1a"
         line = next(t for t in line_traces if t["name"] + " peak" == marker["name"])
         assert marker["marker"]["color"] != line["line"]["color"]
+
+
+def test_untargeted_dashboard_uses_shift_and_seed_labels(tmp_path: Path) -> None:
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 100.0,
+                "area": 1000.0,
+                "target_mz": 100.0,
+                "target_rt": 1.0,
+            }
+        ],
+    )
+
+    synth = HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+        untargeted_mode=True,
+    )
+    synth.render()
+
+    index_html = html_output.read_text(encoding="utf-8")
+    assert "Mass shift overview" in index_html
+    assert "Retention time shift overview" in index_html
+    assert "Seed m/z" in index_html
+    assert "Seed RT (min)" in index_html
+    assert "Avg mass shift (ppm)" in index_html
+    assert "Avg RT shift (min)" in index_html
+    assert "Mass accuracy overview" not in index_html
+    assert ">Target m/z<" not in index_html
+
+    compound_html = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
+    assert "Seed m/z" in compound_html
+    assert "Seed RT" in compound_html
+    assert "Mass shift (ppm)" in compound_html
+    assert "RT shift" in compound_html
+    assert "Target: m/z" not in compound_html
+    assert "PPM error" not in compound_html
+
+
+def test_targeted_dashboard_keeps_accuracy_and_target_labels(tmp_path: Path) -> None:
+    output_dir = tmp_path / "results"
+    output_dir.mkdir()
+    html_output = output_dir / "dashboard.html"
+    _write_sample(
+        output_dir,
+        "sample_a",
+        acquisition_time="2026-01-01T10:00:00+00:00",
+        rows=[
+            {
+                "mf_id": 0,
+                "compound_name": "Alpha",
+                "intensity": 100.0,
+                "area": 1000.0,
+            }
+        ],
+    )
+
+    synth = HTMLSynthesizer(
+        output_dirs=(output_dir,),
+        html_output=html_output,
+        mz_tolerance_ppm=5.0,
+        rt_tolerance=0.5,
+        untargeted_mode=False,
+    )
+    synth.render()
+
+    index_html = html_output.read_text(encoding="utf-8")
+    assert "Mass accuracy overview" in index_html
+    assert "Target m/z" in index_html
+    assert "Avg ppm" in index_html
+    assert "Mass shift overview" not in index_html
+    assert "Seed m/z" not in index_html
+
+    compound_html = (output_dir / "compounds" / "alpha.html").read_text(encoding="utf-8")
+    assert "Target: m/z" in compound_html
+    assert "PPM error" in compound_html
+    assert "Seed m/z" not in compound_html
+    assert "Mass shift (ppm)" not in compound_html
+
