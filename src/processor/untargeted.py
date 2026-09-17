@@ -21,6 +21,7 @@ from corems.encapsulation.input.parameter_from_json import load_and_set_toml_par
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
 from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
+from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
 
 _PEAK_METRIC_OPERATORS = {
     ">": lambda value, threshold: value > threshold,
@@ -177,7 +178,10 @@ def build_untargeted_search_space(
     print(f"[untargeted] parsing raw file: {raw_file}")
     try:
         parser = ImportMassSpectraThermoMSFileReader(raw_file)
+        skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
         lcms_obj = parser.get_lcms_obj(spectra="ms1")
+    except ValueError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
 

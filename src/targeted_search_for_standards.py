@@ -32,6 +32,7 @@ from metabwatch.output.layout import (
     sample_trace_csv,
 )
 from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
+from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
 
 
 REQUIRED_STANDARDS_COLUMNS = {
@@ -366,7 +367,10 @@ def process_raw_to_observed_features_df(
     print(f"Loading raw file: {raw_file}")
     try:
         parser = ImportMassSpectraThermoMSFileReader(raw_file)
+        skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
         lcms_obj = parser.get_lcms_obj(spectra="ms1")
+    except ValueError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
 
