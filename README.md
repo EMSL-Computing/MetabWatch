@@ -39,7 +39,7 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
 
 - **Targeted** matches the method’s compound list. **Untargeted** builds a list
   from the first sample whose name matches the usual filter (`QC_Metab_` or
-  `Pool`).
+  `Pool`). Top N is the largest peaks after dropping likely 13C isotopologues.
 - **Polarity:** Auto locks from the first successful file; Positive/Negative
   lock before the first sample. One polarity per output folder.
 - **Project ID:** extra file-name filter. Leave empty to keep only the usual

@@ -54,7 +54,7 @@ STARTER_HOVER = {
     "min_area": "Ignore peaks smaller than this.",
     "sample_regex": "Only process files whose name matches this pattern.",
     "top_n": (
-        "How many of the largest peaks to keep when building the untargeted list."
+        "How many of the largest peaks to keep after dropping likely 13C isotopologues."
     ),
     "save_in": "Parent folder where the new config folder will be created.",
     "folder_name": (

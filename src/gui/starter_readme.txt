@@ -72,7 +72,8 @@ qc_compounds  (targeted only)
 
 top_n  (untargeted only)
     How many of the largest peaks from the first matching file to
-    keep as the search list. Default is 100.
+    keep as the search list, after dropping likely 13C isotopologues.
+    Default is 100.
 
 mz_tolerance_ppm
     How close a measured m/z must be to a listed compound, in parts
