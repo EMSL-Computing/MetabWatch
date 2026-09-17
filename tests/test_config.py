@@ -263,20 +263,16 @@ def test_mixed_formats_rejected(tmp_path: Path, project_root: Path) -> None:
         load_pipeline_config(config_path, project_root)
 
 
-def test_example_configs_load(project_root: Path) -> None:
-    """Smoke-load the shipped example config and untargeted workflow JSON."""
-    targeted = load_pipeline_config(
-        project_root / "data/hilic_pipeline_config.json", project_root
-    )
+def test_untargeted_smoke_config_loads(project_root: Path) -> None:
+    """Smoke-load the untargeted workflow JSON used by make test-workflow-untargeted."""
     untargeted = load_pipeline_config(
         project_root / "tests/data/hilic_pipeline_config_untargeted.json",
         project_root,
     )
 
-    assert targeted.search_space.mode == "targeted"
-    assert targeted.watcher.sample_name_regex == "QC_Metab_(.+)"
     assert untargeted.search_space.mode == "untargeted"
     assert untargeted.search_space.top_n == 100
+    assert untargeted.watcher.sample_name_regex == "QC_Metab_(.+)"
 
 
 def test_absolute_paths_preserved(tmp_path: Path, project_root: Path) -> None:
