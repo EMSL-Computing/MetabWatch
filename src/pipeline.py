@@ -15,7 +15,7 @@ ensure_dotnet_runtime()
 
 from metabwatch.config import PipelineConfig, load_pipeline_config
 from metabwatch.output import OutputTracker
-from metabwatch.pipeline_queue import ProcessingQueue
+from metabwatch.pipeline_queue import ProcessingQueue, is_polarity_mismatch_error
 from metabwatch.presets import METHOD_KEYS, PRESET_SPECS, build_pipeline_config
 from metabwatch.processor import (
     ProcessResult,
@@ -147,11 +147,6 @@ def _clickable_path(path: Path) -> str:
     uri = f"file://{quote(str(abs_path))}"
     label = str(abs_path)
     return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
-
-
-def _is_polarity_mismatch(error: str | None) -> bool:
-    """Return True when an error message indicates a polarity lock failure."""
-    return bool(error) and "polarity mismatch" in error.lower()
 
 
 def abort_batch_on_polarity_mismatch(config: PipelineConfig) -> bool:
@@ -579,7 +574,7 @@ def run_watch_mode(
                     print(
                         f"[failed] {raw_file.name} untargeted search space build: {exc}"
                     )
-                    if _is_polarity_mismatch(str(exc)):
+                    if is_polarity_mismatch_error(str(exc)):
                         if abort_batch_on_polarity_mismatch(config):
                             mismatch_in_batch = True
                             polarity_hard_stop_once = True
@@ -606,7 +601,9 @@ def run_watch_mode(
                     output_tracker=output_tracker,
                 )
 
-                if result.status != "completed" and _is_polarity_mismatch(result.error):
+                if result.status != "completed" and is_polarity_mismatch_error(
+                    result.error
+                ):
                     if abort_batch_on_polarity_mismatch(config):
                         mismatch_in_batch = True
                         polarity_hard_stop_once = True

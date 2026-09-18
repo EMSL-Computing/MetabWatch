@@ -20,8 +20,11 @@ import pandas as pd
 from corems.encapsulation.input.parameter_from_json import load_and_set_toml_parameters_lcms
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
+from metabwatch.pipeline_queue import (
+    polarity_from_lcms,
+    skip_if_locked_polarity_mismatch,
+)
 from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
-from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
 
 _PEAK_METRIC_OPERATORS = {
     ">": lambda value, threshold: value > threshold,
@@ -195,15 +198,7 @@ def build_untargeted_search_space(
             f"Failed to load CoreMS parameter file {params_path}: {exc}"
         ) from exc
 
-    polarity = str(lcms_obj.polarity).strip().lower()
-    if expected_polarity is not None:
-        expected = str(expected_polarity).strip().lower()
-        if polarity != expected:
-            raise ValueError(
-                f"Polarity mismatch: file {raw_file.name} is '{polarity}' "
-                f"but this run is locked to '{expected}'. "
-                "MetabWatch does not allow mixed polarities in one input folder / run."
-            )
+    polarity = polarity_from_lcms(lcms_obj)
 
     align_peak_picking_to_ms1_format(lcms_obj)
 

@@ -8,6 +8,7 @@ from metabwatch.output.layout import (
     sample_match_csv,
     sample_trace_csv,
 )
+from metabwatch.pipeline_queue import is_polarity_mismatch_error
 from metabwatch.targeted_search_for_standards import (
     process_raw_to_observed_features_df,
 )
@@ -117,7 +118,7 @@ class ProcessorOrchestrator:
             True if the message contains retry hints.
         """
         text = str(exc).lower()
-        if "polarity mismatch" in text:
+        if is_polarity_mismatch_error(text):
             return False
         retry_hints = ("temporar", "locked", "timeout", "i/o", "resource busy")
         return any(hint in text for hint in retry_hints)

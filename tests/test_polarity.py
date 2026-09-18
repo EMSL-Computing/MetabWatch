@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -347,7 +348,7 @@ class _PeekParser:
 
 
 def test_polarity_from_scan_filter_maps_corems_modes() -> None:
-    from metabwatch.processor.polarity import polarity_from_scan_filter
+    from metabwatch.pipeline_queue import polarity_from_scan_filter
 
     assert polarity_from_scan_filter(_PeekParser(1)) == "positive"
     assert polarity_from_scan_filter(_PeekParser(-1)) == "negative"
@@ -356,7 +357,7 @@ def test_polarity_from_scan_filter_maps_corems_modes() -> None:
 
 
 def test_skip_if_locked_polarity_mismatch_is_noop_when_unlocked() -> None:
-    from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
+    from metabwatch.pipeline_queue import skip_if_locked_polarity_mismatch
 
     parser = _PeekParser(1)
     skip_if_locked_polarity_mismatch(parser, Path("pos.raw"), None)
@@ -365,7 +366,7 @@ def test_skip_if_locked_polarity_mismatch_is_noop_when_unlocked() -> None:
 
 
 def test_skip_if_locked_polarity_mismatch_allows_matching_file() -> None:
-    from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
+    from metabwatch.pipeline_queue import skip_if_locked_polarity_mismatch
 
     parser = _PeekParser(-1)
     skip_if_locked_polarity_mismatch(parser, Path("neg.raw"), "negative")
@@ -374,7 +375,7 @@ def test_skip_if_locked_polarity_mismatch_allows_matching_file() -> None:
 
 
 def test_skip_if_locked_polarity_mismatch_closes_and_raises() -> None:
-    from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
+    from metabwatch.pipeline_queue import skip_if_locked_polarity_mismatch
 
     parser = _PeekParser(1)
     with pytest.raises(
@@ -387,3 +388,19 @@ def test_skip_if_locked_polarity_mismatch_closes_and_raises() -> None:
         skip_if_locked_polarity_mismatch(parser, Path("neg.raw"), "NEGATIVE")
     assert parser.polarity_calls == 1
     assert parser.closed is True
+
+
+def test_is_polarity_mismatch_error_matches_lock_message() -> None:
+    from metabwatch.pipeline_queue import is_polarity_mismatch_error
+
+    assert is_polarity_mismatch_error(
+        "Polarity mismatch: file a.raw is 'positive' but this run is locked to 'negative'."
+    )
+    assert is_polarity_mismatch_error(None) is False
+    assert is_polarity_mismatch_error("Failed to parse raw file") is False
+
+
+def test_polarity_from_lcms_normalizes() -> None:
+    from metabwatch.pipeline_queue import polarity_from_lcms
+
+    assert polarity_from_lcms(SimpleNamespace(polarity="Positive")) == "positive"

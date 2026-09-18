@@ -31,8 +31,11 @@ from metabwatch.output.layout import (
     sample_tic_png,
     sample_trace_csv,
 )
+from metabwatch.pipeline_queue import (
+    polarity_from_lcms,
+    skip_if_locked_polarity_mismatch,
+)
 from metabwatch.processor.peak_picking import align_peak_picking_to_ms1_format
-from metabwatch.processor.polarity import skip_if_locked_polarity_mismatch
 
 
 REQUIRED_STANDARDS_COLUMNS = {
@@ -386,15 +389,7 @@ def process_raw_to_observed_features_df(
             f"Failed to load CoreMS parameter file {params_path}: {exc}"
         ) from exc
 
-    raw_polarity = str(lcms_obj.polarity).strip().lower()
-    if expected_polarity is not None:
-        expected = str(expected_polarity).strip().lower()
-        if raw_polarity != expected:
-            raise ValueError(
-                f"Polarity mismatch: file {raw_file.name} is '{raw_polarity}' "
-                f"but this run is locked to '{expected}'. "
-                "MetabWatch does not allow mixed polarities in one input folder / run."
-            )
+    raw_polarity = polarity_from_lcms(lcms_obj)
     target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
     if target_df.empty:
         raise ValueError(

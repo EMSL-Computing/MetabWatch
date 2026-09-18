@@ -7,6 +7,11 @@ from pathlib import Path
 _POLARITY_BY_MODE = {1: "positive", -1: "negative"}
 
 
+def is_polarity_mismatch_error(error: str | None) -> bool:
+    """Return True when an error message indicates a polarity lock failure."""
+    return bool(error) and "polarity mismatch" in error.lower()
+
+
 def polarity_from_scan_filter(parser) -> str:
     """Return ``positive`` or ``negative`` from the first scan's Thermo filter.
 
@@ -20,6 +25,11 @@ def polarity_from_scan_filter(parser) -> str:
     return polarity
 
 
+def polarity_from_lcms(lcms_obj) -> str:
+    """Normalized CoreMS polarity on a loaded LCMS object."""
+    return str(lcms_obj.polarity).strip().lower()
+
+
 def skip_if_locked_polarity_mismatch(
     parser,
     raw_file: Path,
@@ -29,6 +39,8 @@ def skip_if_locked_polarity_mismatch(
 
     No-op when ``expected_polarity`` is unset (Auto: first successful file
     still locks the run). On mismatch, close the Thermo reader if possible.
+    After a successful ``get_lcms_obj``, CoreMS already rejects mixed-polarity
+    files, so callers should not repeat this check against ``lcms_obj.polarity``.
     """
     if expected_polarity is None:
         return
