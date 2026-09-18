@@ -14,6 +14,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues (`find_c13_mass_features`).
+- Untargeted dashboard wording: mass/RT **shift** (not accuracy/error) and **seed** m/z and RT (not target), because there is no theoretical mass. Targeted labels are unchanged.
 
 ## [0.3.0] - 2026-09-09
 
