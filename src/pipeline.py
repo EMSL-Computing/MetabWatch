@@ -149,17 +149,6 @@ def _clickable_path(path: Path) -> str:
     return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
 
 
-def abort_batch_on_polarity_mismatch(config: PipelineConfig) -> bool:
-    """Return True when a polarity mismatch should skip remaining batch files.
-
-    Auto (unset config polarity) still hard-stops the rest of the batch after
-    the first mismatch. When the operator pre-set polarity (GUI Positive /
-    Negative, CLI ``--polarity``, JSON ``polarity``), opposite-polarity files
-    fail one at a time and matching files still run.
-    """
-    return config.polarity is None
-
-
 def apply_configured_polarity(
     config: PipelineConfig, state_store: ManifestStateStore
 ) -> str | None:
@@ -455,7 +444,6 @@ def run_watch_mode(
                 f"[polarity] run locked to {state_store.get_run_polarity()} (from manifest)"
             )
 
-        polarity_hard_stop_once = False
         forced_enqueued: set[Path] = set()
 
         # Startup reconciliation: files written while MetabWatch was offline.
@@ -524,7 +512,6 @@ def run_watch_mode(
 
             total = len(batch)
             synthesized_this_cycle = False
-            mismatch_in_batch = False
             for index, raw_file in enumerate(
                 tqdm(batch, total=total, unit="file", desc="Processing raw files"),
                 start=1,
@@ -534,19 +521,6 @@ def run_watch_mode(
                         f"[stopped] Stop requested; "
                         f"skipping {total - index + 1} remaining file(s) in batch."
                     )
-                    break
-
-                if mismatch_in_batch:
-                    remaining = total - index + 1
-                    print(
-                        f"[polarity] hard-stop: skipping {remaining} remaining "
-                        "file(s) in this batch due to mixed polarity"
-                    )
-                    for skipped in batch[index - 1 :]:
-                        print(
-                            f"[skipped] {skipped.name} "
-                            "(polarity hard-stop after mixed polarity)"
-                        )
                     break
 
                 print(f"[processing {index}/{total}] {raw_file.name}")
@@ -575,15 +549,11 @@ def run_watch_mode(
                         f"[failed] {raw_file.name} untargeted search space build: {exc}"
                     )
                     if is_polarity_mismatch_error(str(exc)):
-                        if abort_batch_on_polarity_mismatch(config):
-                            mismatch_in_batch = True
-                            polarity_hard_stop_once = True
-                        else:
-                            print(
-                                f"[polarity] {raw_file.name} does not match lock "
-                                f"{state_store.get_run_polarity()}; "
-                                "continuing with remaining files"
-                            )
+                        print(
+                            f"[polarity] {raw_file.name} does not match lock "
+                            f"{state_store.get_run_polarity()}; "
+                            "continuing with remaining files"
+                        )
                     continue
 
                 if bootstrap_polarity and state_store.get_run_polarity() is None:
@@ -604,15 +574,11 @@ def run_watch_mode(
                 if result.status != "completed" and is_polarity_mismatch_error(
                     result.error
                 ):
-                    if abort_batch_on_polarity_mismatch(config):
-                        mismatch_in_batch = True
-                        polarity_hard_stop_once = True
-                    else:
-                        print(
-                            f"[polarity] {raw_file.name} does not match lock "
-                            f"{state_store.get_run_polarity()}; "
-                            "continuing with remaining files"
-                        )
+                    print(
+                        f"[polarity] {raw_file.name} does not match lock "
+                        f"{state_store.get_run_polarity()}; "
+                        "continuing with remaining files"
+                    )
 
                 # Refresh HTML + wide CSV exports immediately after each completed
                 # sample (same artifacts the end-of-batch synthesizer would write).
@@ -658,8 +624,6 @@ def run_watch_mode(
                     print("[stopped] Stop requested.")
                     return 0
 
-        if once and polarity_hard_stop_once:
-            return 1
         return 0
     finally:
         if observer is not None:
