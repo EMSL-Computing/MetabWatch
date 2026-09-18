@@ -25,7 +25,8 @@ MAIN_HOVER = {
     ),
     "polarity": (
         "Auto locks from the first successful file; Positive/Negative lock "
-        "before the first sample. One polarity per output folder."
+        "before the first sample. One polarity per output folder. "
+        "Opposite-polarity files are skipped; matching files still run."
     ),
     "input_folder": "Folder of Thermo `.raw` files.",
     "output_folder": (
