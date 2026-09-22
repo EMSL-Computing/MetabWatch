@@ -7,16 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-09-18
-
 ### Added
 
 - Repository `LICENSE`: Battelle Memorial Institute 2026 BSD-style terms and DOE / PNNL disclaimer.
 
 ### Changed
 
-- Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues.
-- Untargeted dashboard wording: mass/RT **shift** (not accuracy/error) and **seed** m/z and RT (not target). Targeted labels are unchanged.
+- Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues (`find_c13_mass_features`).
+- Untargeted dashboard wording: mass/RT **shift** (not accuracy/error) and **seed** m/z and RT (not target), because there is no theoretical mass. Targeted labels are unchanged.
 - When run polarity is already locked, opposite-polarity `.raw` files are skipped after a CoreMS first-scan filter peek, without loading MS1 spectra.
 - Auto polarity no longer hard-stops the rest of a mixed folder after the first opposite-polarity file. That file is skipped; later files that match the lock still run.
 
