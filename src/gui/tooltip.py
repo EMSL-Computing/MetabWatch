@@ -25,7 +25,8 @@ MAIN_HOVER = {
     ),
     "polarity": (
         "Auto locks from the first successful file; Positive/Negative lock "
-        "before the first sample. One polarity per output folder."
+        "before the first sample. One polarity per output folder. "
+        "Opposite-polarity files are skipped; matching files still run."
     ),
     "input_folder": "Folder of Thermo `.raw` files.",
     "output_folder": (
@@ -54,7 +55,7 @@ STARTER_HOVER = {
     "min_area": "Ignore peaks smaller than this.",
     "sample_regex": "Only process files whose name matches this pattern.",
     "top_n": (
-        "How many of the largest peaks to keep when building the untargeted list."
+        "How many of the largest peaks to keep after dropping likely 13C isotopologues."
     ),
     "save_in": "Parent folder where the new config folder will be created.",
     "folder_name": (

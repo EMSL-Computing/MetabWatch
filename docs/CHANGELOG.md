@@ -7,6 +7,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
+### Added
+
+- Repository `LICENSE`: Battelle Memorial Institute 2026 BSD-style terms and DOE / PNNL disclaimer.
+
+### Changed
+
+- Packaged untargeted presets no longer drop peaks for tailing factor (`hilic_metab_pnnl`, `hilic_metab_olympic_eclipse01`, `rp_metab_pnnl`, and `rp_metab_olympic_eclipse01`). Noise-score and Gaussian-similarity keep-rules stay.
+- HILIC presets cluster same-mass features within 0.15 min instead of 0.10 min, so one broad hump is not kept as two peaks. RP stays at 0.10 min. CoreMS peak picking applies this window on targeted and untargeted runs (HILIC m/z window stays the CoreMS default, 5 ppm). The preset `cluster_mass_features` flag only controls a second clustering pass and remains off. On `hilic_metab_pnnl` untargeted runs, the same RT number is the denominator for redundant-feature scan frequency. `hilic_metab_olympic_eclipse01` leaves `remove_redundant_mass_features` off.
+- Packaged HILIC targeted QC lists no longer monitor Astilbin `[M-H]-` or 3-Hydroxybutyric acid `[M-H]-` (`hilic_metab_pnnl` and `hilic_metab_olympic_eclipse01`). Astilbin `[M+H]+` stays on HILIC. RP lists are unchanged.
+- Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues (`find_c13_mass_features`).
+- Untargeted dashboard wording: mass/RT **shift** (not accuracy/error) and **seed** m/z and RT (not target), because there is no theoretical mass. Targeted labels are unchanged.
+- When run polarity is already locked, opposite-polarity `.raw` files are skipped after a CoreMS first-scan filter peek, without loading MS1 spectra.
+- Auto polarity no longer hard-stops the rest of a mixed folder after the first opposite-polarity file. That file is skipped; later files that match the lock still run.
+
 ## [0.3.0] - 2026-09-09
 
 ### Added

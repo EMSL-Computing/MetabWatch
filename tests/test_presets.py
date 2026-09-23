@@ -235,7 +235,7 @@ def test_preset_qc_rts_match_aug_2026_list() -> None:
 
 
 def test_hilic_presets_omit_problematic_qc_compounds() -> None:
-    """HILIC targeted lists drop Hesperetin, Syringaldehide, and negative L-Glutamine."""
+    """HILIC targeted lists drop selected compounds and negative-only ions."""
     for method in _HILIC_METHODS:
         rows = _qc_rows(method)
         names_by_polarity = {
@@ -248,13 +248,23 @@ def test_hilic_presets_omit_problematic_qc_compounds() -> None:
         assert "Syringaldehide" not in names_by_polarity["negative"]
         assert "L-Glutamine" not in names_by_polarity["negative"]
         assert "L-Glutamine" in names_by_polarity["positive"]
+        assert "Astilbin" not in names_by_polarity["negative"]
+        assert "Astilbin" in names_by_polarity["positive"]
+        assert "3-Hydroxybutyric acid" not in names_by_polarity["negative"]
+        assert "3-Hydroxybutyric acid" not in names_by_polarity["positive"]
 
 
 def test_rp_presets_keep_hilic_omitted_qc_compounds() -> None:
     """RP targeted lists are unchanged by the HILIC-only QC trim."""
     for method in _RP_METHODS:
         names = {row["compound_name"] for row in _qc_rows(method)}
-        assert {"Hesperetin", "Syringaldehide", "L-Glutamine"} <= names
+        assert {
+            "Hesperetin",
+            "Syringaldehide",
+            "L-Glutamine",
+            "Astilbin",
+            "3-Hydroxybutyric acid",
+        } <= names
 
 
 def test_eclipse01_presets_use_own_asset_folders() -> None:

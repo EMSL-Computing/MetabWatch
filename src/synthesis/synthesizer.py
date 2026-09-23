@@ -800,7 +800,7 @@ class HTMLSynthesizer:
                         "Compound: %{customdata[1]}<br>"
                         "Batch-mean m/z: %{customdata[2]:.6f}<br>"
                         "Tolerance window: [%{customdata[3]:.6f}, %{customdata[4]:.6f}]<br>"
-                        "ppm deviation range: [%{customdata[5]:.3f}, %{customdata[6]:.3f}]<extra></extra>"
+                        "mass shift range (ppm): [%{customdata[5]:.3f}, %{customdata[6]:.3f}]<extra></extra>"
                     ),
                 },
                 {
@@ -824,7 +824,7 @@ class HTMLSynthesizer:
                         "Compound: %{customdata[1]}<br>"
                         "Sample: %{customdata[2]}<br>"
                         "Observed m/z: %{x:.6f}<br>"
-                        "ppm deviation: %{y:.3f}<extra></extra>"
+                        "mass shift (ppm): %{y:.3f}<extra></extra>"
                     ),
                 },
             ],
@@ -832,10 +832,10 @@ class HTMLSynthesizer:
                 "height": 380,
                 "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
                 "showlegend": True,
-                "title": {"text": "Mass accuracy overview (untargeted)"},
+                "title": {"text": "Mass shift overview"},
                 "xaxis": {"title": "m/z (batch-mean anchor; newest observed on dots)"},
                 "yaxis": {
-                    "title": "ppm deviation from batch mean",
+                    "title": "mass shift from batch mean (ppm)",
                     "zeroline": True,
                     "range": [-self.mz_tolerance_ppm, self.mz_tolerance_ppm],
                 },
@@ -864,10 +864,10 @@ class HTMLSynthesizer:
                     "showlegend": False,
                     "hovertemplate": (
                         "Compound: %{customdata[1]}<br>"
-                        "Target RT: %{x:.4f} min<br>"
+                        "Seed RT: %{x:.4f} min<br>"
                         "Batch-mean RT: %{customdata[2]:.4f} min<br>"
                         "Tolerance window: [%{customdata[3]:.4f}, %{customdata[4]:.4f}] min<br>"
-                        "RT deviation range: [%{customdata[5]:.4f}, %{customdata[6]:.4f}] min<extra></extra>"
+                        "RT shift range: [%{customdata[5]:.4f}, %{customdata[6]:.4f}] min<extra></extra>"
                     ),
                 },
                 {
@@ -890,8 +890,8 @@ class HTMLSynthesizer:
                     "hovertemplate": (
                         "Compound: %{customdata[1]}<br>"
                         "Sample: %{customdata[2]}<br>"
-                        "Target RT: %{x:.4f} min<br>"
-                        "RT deviation: %{y:.4f} min<extra></extra>"
+                        "Seed RT: %{x:.4f} min<br>"
+                        "RT shift: %{y:.4f} min<extra></extra>"
                     ),
                 },
             ],
@@ -899,10 +899,10 @@ class HTMLSynthesizer:
                 "height": 380,
                 "margin": {"l": 70, "r": 24, "t": 34, "b": 70},
                 "showlegend": True,
-                "title": {"text": "Retention time overview (untargeted)"},
-                "xaxis": {"title": "Target retention time (min)"},
+                "title": {"text": "Retention time shift overview"},
+                "xaxis": {"title": "Seed retention time (min)"},
                 "yaxis": {
-                    "title": "RT deviation from batch mean (min)",
+                    "title": "RT shift from batch mean (min)",
                     "zeroline": True,
                     "range": [-self.rt_tolerance, self.rt_tolerance],
                 },
@@ -1115,13 +1115,21 @@ class HTMLSynthesizer:
         rt_json = json.dumps(rt_plot)
 
         if self.untargeted_mode:
-            _avg_ppm_tooltip = "error vs untargeted-search-space mz (set by the seed sample)"
-            _avg_rt_tooltip = "error vs untargeted-search-space rt (set by the seed sample)"
-            _target_mz_label = "Target m/z"
-            _target_rt_label = "Target RT (min)"
-            _target_mz_tooltip = "m/z from the untargeted-search-space CSV (set by the seed sample)"
-            _target_rt_tooltip = "RT from the untargeted-search-space CSV (set by the seed sample)"
+            _mz_section = "Mass shift overview"
+            _rt_section = "Retention time shift overview"
+            _avg_ppm_label = "Avg mass shift (ppm)"
+            _avg_rt_label = "Avg RT shift (min)"
+            _avg_ppm_tooltip = "mass shift vs seed-sample m/z from the untargeted search space"
+            _avg_rt_tooltip = "RT shift vs seed-sample RT from the untargeted search space"
+            _target_mz_label = "Seed m/z"
+            _target_rt_label = "Seed RT (min)"
+            _target_mz_tooltip = "m/z from the untargeted search-space CSV (seed sample)"
+            _target_rt_tooltip = "RT from the untargeted search-space CSV (seed sample)"
         else:
+            _mz_section = "Mass accuracy overview"
+            _rt_section = "Retention time overview"
+            _avg_ppm_label = "Avg ppm"
+            _avg_rt_label = "Avg RT Error (min)"
             _avg_ppm_tooltip = "error vs target"
             _avg_rt_tooltip = "error vs target"
             _target_mz_label = "Target m/z"
@@ -1198,10 +1206,10 @@ class HTMLSynthesizer:
           {cv_summary_html}
         </div>
 
-        <h2 class=\"section-title\">Mass accuracy overview</h2>
+        <h2 class=\"section-title\">{escape(_mz_section)}</h2>
         <div id=\"landing-mz\"></div>
 
-        <h2 class=\"section-title\">Retention time overview</h2>
+        <h2 class=\"section-title\">{escape(_rt_section)}</h2>
         <div id=\"landing-rt\"></div>
 
         <h2 class=\"section-title\">Compound Index</h2>
@@ -1212,8 +1220,8 @@ class HTMLSynthesizer:
                     <th title="{escape(_target_mz_tooltip)}">{escape(_target_mz_label)}</th>
                     <th title="{escape(_target_rt_tooltip)}">{escape(_target_rt_label)}</th>
                     <th>Detected Samples</th>
-                    <th title="{escape(_avg_ppm_tooltip)}">Avg ppm</th>
-                    <th title="{escape(_avg_rt_tooltip)}">Avg RT Error (min)</th>
+                    <th title="{escape(_avg_ppm_tooltip)}">{escape(_avg_ppm_label)}</th>
+                    <th title="{escape(_avg_rt_tooltip)}">{escape(_avg_rt_label)}</th>
                     <th>Intensity CV</th>
                     <th>Area CV</th>
                 </tr>
@@ -1457,18 +1465,33 @@ class HTMLSynthesizer:
             },
         ]
 
+        if self.untargeted_mode:
+            ppm_name = "Mass shift (ppm)"
+            rt_shift_name = "RT shift"
+            ppm_hover = "Mass shift (ppm): %{y:.3f}<extra></extra>"
+            rt_hover = "RT shift: %{y:.4f} min<extra></extra>"
+            ppm_axis = "Mass shift (ppm)"
+            rt_axis = "RT shift (min)"
+        else:
+            ppm_name = "PPM error"
+            rt_shift_name = "RT error"
+            ppm_hover = "PPM error: %{y:.3f}<extra></extra>"
+            rt_hover = "RT error: %{y:.4f} min<extra></extra>"
+            ppm_axis = "PPM error"
+            rt_axis = "RT error (min)"
+
         top_plot = {
             "data": [
                 {
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": "PPM error",
+                    "name": ppm_name,
                     "x": samples,
                     "y": ppm_values,
                     "customdata": full_samples,
                     "hovertemplate": (
                         "Sample: %{customdata}<br>"
-                        "PPM error: %{y:.3f}<extra></extra>"
+                        + ppm_hover
                     ),
                     "xaxis": "x",
                     "yaxis": "y",
@@ -1478,13 +1501,13 @@ class HTMLSynthesizer:
                 {
                     "type": "scatter",
                     "mode": "lines+markers",
-                    "name": "RT error",
+                    "name": rt_shift_name,
                     "x": samples,
                     "y": rt_error_values,
                     "customdata": full_samples,
                     "hovertemplate": (
                         "Sample: %{customdata}<br>"
-                        "RT error: %{y:.4f} min<extra></extra>"
+                        + rt_hover
                     ),
                     "xaxis": "x",
                     "yaxis": "y2",
@@ -1524,13 +1547,13 @@ class HTMLSynthesizer:
                     "automargin": True,
                 },
                 "yaxis": {
-                    "title": {"text": "PPM error", "standoff": 8},
+                    "title": {"text": ppm_axis, "standoff": 8},
                     "automargin": True,
                     "domain": [0.72, 1.0],
                     "range": [-self.mz_tolerance_ppm, self.mz_tolerance_ppm],
                 },
                 "yaxis2": {
-                    "title": {"text": "RT error (min)", "standoff": 8},
+                    "title": {"text": rt_axis, "standoff": 8},
                     "automargin": True,
                     "domain": [0.38, 0.66],
                     "range": [-self.rt_tolerance, self.rt_tolerance],
@@ -1582,10 +1605,19 @@ class HTMLSynthesizer:
         top_json = json.dumps(top_plot)
         eic_json = json.dumps(eic_plot)
 
-        _anchor_label = "Seed (untargeted)" if self.untargeted_mode else "Target"
         _target_mz_text = f"{target_mz:.4f}" if target_mz is not None else "n/a"
         _target_rt_text = f"{target_rt:.3f}" if target_rt is not None else "n/a"
         detected_n = compound.get("detected_count", len(series))
+        if self.untargeted_mode:
+            _overview_line = (
+                f"Seed m/z {escape(_target_mz_text)} &middot; "
+                f"Seed RT {escape(_target_rt_text)} min"
+            )
+        else:
+            _overview_line = (
+                f"Target: m/z {escape(_target_mz_text)} &middot; "
+                f"RT {escape(_target_rt_text)} min"
+            )
 
         return f"""<!doctype html>
 <html lang=\"en\">
@@ -1647,7 +1679,7 @@ class HTMLSynthesizer:
       {self._compound_step_nav_html(previous_compound, next_compound)}
     </div>
     <h1>{escape(compound['name'])}</h1>
-    <p class=\"meta\">{escape(_anchor_label)}: m/z {escape(_target_mz_text)} &middot; RT {escape(_target_rt_text)} min &middot; detected in {detected_n} sample(s). Generated: {escape(generated_at)}</p>
+    <p class=\"meta\">{_overview_line} &middot; detected in {detected_n} sample(s). Generated: {escape(generated_at)}</p>
     {self._polarity_meta_html(polarity_label)}
 
     <h2 class=\"section-title\">EIC overlay (most recent darkest)</h2>

@@ -34,7 +34,7 @@ TARGETED_RESULTS_DIR ?= data/results_hilic_pos
 
 # Untargeted smoke: advanced JSON so fixtures named QC_Metab_* still match
 # (preset untargeted filter is "Pooled"; local smoke data uses QC_Metab_ stems).
-UNTARGETED_CONFIG      ?= data/hilic_pipeline_config_untargeted.json
+UNTARGETED_CONFIG      ?= tests/data/hilic_pipeline_config_untargeted.json
 UNTARGETED_RESULTS_DIR ?= data/results_hilic_pos_untargeted
 
 # Optional future CI download location (not required when data is already on disk)

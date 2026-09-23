@@ -39,9 +39,10 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
 
 - **Targeted** matches the method’s compound list. **Untargeted** builds a list
   from the first sample whose name matches the usual filter (`QC_Metab_` or
-  `Pool`).
+  `Pool`). Top N is the largest peaks after dropping likely 13C isotopologues.
 - **Polarity:** Auto locks from the first successful file; Positive/Negative
-  lock before the first sample. One polarity per output folder.
+  lock before the first sample. One polarity per output folder. Opposite-polarity
+  files are skipped; matching files still run.
 - **Project ID:** extra file-name filter. Leave empty to keep only the usual
   sample filter.
 - **Force reprocess:** run again even if that file was already done.
@@ -71,3 +72,4 @@ overwritten. *Fill the CSV of monitored_compounds before a targeted Start for ta
 - [Command line](docs/cli.md) — `metabwatch` flags and JSON
 - [Maintainer / development](docs/MAINTAINER.md) — Python, macOS, CoreMS
 - [Changelog](docs/CHANGELOG.md)
+- [License](LICENSE) — Battelle Memorial Institute 2026; BSD-style terms and DOE / PNNL disclaimer
