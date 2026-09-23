@@ -7,6 +7,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
 ### Added
 
 - Repository `LICENSE`: Battelle Memorial Institute 2026 BSD-style terms and DOE / PNNL disclaimer.
