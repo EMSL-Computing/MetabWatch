@@ -130,9 +130,7 @@ def test_untargeted_calls_add_peak_metrics_after_integrate(
     assert fake.parameters.lc_ms.mass_feature_attribute_filter_dict[
         "gaussian_similarity"
     ]["value"] == 0.7
-    assert fake.parameters.lc_ms.mass_feature_attribute_filter_dict[
-        "tailing_factor"
-    ]["value"] == 1.5
+    assert "tailing_factor" not in fake.parameters.lc_ms.mass_feature_attribute_filter_dict
     assert out.is_file()
     assert list(result["compound_name"]) == ["feature_001", "feature_002"]
 
