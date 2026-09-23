@@ -13,6 +13,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- HILIC untargeted presets no longer drop peaks for tailing factor (`hilic_metab_pnnl` and `hilic_metab_olympic_eclipse01`). Noise-score and Gaussian-similarity keep-rules stay. RP presets still require `tailing_factor` ≤ 1.5.
+- HILIC presets cluster same-mass features within 0.15 min instead of 0.10 min, so one broad hump is not kept as two peaks. RP stays at 0.10 min.
 - Packaged HILIC targeted QC lists no longer monitor Astilbin `[M-H]-` or 3-Hydroxybutyric acid `[M-H]-` (`hilic_metab_pnnl` and `hilic_metab_olympic_eclipse01`). Astilbin `[M+H]+` stays on HILIC. RP lists are unchanged.
 - Untargeted search-space Top N is taken after dropping features CoreMS marks as 13C isotopologues (`find_c13_mass_features`).
 - Untargeted dashboard wording: mass/RT **shift** (not accuracy/error) and **seed** m/z and RT (not target), because there is no theoretical mass. Targeted labels are unchanged.

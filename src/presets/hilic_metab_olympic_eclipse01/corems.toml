@@ -9,7 +9,7 @@ min_peak_datapoints = 2.0
 ph_smooth_it = 0
 ph_inten_min_rel = 0.003
 ph_persis_min_rel = 0.003
-mass_feature_cluster_rt_tolerance = 0.1
+mass_feature_cluster_rt_tolerance = 0.15
 remove_mass_features_by_peak_metrics = true
 verbose_processing = false
 
@@ -24,9 +24,5 @@ operator = ">="
 [LiquidChromatograph.mass_feature_attribute_filter_dict.gaussian_similarity]
 value = 0.7
 operator = ">="
-
-[LiquidChromatograph.mass_feature_attribute_filter_dict.tailing_factor]
-value = 1.5
-operator = "<="
 
 [mass_spectrum]
