@@ -7,7 +7,7 @@ Local fixtures and source lists. Packaged methods live in `src/presets/`, not he
 | File | What it is |
 |------|------------|
 | `original_QC_list.xlsx` | Source HILIC QC list (W. Kew, April 2026) |
-| `QC_Metab_26-06.csv` | Olympic LC / Eclipse 01 QC list (Priscila Lalli, 26 August 2026). Packaged HILIC/RP search spaces use these retention times: omit a compound when this list has no numeric RT for that method, and omit an ion type when `[M+H]+` or `[M-H]-` is not numeric. HILIC targeted lists also omit Hesperetin (both polarities), Syringaldehide (both polarities), and L-Glutamine (negative only). |
+| `QC_Metab_26-06.csv` | Olympic LC / Eclipse 01 QC list (Priscila Lalli, 26 August 2026). Packaged HILIC/RP search spaces use these retention times: omit a compound when this list has no numeric RT for that method, and omit an ion type when `[M+H]+` or `[M-H]-` is not numeric. HILIC targeted lists also omit Hesperetin (both polarities), Syringaldehide (both polarities), L-Glutamine (negative only), Astilbin (negative only), and 3-Hydroxybutyric acid (negative only). |
 
 ## Local only (not in git)
 

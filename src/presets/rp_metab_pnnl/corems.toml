@@ -27,8 +27,4 @@ operator = ">="
 value = 0.7
 operator = ">="
 
-[LiquidChromatograph.mass_feature_attribute_filter_dict.tailing_factor]
-value = 1.5
-operator = "<="
-
 [mass_spectrum]

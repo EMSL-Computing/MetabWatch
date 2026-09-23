@@ -39,7 +39,6 @@ _PEAK_METRIC_FILTERS = {
     "noise_score_max": {"value": 0.8, "operator": ">="},
     "noise_score_min": {"value": 0.5, "operator": ">="},
     "gaussian_similarity": {"value": 0.7, "operator": ">="},
-    "tailing_factor": {"value": 1.5, "operator": "<="},
 }
 _HILIC_PNNL_KEYS = _SHARED_LC_KEYS | {"remove_redundant_mass_features"}
 _HILIC_OLYMPIC_KEYS = set(_SHARED_LC_KEYS)
@@ -89,7 +88,8 @@ def test_preset_toml_loads_on_corems_defaults(method: str) -> None:
     assert lc.ph_smooth_it == 0
     assert lc.ph_inten_min_rel == 0.003
     assert lc.ph_persis_min_rel == 0.003
-    assert lc.mass_feature_cluster_rt_tolerance == 0.1
+    expected_rt_cluster = 0.15 if method.startswith("hilic_") else 0.1
+    assert lc.mass_feature_cluster_rt_tolerance == expected_rt_cluster
     assert lc.remove_mass_features_by_peak_metrics is True
     assert lc.mass_feature_attribute_filter_dict == _PEAK_METRIC_FILTERS
     assert lc.verbose_processing is False
