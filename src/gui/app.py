@@ -322,6 +322,10 @@ class MetabWatchApp(ttk.Frame):
             log_frame, height=16, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 9)
         )
         self.log.grid(row=0, column=0, sticky="nsew")
+        self.save_log_btn = ttk.Button(
+            log_frame, text="Save log", command=self._save_log
+        )
+        self.save_log_btn.grid(row=1, column=0, sticky="w", pady=(4, 0))
         self._attach_hover_notes()
 
     def _attach_hover_notes(self) -> None:
@@ -577,6 +581,29 @@ class MetabWatchApp(ttk.Frame):
         self.log.insert(tk.END, line + "\n")
         self.log.see(tk.END)
         self.log.configure(state=tk.DISABLED)
+
+    def _save_log(self) -> None:
+        """Write the Log panel text to a file the user chooses."""
+        initial = self.output_var.get().strip()
+        dialog_kwargs: dict[str, str] = {}
+        if initial and Path(initial).is_dir():
+            dialog_kwargs["initialdir"] = initial
+        path = filedialog.asksaveasfilename(
+            title="Save log",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile="metabwatch-log.txt",
+            **dialog_kwargs,
+        )
+        if not path:
+            return
+        text = self.log.get("1.0", "end-1c")
+        if text and not text.endswith("\n"):
+            text += "\n"
+        try:
+            Path(path).write_text(text, encoding="utf-8")
+        except OSError as exc:
+            messagebox.showerror("Save log", str(exc))
 
     def _open_dashboard(self) -> None:
         path = self.runner.dashboard_path()

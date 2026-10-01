@@ -35,6 +35,7 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
    until Stop).
 7. **Start**.
 8. **Open dashboard**
+9. **Save log** — write the Log panel to a text file (available during a run).
 
 ### What the options mean
 
