@@ -7,6 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. Build with `packaging\build.ps1` ([BUILDING.md](BUILDING.md)); the build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
+
 ## [0.4.0] - 2026-09-23
 
 ### Added
