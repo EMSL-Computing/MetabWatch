@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from metabwatch.pipeline_queue.polarity import is_polarity_mismatch_error
+
 
 """Manifest-backed persistent state store for pipeline idempotency.
 
@@ -206,9 +208,12 @@ class ManifestStateStore:
     def should_process(self, raw_file: Path) -> bool:
         """Return True when the file should be processed.
 
-        A file should be processed when there is no manifest entry, when the
-        fingerprint changed, or when the last recorded status is not
-        `completed`.
+        A file should be processed when there is no manifest entry, or when
+        its fingerprint changed. An unchanged file is skipped after it
+        completes, and after it fails because its polarity does not match the
+        locked run. Other failures stay eligible so a later poll can retry
+        them. Callers that pass ``--force-reprocess`` enqueue on startup
+        before this check, so a forced run still tries a polarity mismatch.
         """
         key = str(raw_file.resolve())
         entry = self._entries.get(key)
@@ -217,6 +222,8 @@ class ManifestStateStore:
         fingerprint, _, _ = self.fingerprint(raw_file)
         if entry.fingerprint != fingerprint:
             return True
+        if entry.status == "failed" and is_polarity_mismatch_error(entry.error):
+            return False
         return entry.status != "completed"
 
     def mark_in_progress(self, raw_file: Path) -> ManifestEntry:

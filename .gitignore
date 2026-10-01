@@ -14,6 +14,12 @@ build/
 dist/
 *.egg
 
+# Standalone exe build (packaging/build.ps1); the committed spec lives in
+# packaging/, so ignore any auto-generated specs at the repo root.
+.venv-build/
+.venv-*/
+/*.spec
+
 # Local env overrides (optional)
 .env
 venv/

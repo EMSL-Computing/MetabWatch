@@ -113,10 +113,11 @@ the CSV to rebuild.
 ## One polarity per results folder
 
 Set `--polarity` / JSON `polarity`, or leave unset (Auto). One output folder is
-one polarity. Opposite-polarity files are skipped. If polarity was set up front,
-matching files in the same batch still run. If polarity is Auto, a mixed batch
-stops after the first mismatch. Use separate input and output folders for
-positive and negative.
+one polarity. Opposite-polarity files are skipped and are not tried again
+unless the file changes on disk or you pass `--force-reprocess`. If polarity
+was set up front, matching files in the same batch still run. If polarity is
+Auto, a mixed batch stops after the first mismatch. Use separate input and
+output folders for positive and negative.
 
 ## Results
 
