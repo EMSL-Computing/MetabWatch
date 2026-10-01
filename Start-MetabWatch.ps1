@@ -2,6 +2,7 @@
 #
 # Desktop shortcut Target example (name the shortcut with the version, e.g. "MetabWatch 0.2.0"):
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\repo\Start-MetabWatch.ps1"
+# Extra arguments are passed to the GUI, e.g. append --no-log-timestamps.
 
 $ErrorActionPreference = "Stop"
 
@@ -54,7 +55,7 @@ Write-Host ""
 Set-Location -LiteralPath $AppDir
 
 try {
-    Start-Process -FilePath $Launcher -ArgumentList @("-m", "metabwatch.gui") -WorkingDirectory $AppDir
+    Start-Process -FilePath $Launcher -ArgumentList (@("-m", "metabwatch.gui") + $args) -WorkingDirectory $AppDir
 }
 catch {
     Stop-WithError "Failed to start MetabWatch GUI:`n$($_.Exception.Message)"

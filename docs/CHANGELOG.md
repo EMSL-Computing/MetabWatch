@@ -7,6 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- GUI Log panel lines start with the time (`HH:MM:SS`); each run's `---` line and the first line after midnight also show the date. Turn off with `--no-log-timestamps` (`metabwatch-gui`, `Start-MetabWatch.ps1`).
+
 ## [0.4.0] - 2026-09-23
 
 ### Added

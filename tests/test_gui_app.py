@@ -148,3 +148,50 @@ def test_starter_dialog_attaches_hover_notes() -> None:
         dialog.destroy()
     finally:
         root.destroy()
+
+
+def test_stamp_log_line_time_only_within_same_day() -> None:
+    from datetime import date, datetime
+
+    from metabwatch.gui.app import _stamp_log_line
+
+    now = datetime(2026, 10, 1, 14, 3, 22)
+    line, last = _stamp_log_line("hello", now, date(2026, 10, 1))
+    assert line == "14:03:22 hello"
+    assert last == date(2026, 10, 1)
+
+
+def test_stamp_log_line_includes_date_on_first_line_rollover_and_separator() -> None:
+    from datetime import date, datetime
+
+    from metabwatch.gui.app import _stamp_log_line
+
+    now = datetime(2026, 10, 2, 0, 0, 5)
+    assert _stamp_log_line("first", now, None)[0] == "2026-10-02 00:00:05 first"
+    assert _stamp_log_line("next day", now, date(2026, 10, 1))[0] == (
+        "2026-10-02 00:00:05 next day"
+    )
+    assert _stamp_log_line("---", now, date(2026, 10, 2), separator=True)[0] == (
+        "2026-10-02 00:00:05 ---"
+    )
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_gui_log_timestamps_toggle(enabled: bool) -> None:
+    import re
+
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    try:
+        app = MetabWatchApp(root, log_timestamps=enabled)
+        app._append_log("first")
+        app._append_log("second")
+        lines = app.log.get("1.0", "end-1c").splitlines()
+        if enabled:
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} first", lines[0])
+            assert re.fullmatch(r"\d{2}:\d{2}:\d{2} second", lines[1])
+        else:
+            assert lines == ["first", "second"]
+    finally:
+        root.destroy()

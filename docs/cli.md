@@ -146,6 +146,15 @@ still load. Do not mix old and new keys in one file.
 | `search_space.mode` | `targeted` (`true` / `false`) |
 | `watcher.sample_name_regex` | `sample_name_regex` |
 
+## GUI options
+
+`metabwatch-gui` (or `python -m metabwatch.gui`) accepts:
+
+| Flag | Meaning |
+|------|---------|
+| `--config PATH` | Open in Custom JSON mode with this config selected. |
+| `--no-log-timestamps` | Do not prefix Log panel lines with the time. By default each line starts with `HH:MM:SS`, and the full date is shown on each run's `---` line and after midnight. |
+
 ## Developers
 
 ```bash
