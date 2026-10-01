@@ -54,7 +54,15 @@ How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin`
    ```
    Optionally create a GitLab **Release** from the tag in the UI (notes = the changelog section). Tags alone are enough if you do not use Releases.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
-9. Lab machines: `git pull`, **always** reinstall into the lab venv (`pip install .` or `pip install -e .`) so package data is present, then create a new versioned desktop shortcut per [INSTALL.md](INSTALL.md) (e.g. `MetabWatch X.Y.Z`). A `git pull` alone is not enough if the install is stale.
+9. **Build the exe** from the tag on a Windows build PC (see [BUILDING.md](BUILDING.md)):
+   ```powershell
+   git checkout vX.Y.Z
+   .\packaging\build.ps1 -Clean
+   ```
+   The build must end with the self-test passing. Smoke-test `dist\MetabWatch-X.Y.Z.exe` on real `.raw` files (one targeted and one untargeted run), then attach `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256` to the GitLab **Release** for the tag, and/or copy them to the lab share.
+10. Lab machines:
+    - **Exe installs:** copy the new exe to the PC and make a new versioned shortcut per [INSTALL.md](INSTALL.md#standalone-exe-recommended).
+    - **Source installs:** `git pull`, then **always** reinstall into the lab venv (`pip install .` or `pip install -e .`) so package data is present, then create a new versioned desktop shortcut (e.g. `MetabWatch X.Y.Z`). A `git pull` alone is not enough if the install is stale.
 
 ### Offline dashboard assets (when relevant)
 
@@ -103,4 +111,8 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 - [ ] MR into `main` opened and merged
 - [ ] Annotated tag `vX.Y.Z` pushed to `origin`
 - [ ] `dev` updated from `main` if needed
-- [ ] Lab machines: `git pull` + `pip install .` (or `pip install -e .`) + versioned shortcut per [INSTALL.md](INSTALL.md)
+- [ ] If dependencies changed: `packaging/requirements-build.txt` refreshed ([BUILDING.md](BUILDING.md#dependencies-changed))
+- [ ] `packaging\build.ps1 -Clean` from the tag; self-test PASS; exe smoke-tested on real `.raw` files
+- [ ] `MetabWatch-X.Y.Z.exe` + `.sha256` attached to the GitLab Release / copied to the lab share
+- [ ] *(Optional, for offline source installs)* `MetabWatch-X.Y.Z-offline.zip` built per [INSTALL.md](INSTALL.md#offline-pcs-no-internet)
+- [ ] Lab machines: new exe + versioned shortcut (or, for source installs, `git pull` + `pip install .` + shortcut) per [INSTALL.md](INSTALL.md)

@@ -10,7 +10,8 @@ Lab use is the **MetabWatch** window. Command line: [docs/cli.md](docs/cli.md).
 ### **Windows (recommended):** 
 
 Double-click the desktop shortcut (named with the version,
-e.g. `MetabWatch 0.3.0`), or `Start-MetabWatch.ps1` in the repo folder.
+e.g. `MetabWatch 0.4.0`). Lab PCs run the standalone `MetabWatch-X.Y.Z.exe`,
+which needs no Python. Source installs use `Start-MetabWatch.ps1` in the repo folder.
 
 Or run `metabwatch-gui` from the command line within an appropriately configured Python environment.
 
@@ -69,6 +70,7 @@ overwritten. *Fill the CSV of monitored_compounds before a targeted Start for ta
 ## More
 
 - [Windows install](docs/INSTALL.md) — lab PC, shortcut
+- [Building the Windows exe](docs/BUILDING.md) — maintainers
 - [Command line](docs/cli.md) — `metabwatch` flags and JSON
 - [Maintainer / development](docs/MAINTAINER.md) — Python, macOS, CoreMS
 - [Changelog](docs/CHANGELOG.md)
