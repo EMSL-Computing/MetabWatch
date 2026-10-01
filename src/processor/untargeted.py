@@ -178,7 +178,6 @@ def build_untargeted_search_space(
         mz_tolerance_ppm=mz_tolerance_ppm,
     )
 
-    print(f"[untargeted] parsing raw file: {raw_file}")
     try:
         parser = ImportMassSpectraThermoMSFileReader(raw_file)
         skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)

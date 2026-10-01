@@ -13,6 +13,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - GUI **Save log** writes the Log panel to a text file. The button stays available while a run is going. If an output folder is already chosen, the save dialog starts there.
 - Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. Build with `packaging\build.ps1` ([BUILDING.md](BUILDING.md)); the build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
 
+### Changed
+
+- Watch and process logs are shorter. Each sample is the file name, then one line such as `15 of 15 matched`. A polarity mismatch is one `Skipped` line. Paths are plain text in the GUI (terminal runs still get clickable links). After a batch the log says it is waiting, then stays quiet for an hour unless a new file arrives. Empty progress bars are not written.
+
 ### Fixed
 
 - Watch mode no longer reprocesses an unchanged `.raw` file after it fails the polarity lock. The file is tried again only if it changes on disk or the run uses `--force-reprocess`.
