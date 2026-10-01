@@ -114,4 +114,5 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 - [ ] If dependencies changed: `packaging/requirements-build.txt` refreshed ([BUILDING.md](BUILDING.md#dependencies-changed))
 - [ ] `packaging\build.ps1 -Clean` from the tag; self-test PASS; exe smoke-tested on real `.raw` files
 - [ ] `MetabWatch-X.Y.Z.exe` + `.sha256` attached to the GitLab Release / copied to the lab share
+- [ ] *(Optional, for offline source installs)* `MetabWatch-X.Y.Z-offline.zip` built per [INSTALL.md](INSTALL.md#offline-pcs-no-internet)
 - [ ] Lab machines: new exe + versioned shortcut (or, for source installs, `git pull` + `pip install .` + shortcut) per [INSTALL.md](INSTALL.md)

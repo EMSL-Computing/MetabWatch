@@ -126,11 +126,16 @@ one of them, delete it from the list. To check what is really imported:
 
 ## Offline build
 
-On a machine with internet access:
+On a machine with internet access and the same Python version (3.13):
 
 ```powershell
-py -3.13 -m pip download -r packaging\requirements-build.txt -d D:\mw-wheels
+py -3.13 -m pip wheel -r packaging\requirements-build.txt wheel -w D:\mw-wheels
 ```
+
+Use `pip wheel`, not `pip download`. One dependency (`hopcroftkarp`) is
+published only as source, and `pip wheel` builds it here. The extra `wheel`
+package is needed because `build.ps1` builds MetabWatch from the repo, and
+`pyproject.toml` lists it as a build requirement.
 
 Copy `D:\mw-wheels` to the build PC, then run:
 
