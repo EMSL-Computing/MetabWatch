@@ -109,8 +109,8 @@ def _sample_ignore_reason(
     """Return why a sample is ignored, or None when both filters pass.
 
     The preset/config regex (``QC_Metab_`` / ``Pool``) is always applied when
-    set. A non-empty ``project_id`` is an extra case-insensitive substring
-    on the filename stem; both must pass.
+    set. A non-empty run filter (``project_id``) is an extra case-insensitive
+    substring on the filename stem; both must pass.
     """
     if sample_regex is not None and not sample_regex.search(raw_file.stem):
         return "sample_name_regex no match"
@@ -125,7 +125,7 @@ def _sample_allowed(
     sample_regex: re.Pattern[str] | None,
     project_id: str = "",
 ) -> bool:
-    """Return True when a sample passes regex and optional project-id filters."""
+    """Return True when a sample passes the regex and optional run filter."""
     return _sample_ignore_reason(raw_file, sample_regex, project_id) is None
 
 
@@ -158,7 +158,7 @@ def _files_queued_line(count: int, *, force: bool) -> str:
 
 def _ignored_line(name: str, reason: str) -> str:
     if reason == "project_id no match":
-        return f"Ignored {name}: name does not contain the project ID"
+        return f"Ignored {name}: name does not contain the run filter"
     return f"Ignored {name}: name does not match the sample filter"
 
 
@@ -485,7 +485,7 @@ def run_watch_mode(
             print(f"Run locked to {state_store.get_run_polarity()}.")
         if config.watcher.project_id:
             print(
-                "Only files whose name contains "
+                "Run filter: only files whose name contains "
                 f"{config.watcher.project_id!r}."
             )
         print(f"Dashboard: {_clickable_path(config.synthesizer.html_output)}")
@@ -868,8 +868,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         dest="project_id",
         help=(
-            "Optional filename-stem substring (batch / project). Combined "
-            "with the preset sample-name filter (QC_Metab_ / Pool). Omit or "
+            "Run filter. Optional text the file name must contain "
+            "(not case-sensitive), in addition to the sample-name filter "
+            "(QC_Metab_ / Pool). Same as the GUI Run filter field. Omit or "
             "leave empty for no extra filter. For --config, set project_id "
             "in the JSON."
         ),

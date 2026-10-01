@@ -86,8 +86,8 @@ class WatcherConfig:
     sample_name_regex : str | None
         Optional regex applied to raw filename stem to decide processing.
     project_id : str
-        Optional case-insensitive substring of the filename stem. Empty
-        means no extra filter; the regex still applies.
+        Optional run filter: case-insensitive substring of the filename
+        stem. Empty means no extra filter; the regex still applies.
     discovery_mode : str
         How new files are discovered: ``hybrid`` (watchdog + fallback poll,
         default), ``watchdog`` (FS events + startup scan only), or ``poll``
@@ -327,7 +327,7 @@ def _normalize_optional_polarity(value: Any, *, context: str) -> str | None:
 
 
 def _normalize_project_id(value: Any) -> str:
-    """Return a stripped project-id substring, or empty when unset."""
+    """Return a stripped run-filter substring, or empty when unset."""
     if value is None:
         return ""
     return str(value).strip()

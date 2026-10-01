@@ -62,9 +62,11 @@ polarity  (optional)
     Auto in Create custom config does not write this key.
 
 project_id  (optional)
-    Only process files whose name contains this text (not case-sensitive).
-    Omit this key, or use an empty string, for no extra filter. The
-    sample-name filter still applies.
+    Run filter. Only process files whose name contains this text
+    (not case-sensitive). This is the Run filter field in the window
+    and --project-id on the command line. Omit this key, or use an
+    empty string, for no extra filter. The sample-name filter still
+    applies.
 
 qc_compounds  (targeted only)
     Path to monitored_compounds.csv in this folder. Fill that CSV

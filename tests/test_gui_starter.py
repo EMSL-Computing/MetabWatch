@@ -255,6 +255,8 @@ def test_starter_readme_tells_operator_to_fill_csv(tmp_path: Path) -> None:
     assert "negative" in text
     assert "blank template" in text
     assert CONFIG_FILENAME in text
+    assert "project_id" in text
+    assert "Run filter" in text
     assert "sample_name_regex" in text
     assert "QC_Metab_(.+)" in text
     assert "(?i)Pool" in text
