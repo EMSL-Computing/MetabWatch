@@ -11,6 +11,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. Build with `packaging\build.ps1` ([BUILDING.md](BUILDING.md)); the build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
 
+### Fixed
+
+- Watch mode no longer reprocesses an unchanged `.raw` file after it fails the polarity lock. The file is tried again only if it changes on disk or the run uses `--force-reprocess`.
+
 ## [0.4.0] - 2026-09-23
 
 ### Added
