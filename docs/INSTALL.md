@@ -17,8 +17,9 @@ There are two ways to install:
 
 ## Standalone exe (recommended)
 
-Get `MetabWatch-X.Y.Z.exe` (and its `.sha256`) from the GitLab Release or the
-lab share. Maintainers build it with [BUILDING.md](BUILDING.md).
+Get `MetabWatch-X.Y.Z.exe` (and its `.sha256`) from the GitHub Release for
+that version, or from the lab share. A version tag builds it
+([RELEASING.md](RELEASING.md)). [BUILDING.md](BUILDING.md) is the manual build.
 
 1. Copy the exe to a folder on the PC's **local** disk, for example
    `C:\MetabWatch\`. Do **not** run it straight from a network share: .NET

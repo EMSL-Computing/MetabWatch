@@ -3,7 +3,6 @@ name: Build Windows exe
 on:
   push:
     tags: ["v*"]
-    branches: [dev]        # TEMPORARY for testing: remove before the real release
   workflow_dispatch:
 
 permissions:
