@@ -21,6 +21,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Watch mode no longer reprocesses an unchanged `.raw` file after it fails the polarity lock. The file is tried again only if it changes on disk or the run uses `--force-reprocess`.
+- Watch mode skips a `.raw` file whose name is an already recorded file plus a leading `x_` when they are in the same folder and the same size. A different size is processed. `--force-reprocess` still runs a lone `x_` file, and runs the name without `x_` when both are present.
 
 ## [0.4.0] - 2026-09-23
 

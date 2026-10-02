@@ -162,6 +162,41 @@ def _ignored_line(name: str, reason: str) -> str:
     return f"Ignored {name}: name does not match the sample filter"
 
 
+def _same_run_skip_line(name: str, other_name: str) -> str:
+    return f"Skipped {name}: same run as {other_name}"
+
+
+def _note_same_run_skip(raw_file: Path, other: Path, announced: set[str]) -> None:
+    """Print a same-run skip once per path for this process."""
+    key = str(raw_file.resolve())
+    if key in announced:
+        return
+    announced.add(key)
+    print(_same_run_skip_line(raw_file.name, other.name))
+
+
+def _unprefixed_twin_present(raw_file: Path, present: set[Path]) -> Path | None:
+    """Return the on-disk name without a leading ``x_`` when it is the same size.
+
+    Only the spelling that starts with ``x_`` is dropped, and only when that
+    other file is in ``present``. A different size is a different file.
+    """
+    if not raw_file.name.startswith("x_"):
+        return None
+    other = ManifestStateStore.other_spelling(raw_file)
+    if other is None:
+        return None
+    other_key = other.resolve()
+    if other_key not in present:
+        return None
+    try:
+        if raw_file.stat().st_size != other_key.stat().st_size:
+            return None
+    except OSError:
+        return None
+    return other_key
+
+
 def _sample_result_line(result: ProcessResult, *, locked: bool) -> str:
     if result.targets is not None:
         body = f"{result.rows} of {result.targets} matched"
@@ -491,10 +526,12 @@ def run_watch_mode(
         print(f"Dashboard: {_clickable_path(config.synthesizer.html_output)}")
 
         forced_enqueued: set[Path] = set()
+        announced_same_run: set[str] = set()
 
         # Startup reconciliation: files written while MetabWatch was offline.
         reconcile_files = watcher.list_current_raw_files()
         watcher.register_many(reconcile_files)
+        present = {path.resolve() for path in reconcile_files}
 
         if force_reprocess or not state_store.has_entries():
             bootstrap_files = reconcile_files
@@ -505,6 +542,10 @@ def run_watch_mode(
                 )
                 if reason:
                     print(_ignored_line(raw_file.name, reason))
+                    continue
+                twin = _unprefixed_twin_present(raw_file, present)
+                if twin is not None:
+                    _note_same_run_skip(raw_file, twin, announced_same_run)
                     continue
                 if force_reprocess or state_store.should_process(raw_file):
                     queue.enqueue(raw_file)
@@ -526,20 +567,28 @@ def run_watch_mode(
             if observer is not None:
                 watcher.register_many(observer.drain())
 
-            for raw_file in watcher.get_stable_new_files(
+            stable_files = watcher.get_stable_new_files(
                 scan_directory=scan_each_cycle
-            ):
+            )
+            present = {path.resolve() for path in stable_files}
+            for raw_file in stable_files:
                 reason = _sample_ignore_reason(
                     raw_file, sample_regex, config.watcher.project_id
                 )
                 if reason:
                     print(_ignored_line(raw_file.name, reason))
                     continue
+                twin = _unprefixed_twin_present(raw_file, present)
+                if twin is not None:
+                    _note_same_run_skip(raw_file, twin, announced_same_run)
+                    continue
                 if force_reprocess and raw_file in forced_enqueued:
                     continue
                 if not state_store.should_process(raw_file):
-                    if force_reprocess:
-                        continue
+                    if not force_reprocess:
+                        other = state_store.same_run_block(raw_file)
+                        if other is not None:
+                            _note_same_run_skip(raw_file, other, announced_same_run)
                     continue
                 queue.enqueue(raw_file)
                 if force_reprocess:
