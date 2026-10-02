@@ -107,15 +107,18 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 
 ## Checklist
 
-- [ ] Changelog section for `X.Y.Z` written (from `main..dev`)
-- [ ] `pyproject.toml` version = `X.Y.Z`
-- [ ] `src/__init__.py` `_FALLBACK_VERSION` = `X.Y.Z`
-- [ ] If dashboard/packaging changed: vendored `src/synthesis/static/plotly-*.min.js` present, filename pin matches, `package-data` still includes `static/*`
-- [ ] MR into `main` opened and merged
-- [ ] Annotated tag `vX.Y.Z` created on GitLab and pushed to `origin` (the mirror copies it to GitHub)
-- [ ] `dev` updated from `main` if needed
-- [ ] If dependencies changed: `packaging/requirements-build.txt` refreshed ([BUILDING.md](BUILDING.md#dependencies-changed))
-- [ ] **Build Windows exe** workflow green; draft GitHub Release has `MetabWatch-X.Y.Z.exe` and `.sha256`
-- [ ] Checksum matches; exe smoke-tested on real `.raw` files; draft published (and copied to the lab share if you use one)
-- [ ] *(Optional, for offline source installs)* `MetabWatch-X.Y.Z-offline.zip` built per [INSTALL.md](INSTALL.md#offline-pcs-no-internet)
-- [ ] Lab machines: new exe + versioned shortcut (or, for source installs, `git pull` + `pip install .` + shortcut) per [INSTALL.md](INSTALL.md)
+Do these in order. The commands are in [Cut a release](#cut-a-release) above.
+
+- [ ] On `dev`, write `## [X.Y.Z]` in `docs/CHANGELOG.md` from `main..dev`. Move shipping notes out of `## [Unreleased]`.
+- [ ] Set `X.Y.Z` in both `pyproject.toml` and `src/__init__.py` `_FALLBACK_VERSION`.
+- [ ] Dependencies changed: refresh `packaging/requirements-build.txt` ([BUILDING.md](BUILDING.md#dependencies-changed)). Skip if they did not.
+- [ ] Dashboard or packaging changed: the vendored Plotly file, the filename pin, and `static/*` in `package-data` still match. Skip if they did not.
+- [ ] Merge the release MR from `dev` into `main`.
+- [ ] On `main`, create annotated tag `vX.Y.Z` and push it to GitLab (`git push origin main --tags`).
+- [ ] Merge `main` back into `dev`.
+- [ ] On GitHub, wait until **Build Windows exe** is green. The draft release contains `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`.
+- [ ] Download both files and confirm the checksum matches.
+- [ ] Smoke-test the exe on one targeted `.raw` run and one untargeted run.
+- [ ] Publish the draft. Copy both files to the lab share if the lab uses one.
+- [ ] Update each lab PC per [INSTALL.md](INSTALL.md): new exe and shortcut, or `git pull`, `pip install .`, and a new shortcut.
+- [ ] A lab PC installs from source with no internet: build `MetabWatch-X.Y.Z-offline.zip` ([INSTALL.md](INSTALL.md#offline-pcs-no-internet)). Skip if none do.
