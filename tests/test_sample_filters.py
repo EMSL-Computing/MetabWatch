@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from metabwatch.pipeline import _compile_sample_regex, _sample_allowed, _sample_ignore_reason
+from metabwatch.pipeline import (
+    _compile_sample_regex,
+    _ignored_line,
+    _sample_allowed,
+    _sample_ignore_reason,
+)
 from metabwatch.presets import build_pipeline_config
 
 
@@ -32,6 +37,15 @@ def test_project_id_and_pool_regex() -> None:
     # Same project id but missing Pool — still rejected by the regex.
     assert not _sample_allowed(qc_same_batch, POOL, "25-02")
     assert _sample_ignore_reason(qc_same_batch, POOL, "25-02") == "sample_name_regex no match"
+
+
+def test_ignored_line_names_the_run_filter() -> None:
+    assert _ignored_line("Pool_other.raw", "project_id no match") == (
+        "Ignored Pool_other.raw: name does not contain the run filter"
+    )
+    assert _ignored_line("Sample_01.raw", "sample_name_regex no match") == (
+        "Ignored Sample_01.raw: name does not match the sample filter"
+    )
 
 
 def test_project_id_case_insensitive() -> None:

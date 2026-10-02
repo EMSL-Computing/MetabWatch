@@ -238,7 +238,7 @@ def build_starter_payload(dest_dir: Path, settings: StarterSettings) -> dict[str
         payload["polarity"] = settings.polarity
     project_id = str(settings.project_id or "").strip()
     if project_id:
-        payload["project_id"] = project_id
+        payload["run-filter"] = project_id
     if settings.targeted:
         payload["qc_compounds"] = str((dest / COMPOUNDS_CSV_FILENAME).resolve())
     else:

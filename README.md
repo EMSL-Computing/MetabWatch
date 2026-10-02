@@ -10,7 +10,8 @@ Lab use is the **MetabWatch** window. Command line: [docs/cli.md](docs/cli.md).
 ### **Windows (recommended):** 
 
 Double-click the desktop shortcut (named with the version,
-e.g. `MetabWatch 0.3.0`), or `Start-MetabWatch.ps1` in the repo folder.
+e.g. `MetabWatch 0.4.0`). Lab PCs run the standalone `MetabWatch-X.Y.Z.exe`,
+which needs no Python. Source installs use `Start-MetabWatch.ps1` in the repo folder.
 
 Or run `metabwatch-gui` from the command line within an appropriately configured Python environment.
 
@@ -28,12 +29,13 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
 2. **Search** — Targeted (packaged QC list) or Untargeted (peak list from the
    first matching sample).
 3. **Polarity** — Auto (detects from first sample and locks in the rest), Positive, or Negative.
-4. **Project ID** (optional) — only files whose name contains this text.
+4. **Run filter** (optional) — only files whose name contains this text.
 5. **Input folder** / **Output folder**.
 6. **Process once** (what is already there) or **Watch continuously** (new files
    until Stop).
 7. **Start**.
 8. **Open dashboard**
+9. **Save log** — write the Log panel to a text file (available during a run).
 
 ### What the options mean
 
@@ -43,8 +45,9 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
 - **Polarity:** Auto locks from the first successful file; Positive/Negative
   lock before the first sample. One polarity per output folder. Opposite-polarity
   files are skipped; matching files still run.
-- **Project ID:** extra file-name filter. Leave empty to keep only the usual
-  sample filter.
+- **Run filter:** extra file-name filter. Leave empty to keep only the usual
+  sample filter. In a config file this is `run-filter`; on the command line
+  it is `--run-filter`.
 - **Force reprocess:** run again even if that file was already done.
 
 Do not mix positive and negative into one output folder. If polarity is set up
@@ -69,6 +72,7 @@ overwritten. *Fill the CSV of monitored_compounds before a targeted Start for ta
 ## More
 
 - [Windows install](docs/INSTALL.md) — lab PC, shortcut
+- [Building the Windows exe](docs/BUILDING.md) — maintainers
 - [Command line](docs/cli.md) — `metabwatch` flags and JSON
 - [Maintainer / development](docs/MAINTAINER.md) — Python, macOS, CoreMS
 - [Changelog](docs/CHANGELOG.md)

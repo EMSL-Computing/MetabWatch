@@ -100,7 +100,7 @@ def test_resolve_preset_project_id(tmp_path: Path) -> None:
             str(tmp_path / "raw"),
             "--output",
             str(tmp_path / "out"),
-            "--project-id",
+            "--run-filter",
             "25-02",
         ]
     )
@@ -114,11 +114,11 @@ def test_resolve_rejects_project_id_with_config(tmp_path: Path) -> None:
         [
             "--config",
             str(tmp_path / "c.json"),
-            "--project-id",
+            "--run-filter",
             "25-02",
         ]
     )
-    with pytest.raises(ValueError, match="project"):
+    with pytest.raises(ValueError, match="run-filter"):
         resolve_config_from_args(ns)
 
 

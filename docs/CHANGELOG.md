@@ -7,6 +7,25 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-02
+
+### Added
+
+- GUI Log panel lines start with the time (`HH:MM:SS`); each run's `---` line and the first line after midnight also show the date. Turn off with `--no-log-timestamps` (`metabwatch-gui`, `Start-MetabWatch.ps1`).
+- GUI **Save log** writes the Log panel to a text file. The button stays available while a run is going. If an output folder is already chosen, the save dialog starts there.
+- Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. A version tag builds it and attaches the exe and `.sha256` to a draft GitHub Release ([RELEASING.md](RELEASING.md)). The build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
+- Source installs on a PC with no internet can use a wheelhouse plus the Python installer. Build the wheelhouse with `pip wheel` so `hopcroftkarp` is included. See [INSTALL.md](INSTALL.md#offline-pcs-no-internet).
+
+### Changed
+
+- Watch and process logs are shorter. Each sample is the file name, then one line such as `15 of 15 matched`. A polarity mismatch is one `Skipped` line. Paths are plain text in the GUI (terminal runs still get clickable links). After a batch the log says it is waiting, then stays quiet for an hour unless a new file arrives. Empty progress bars are not written.
+- The GUI field **Project ID** is now **Run filter** (main window and Create custom config). Hover notes, the watch log, the README, command-line help, and the custom-config README use that name. The JSON key is `run-filter` and the flag is `--run-filter`. Older `project_id` keys and `--project-id` are not read.
+
+### Fixed
+
+- Watch mode no longer reprocesses an unchanged `.raw` file after it fails the polarity lock. The file is tried again only if it changes on disk or the run uses `--force-reprocess`.
+- Watch mode skips a `.raw` file whose name is an already recorded file plus a leading `x_` when they are in the same folder and the same size. A different size is processed. `--force-reprocess` still runs a lone `x_` file, and runs the name without `x_` when both are present.
+
 ## [0.4.0] - 2026-09-23
 
 ### Added

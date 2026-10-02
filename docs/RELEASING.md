@@ -1,6 +1,6 @@
 # Releasing MetabWatch
 
-How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin` → `code.emsl.pnl.gov`). Keep this process simple: human-edited changelog, version bump only at release time, one merge request into `main`.
+How maintainers cut a versioned release. Day-to-day work stays on **internal GitLab** (`origin` → `code.emsl.pnl.gov`). The published release is the **GitHub Release** on `EMSL-Computing/MetabWatch`. Create the version tag on GitLab and push it; the mirror already copies tags to GitHub. There is no GitLab Release for a version. Keep the process simple: human-edited changelog, version bump only at release time, one merge request into `main`.
 
 ## Day-to-day
 
@@ -52,9 +52,19 @@ How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin`
    git tag -a vX.Y.Z -m "MetabWatch X.Y.Z"
    git push origin main --tags
    ```
-   Optionally create a GitLab **Release** from the tag in the UI (notes = the changelog section). Tags alone are enough if you do not use Releases.
+   That push creates the tag on GitLab. The mirror copies `main` and the tag to GitHub. The **Build Windows exe** workflow then runs `packaging/build.ps1 -Clean`, including the exe `--self-test`, and opens a **draft** GitHub Release titled `MetabWatch X.Y.Z` with `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`. Notes are the `## [X.Y.Z]` section of [CHANGELOG.md](CHANGELOG.md). Publish that draft after the checks in step 9. A push to `dev` does not start this build. [BUILDING.md](BUILDING.md) covers building the exe by hand on Windows.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
-9. Lab machines: `git pull`, **always** reinstall into the lab venv (`pip install .` or `pip install -e .`) so package data is present, then create a new versioned desktop shortcut per [INSTALL.md](INSTALL.md) (e.g. `MetabWatch X.Y.Z`). A `git pull` alone is not enough if the install is stale.
+9. On that draft GitHub Release, before you publish it:
+   - Download the exe and the `.sha256` file. The `.sha256` file is the fingerprint the build wrote for that exe: a lowercase hash, two spaces, then the file name. Hash the downloaded exe and compare it with the hash in the file. The same hash means the download is the file CI built. The two lines from this command should match (`Get-FileHash` prints uppercase, so the first line is lowercased):
+     ```powershell
+     (Get-FileHash .\MetabWatch-X.Y.Z.exe -Algorithm SHA256).Hash.ToLower()
+     (Get-Content .\MetabWatch-X.Y.Z.exe.sha256).Split()[0]
+     ```
+   - Smoke-test the exe on real `.raw` files (one targeted run and one untargeted run).
+   - Publish the draft. Copy both files to the lab share if that is how the lab PCs get them.
+10. Lab machines:
+    - **Exe installs:** copy the new exe to the PC and make a new versioned shortcut per [INSTALL.md](INSTALL.md#standalone-exe-recommended).
+    - **Source installs:** `git pull`, then **always** reinstall into the lab venv (`pip install .` or `pip install -e .`) so package data is present, then create a new versioned desktop shortcut (e.g. `MetabWatch X.Y.Z`). A `git pull` alone is not enough if the install is stale.
 
 ### Offline dashboard assets (when relevant)
 
@@ -96,11 +106,18 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 
 ## Checklist
 
-- [ ] Changelog section for `X.Y.Z` written (from `main..dev`)
-- [ ] `pyproject.toml` version = `X.Y.Z`
-- [ ] `src/__init__.py` `_FALLBACK_VERSION` = `X.Y.Z`
-- [ ] If dashboard/packaging changed: vendored `src/synthesis/static/plotly-*.min.js` present, filename pin matches, `package-data` still includes `static/*`
-- [ ] MR into `main` opened and merged
-- [ ] Annotated tag `vX.Y.Z` pushed to `origin`
-- [ ] `dev` updated from `main` if needed
-- [ ] Lab machines: `git pull` + `pip install .` (or `pip install -e .`) + versioned shortcut per [INSTALL.md](INSTALL.md)
+Do these in order. The commands are in [Cut a release](#cut-a-release) above.
+
+- [ ] On `dev`, write `## [X.Y.Z]` in `docs/CHANGELOG.md` from `main..dev`. Move shipping notes out of `## [Unreleased]`.
+- [ ] Set `X.Y.Z` in both `pyproject.toml` and `src/__init__.py` `_FALLBACK_VERSION`.
+- [ ] Dependencies changed: refresh `packaging/requirements-build.txt` ([BUILDING.md](BUILDING.md#dependencies-changed)). Skip if they did not.
+- [ ] Dashboard or packaging changed: the vendored Plotly file, the filename pin, and `static/*` in `package-data` still match. Skip if they did not.
+- [ ] Merge the release MR from `dev` into `main`.
+- [ ] On `main`, create annotated tag `vX.Y.Z` and push it to GitLab (`git push origin main --tags`).
+- [ ] Merge `main` back into `dev`.
+- [ ] On GitHub, wait until **Build Windows exe** is green. The draft release contains `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`.
+- [ ] Download the exe and the `.sha256` file. Hash the exe and confirm it equals the hash in that file (the download matches the file CI built).
+- [ ] Smoke-test the exe on one targeted `.raw` run and one untargeted run.
+- [ ] Publish the draft. Copy both files to the lab share if the lab uses one.
+- [ ] Update each lab PC per [INSTALL.md](INSTALL.md): new exe and shortcut, or `git pull`, `pip install .`, and a new shortcut.
+- [ ] A lab PC installs from source with no internet: build `MetabWatch-X.Y.Z-offline.zip` ([INSTALL.md](INSTALL.md#offline-pcs-no-internet)). Skip if none do.

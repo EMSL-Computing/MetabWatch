@@ -29,7 +29,7 @@ def test_hover_tooltip_can_be_constructed() -> None:
 
     root = _tk_root()
     try:
-        label = ttk.Label(root, text="Project ID")
+        label = ttk.Label(root, text="Run filter")
         tip = HoverTooltip(label, "Optional. Only process files whose name contains this text.")
         assert tip.delay_ms == 500
         assert tip._tip is None
@@ -48,7 +48,7 @@ def test_hover_tooltip_shown_label_has_dark_text() -> None:
 
     root = _tk_root()
     try:
-        label = ttk.Label(root, text="Project ID")
+        label = ttk.Label(root, text="Run filter")
         label.pack()
         root.update_idletasks()
         tip = HoverTooltip(
@@ -114,8 +114,10 @@ def test_gui_app_attaches_hover_notes_to_option_labels() -> None:
     root = _tk_root()
     try:
         app = MetabWatchApp(root)
+        assert str(app.project_id_label.cget("text")) == "Run filter"
         texts = _tooltip_texts(app)
         assert "Choose packaged method shortcuts, or a config file you already have." in texts
+        assert any(t.startswith("Run filter.") for t in texts)
         assert "Packaged chromatography / CoreMS / QC settings." in texts
         assert any("Only process files whose name contains this text" in t for t in texts)
         assert "Folder of Thermo `.raw` files." in texts
@@ -134,8 +136,10 @@ def test_starter_dialog_attaches_hover_notes() -> None:
     root = _tk_root()
     try:
         dialog = StarterConfigDialog(root, on_saved=lambda _result: None)
+        assert str(dialog.project_id_label.cget("text")) == "Run filter"
         texts = _tooltip_texts(dialog)
         assert "Folder of Thermo `.raw` files. Copied into the new JSON." in texts
+        assert any(t.startswith("Run filter.") for t in texts)
         assert "How close a peak's mass must be to a target (parts per million)." in texts
         assert any("Parent folder" in t for t in texts)
         assert any("numbered name" in t for t in texts)
@@ -146,5 +150,120 @@ def test_starter_dialog_attaches_hover_notes() -> None:
         assert str(dialog.polarity_positive.cget("value")) == "positive"
         assert str(dialog.polarity_negative.cget("value")) == "negative"
         dialog.destroy()
+    finally:
+        root.destroy()
+
+
+def test_stamp_log_line_time_only_within_same_day() -> None:
+    from datetime import date, datetime
+
+    from metabwatch.gui.app import _stamp_log_line
+
+    now = datetime(2026, 10, 1, 14, 3, 22)
+    line, last = _stamp_log_line("hello", now, date(2026, 10, 1))
+    assert line == "14:03:22 hello"
+    assert last == date(2026, 10, 1)
+
+
+def test_stamp_log_line_includes_date_on_first_line_rollover_and_separator() -> None:
+    from datetime import date, datetime
+
+    from metabwatch.gui.app import _stamp_log_line
+
+    now = datetime(2026, 10, 2, 0, 0, 5)
+    assert _stamp_log_line("first", now, None)[0] == "2026-10-02 00:00:05 first"
+    assert _stamp_log_line("next day", now, date(2026, 10, 1))[0] == (
+        "2026-10-02 00:00:05 next day"
+    )
+    assert _stamp_log_line("---", now, date(2026, 10, 2), separator=True)[0] == (
+        "2026-10-02 00:00:05 ---"
+    )
+
+
+def test_save_log_writes_panel_text(tmp_path, monkeypatch) -> None:
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    dest = tmp_path / "out" / "metabwatch-log.txt"
+    seen: dict[str, object] = {}
+
+    def _ask(**kwargs: object) -> str:
+        seen.update(kwargs)
+        dest.parent.mkdir()
+        return str(dest)
+
+    monkeypatch.setattr("metabwatch.gui.app.filedialog.asksaveasfilename", _ask)
+    try:
+        app = MetabWatchApp(root, log_timestamps=False)
+        app.output_var.set(str(tmp_path))
+        app._append_log("first")
+        app._append_log("second")
+        app._set_running_ui(True)
+        assert str(app.save_log_btn.cget("state")) == tk.NORMAL
+        app._save_log()
+        assert seen["initialdir"] == str(tmp_path)
+        assert seen["initialfile"] == "metabwatch-log.txt"
+        assert dest.read_text(encoding="utf-8") == "first\nsecond\n"
+    finally:
+        root.destroy()
+
+
+def test_save_log_cancel_writes_nothing(tmp_path, monkeypatch) -> None:
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    monkeypatch.setattr(
+        "metabwatch.gui.app.filedialog.asksaveasfilename", lambda **_kwargs: ""
+    )
+    try:
+        app = MetabWatchApp(root, log_timestamps=False)
+        app._append_log("kept in the panel")
+        app._save_log()
+        assert list(tmp_path.iterdir()) == []
+        assert "kept in the panel" in app.log.get("1.0", "end-1c")
+    finally:
+        root.destroy()
+
+
+def test_save_log_reports_write_errors(tmp_path, monkeypatch) -> None:
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    errors: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "metabwatch.gui.app.filedialog.asksaveasfilename",
+        lambda **_kwargs: str(tmp_path / "missing" / "log.txt"),
+    )
+    monkeypatch.setattr(
+        "metabwatch.gui.app.messagebox.showerror",
+        lambda title, message: errors.append((title, message)),
+    )
+    try:
+        app = MetabWatchApp(root, log_timestamps=False)
+        app._append_log("line")
+        app._save_log()
+        assert errors and errors[0][0] == "Save log"
+        assert not (tmp_path / "missing" / "log.txt").exists()
+    finally:
+        root.destroy()
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_gui_log_timestamps_toggle(enabled: bool) -> None:
+    import re
+
+    from metabwatch.gui.app import MetabWatchApp
+
+    root = _tk_root()
+    try:
+        app = MetabWatchApp(root, log_timestamps=enabled)
+        app._append_log("first")
+        app._append_log("second")
+        lines = app.log.get("1.0", "end-1c").splitlines()
+        if enabled:
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} first", lines[0])
+            assert re.fullmatch(r"\d{2}:\d{2}:\d{2} second", lines[1])
+        else:
+            assert lines == ["first", "second"]
     finally:
         root.destroy()

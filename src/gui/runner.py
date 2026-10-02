@@ -123,18 +123,6 @@ class PipelineRunner:
         try:
             sys.stdout = writer  # type: ignore[assignment]
             sys.stderr = writer  # type: ignore[assignment]
-            mode_label = "once" if once else "watch"
-            self.log_queue.put(
-                f"[gui] Starting pipeline ({mode_label}"
-                f"{', force-reprocess' if force_reprocess else ''})…"
-            )
-            self.log_queue.put(f"[gui] Input:  {config.watcher.raw_dir}")
-            self.log_queue.put(f"[gui] Output: {config.processor.output_dir}")
-            if not once:
-                self.log_queue.put(
-                    "[gui] Watch mode: after the current files finish, the app "
-                    "stays idle until new .raw files appear (not frozen)."
-                )
             exit_code = run_watch_mode(
                 config=config,
                 once=once,

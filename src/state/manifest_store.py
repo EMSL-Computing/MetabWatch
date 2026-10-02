@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from metabwatch.pipeline_queue.polarity import is_polarity_mismatch_error
 
 """Manifest-backed persistent state store for pipeline idempotency.
 
@@ -18,6 +19,9 @@ The manifest also records a single run-level ``polarity`` (``positive`` /
 ``negative``) once the first sample completes. Later samples must match that
 polarity; mixed polarities are not allowed in one output folder.
 """
+
+# One leading "x_" on a filename is the same run as the name without it.
+_SAME_RUN_PREFIX = "x_"
 
 
 @dataclass
@@ -110,6 +114,55 @@ class ManifestStateStore:
         stat = raw_file.stat()
         material = f"{raw_file.resolve()}|{stat.st_size}|{stat.st_mtime}"
         return hashlib.sha256(material.encode("utf-8")).hexdigest(), stat.st_size, stat.st_mtime
+
+    @staticmethod
+    def other_spelling(raw_file: Path) -> Path | None:
+        """Return the same-folder path that differs by one leading ``x_``.
+
+        ``Foo.raw`` pairs with ``x_Foo.raw``, and ``x_Foo.raw`` pairs with
+        ``Foo.raw``. A second prefix is only peeled once, so ``x_x_Foo.raw``
+        pairs with ``x_Foo.raw``. Returns None when the other name would not
+        be a ``.raw`` file with a stem.
+        """
+        name = raw_file.name
+        if name.startswith(_SAME_RUN_PREFIX) and len(name) > len(_SAME_RUN_PREFIX):
+            other_name = name[len(_SAME_RUN_PREFIX) :]
+        else:
+            other_name = f"{_SAME_RUN_PREFIX}{name}"
+        other = Path(other_name)
+        if other.suffix.lower() != ".raw" or not other.stem:
+            return None
+        return raw_file.with_name(other_name)
+
+    def same_run_block(self, raw_file: Path) -> Path | None:
+        """Return the other ``x_`` spelling when that entry already settles this file.
+
+        The match is the same directory and the same size. A completed entry,
+        an entry still in progress, or a polarity-mismatch failure settles the
+        run. A retryable failure does not. When this path already has its own
+        manifest entry, returns None so the same-path size and modification
+        time rule still decides.
+        """
+        key = str(raw_file.resolve())
+        if key in self._entries:
+            return None
+        other = self.other_spelling(raw_file)
+        if other is None:
+            return None
+        try:
+            size = raw_file.stat().st_size
+        except OSError:
+            return None
+        parent = raw_file.resolve().parent
+        for entry in self._entries.values():
+            entry_path = Path(entry.raw_file)
+            if entry_path.name != other.name or entry_path.parent != parent:
+                continue
+            if entry.size != size:
+                continue
+            if _entry_settles_same_run(entry):
+                return entry_path
+        return None
 
     def _load(self) -> None:
         """Load manifest JSON into memory if it exists."""
@@ -206,17 +259,25 @@ class ManifestStateStore:
     def should_process(self, raw_file: Path) -> bool:
         """Return True when the file should be processed.
 
-        A file should be processed when there is no manifest entry, when the
-        fingerprint changed, or when the last recorded status is not
-        `completed`.
+        A file should be processed when there is no manifest entry, or when
+        its fingerprint changed. An unchanged file is skipped after it
+        completes, and after it fails because its polarity does not match the
+        locked run. Other failures stay eligible so a later poll can retry
+        them. A file whose name differs only by one leading ``x_`` from an
+        entry in the same directory is the same run when the size matches, and
+        is skipped on the same terms. Callers that pass ``--force-reprocess``
+        enqueue on startup before this check, so a forced run still tries a
+        polarity mismatch.
         """
         key = str(raw_file.resolve())
         entry = self._entries.get(key)
         if entry is None:
-            return True
+            return self.same_run_block(raw_file) is None
         fingerprint, _, _ = self.fingerprint(raw_file)
         if entry.fingerprint != fingerprint:
             return True
+        if entry.status == "failed" and is_polarity_mismatch_error(entry.error):
+            return False
         return entry.status != "completed"
 
     def mark_in_progress(self, raw_file: Path) -> ManifestEntry:
@@ -302,3 +363,10 @@ class ManifestStateStore:
     def has_entries(self) -> bool:
         """Return True if the store contains any manifest entries."""
         return bool(self._entries)
+
+
+def _entry_settles_same_run(entry: ManifestEntry) -> bool:
+    """Return True when this entry means the run should not start again."""
+    if entry.status in {"completed", "in_progress"}:
+        return True
+    return entry.status == "failed" and is_polarity_mismatch_error(entry.error)

@@ -105,7 +105,7 @@ def build_pipeline_config(
         Optional run polarity (``positive`` / ``negative``). ``None`` keeps
         locking from the first successfully processed sample.
     project_id
-        Optional case-insensitive filename-stem substring (batch / project).
+        Optional run filter: case-insensitive filename-stem substring.
         Empty means no extra filter; the preset sample-name regex still applies.
 
     Returns

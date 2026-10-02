@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +13,7 @@ import pytest
 
 from metabwatch.pipeline import (
     apply_configured_polarity,
+    run_watch_mode,
 )
 from metabwatch.presets import build_pipeline_config
 from metabwatch.processor.orchestrator import ProcessResult, ProcessorOrchestrator
@@ -382,3 +385,86 @@ def test_polarity_from_lcms_normalizes() -> None:
     from metabwatch.pipeline_queue import polarity_from_lcms
 
     assert polarity_from_lcms(SimpleNamespace(polarity="Positive")) == "positive"
+
+
+_POLARITY_MISMATCH = (
+    "Polarity mismatch: file neg.raw is 'negative' "
+    "but this run is locked to 'positive'."
+)
+
+
+def test_polarity_mismatch_is_not_reprocessed_until_file_changes(tmp_path: Path) -> None:
+    store = ManifestStateStore(tmp_path / "pipeline_manifest.json")
+    neg = tmp_path / "neg.raw"
+    other = tmp_path / "other.raw"
+    neg.write_bytes(b"neg")
+    other.write_bytes(b"other")
+
+    store.mark_in_progress(neg)
+    store.mark_failed(neg, _POLARITY_MISMATCH)
+    assert store.should_process(neg) is False
+
+    neg.write_bytes(b"neg-replaced")
+    assert store.should_process(neg) is True
+
+    store.mark_in_progress(other)
+    store.mark_failed(other, "Failed to parse raw file")
+    assert store.should_process(other) is True
+
+
+def test_watch_does_not_requeue_polarity_mismatch(monkeypatch, tmp_path: Path) -> None:
+    """Two watch polls must not open an unchanged opposite-polarity file twice."""
+    calls: list[str] = []
+
+    def _fail(self, raw_file: Path, *, expected_polarity: str | None = None):
+        calls.append(raw_file.name)
+        return ProcessResult(
+            raw_file=raw_file,
+            status="failed",
+            error=(
+                f"Polarity mismatch: file {raw_file.name} is 'negative' "
+                "but this run is locked to 'positive'. "
+                "MetabWatch does not allow mixed polarities in one input folder / run."
+            ),
+            retryable=False,
+        )
+
+    monkeypatch.setattr(ProcessorOrchestrator, "process_single_raw", _fail)
+    waits = {"n": 0}
+
+    def _stop_after_second_poll(poll_interval_sec: float, stop_event) -> bool:
+        waits["n"] += 1
+        return waits["n"] >= 2
+
+    monkeypatch.setattr("metabwatch.pipeline._wait_for_poll", _stop_after_second_poll)
+
+    raw_dir = tmp_path / "raw"
+    out_dir = tmp_path / "out"
+    raw_dir.mkdir()
+    out_dir.mkdir()
+    for name in ("QC_Metab_neg-01.raw", "QC_Metab_neg-02.raw"):
+        (raw_dir / name).write_bytes(b"x")
+
+    config = build_pipeline_config(
+        "hilic_metab_pnnl",
+        "targeted",
+        raw_dir,
+        out_dir,
+        polarity="positive",
+    )
+    config = dataclasses.replace(
+        config,
+        watcher=dataclasses.replace(
+            config.watcher,
+            poll_interval_sec=0.01,
+            stability_wait_sec=0.0,
+            discovery_mode="poll",
+        ),
+        initial_backoff_sec=0.0,
+    )
+
+    assert run_watch_mode(config, once=False) == 0
+    assert waits["n"] == 2
+    assert Counter(calls) == Counter(
+        {"QC_Metab_neg-01.raw": 1, "QC_Metab_neg-02.raw": 1}
+    )

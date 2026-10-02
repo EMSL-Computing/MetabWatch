@@ -18,7 +18,7 @@ metabwatch --method hilic_metab_pnnl --search targeted \
 | `--method` | `hilic_metab_pnnl`, `hilic_metab_olympic_eclipse01`, `rp_metab_pnnl`, `rp_metab_olympic_eclipse01` | Packaged method (CoreMS settings + QC list). Olympic / Eclipse 01 keys use a tighter RT window. |
 | `--search` | `targeted`, `untargeted` | Targeted matches the packaged QC list. Untargeted builds a list from the first matching file. |
 | `--polarity` | `positive`, `negative` | Optional. Locks the results folder before the first sample. Omit to lock from the first successful file. |
-| `--project-id` | text | Optional. Only process files whose name contains this text (not case-sensitive). The method’s sample-name filter still applies. |
+| `--run-filter` | text | Run filter. Optional. Only process files whose name contains this text (not case-sensitive). Same as the GUI **Run filter** field. The method’s sample-name filter still applies. |
 | `--input` / `-i` | path | Folder of Thermo `.raw` files |
 | `--output` / `-o` | path | Results folder |
 
@@ -75,7 +75,7 @@ folder’s `README.txt` for operator help; this section is the field list.
 | `min_area` | `5000` | Ignore smaller peaks |
 | `top_n` | `100` | How many largest peaks to keep when untargeted (after dropping 13C isotopologues) |
 | `polarity` | unset | `positive` or `negative`. Omit to lock from the first successful file. |
-| `project_id` | `""` | Extra file-name substring filter. Empty = no extra filter. |
+| `run-filter` | `""` | Run filter. Extra file-name substring. Empty = no extra filter. Same as the GUI **Run filter** field and `--run-filter`. |
 
 Leave `poll_interval_sec`, `stability_wait_sec`, `discovery_mode`, retries, and
 plot flags at defaults unless you have a reason.
@@ -113,10 +113,11 @@ the CSV to rebuild.
 ## One polarity per results folder
 
 Set `--polarity` / JSON `polarity`, or leave unset (Auto). One output folder is
-one polarity. Opposite-polarity files are skipped. If polarity was set up front,
-matching files in the same batch still run. If polarity is Auto, a mixed batch
-stops after the first mismatch. Use separate input and output folders for
-positive and negative.
+one polarity. Opposite-polarity files are skipped and are not tried again
+unless the file changes on disk or you pass `--force-reprocess`. If polarity
+was set up front, matching files in the same batch still run. If polarity is
+Auto, a mixed batch stops after the first mismatch. Use separate input and
+output folders for positive and negative.
 
 ## Results
 
@@ -132,6 +133,8 @@ moved on the next process or dashboard rebuild.
 - `pipeline_manifest.json`
 - `untargeted_search_space.csv` (untargeted only)
 
+Watch mode treats `x_Foo.raw` as the same run as `Foo.raw` when both names are in the same folder and the file size matches, and it does not process the `x_` name again. A different size is processed. `--force-reprocess` still runs a lone `x_` file. When both names are present it runs the name without `x_`.
+
 ## Old JSON files
 
 Configs with nested `processor` / `watcher` / `synthesizer` / `search_space`
@@ -145,6 +148,15 @@ still load. Do not mix old and new keys in one file.
 | `processor.standards_csv` | `qc_compounds` |
 | `search_space.mode` | `targeted` (`true` / `false`) |
 | `watcher.sample_name_regex` | `sample_name_regex` |
+
+## GUI options
+
+`metabwatch-gui` (or `python -m metabwatch.gui`) accepts:
+
+| Flag | Meaning |
+|------|---------|
+| `--config PATH` | Open in Custom JSON mode with this config selected. |
+| `--no-log-timestamps` | Do not prefix Log panel lines with the time. By default each line starts with `HH:MM:SS`, and the full date is shown on each run's `---` line and after midnight. |
 
 ## Developers
 
