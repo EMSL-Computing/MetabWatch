@@ -18,7 +18,7 @@ metabwatch --method hilic_metab_pnnl --search targeted \
 | `--method` | `hilic_metab_pnnl`, `hilic_metab_olympic_eclipse01`, `rp_metab_pnnl`, `rp_metab_olympic_eclipse01` | Packaged method (CoreMS settings + QC list). Olympic / Eclipse 01 keys use a tighter RT window. |
 | `--search` | `targeted`, `untargeted` | Targeted matches the packaged QC list. Untargeted builds a list from the first matching file. |
 | `--polarity` | `positive`, `negative` | Optional. Locks the results folder before the first sample. Omit to lock from the first successful file. |
-| `--project-id` | text | Optional. Only process files whose name contains this text (not case-sensitive). The method’s sample-name filter still applies. |
+| `--run-filter` | text | Run filter. Optional. Only process files whose name contains this text (not case-sensitive). Same as the GUI **Run filter** field. The method’s sample-name filter still applies. |
 | `--input` / `-i` | path | Folder of Thermo `.raw` files |
 | `--output` / `-o` | path | Results folder |
 
@@ -75,7 +75,7 @@ folder’s `README.txt` for operator help; this section is the field list.
 | `min_area` | `5000` | Ignore smaller peaks |
 | `top_n` | `100` | How many largest peaks to keep when untargeted (after dropping 13C isotopologues) |
 | `polarity` | unset | `positive` or `negative`. Omit to lock from the first successful file. |
-| `project_id` | `""` | Extra file-name substring filter. Empty = no extra filter. |
+| `run-filter` | `""` | Run filter. Extra file-name substring. Empty = no extra filter. Same as the GUI **Run filter** field and `--run-filter`. |
 
 Leave `poll_interval_sec`, `stability_wait_sec`, `discovery_mode`, retries, and
 plot flags at defaults unless you have a reason.

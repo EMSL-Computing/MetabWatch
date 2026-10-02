@@ -172,7 +172,7 @@ class MetabWatchApp(ttk.Frame):
         self.search_untargeted.pack(side=tk.LEFT)
         prow += 1
 
-        self.project_id_label = ttk.Label(self.preset_frame, text="Project ID")
+        self.project_id_label = ttk.Label(self.preset_frame, text="Run filter")
         self.project_id_label.grid(row=prow, column=0, sticky="w", pady=2)
         self.project_id_entry = ttk.Entry(
             self.preset_frame, textvariable=self.project_id_var
@@ -782,7 +782,7 @@ class StarterConfigDialog(tk.Toplevel):
         self.search_untargeted.pack(side=tk.LEFT)
         row += 1
 
-        self.project_id_label = ttk.Label(body, text="Project ID")
+        self.project_id_label = ttk.Label(body, text="Run filter")
         self.project_id_label.grid(row=row, column=0, sticky="w", pady=2)
         self.project_id_entry = ttk.Entry(body, textvariable=self.project_id_var)
         self.project_id_entry.grid(row=row, column=1, sticky="ew", pady=2)

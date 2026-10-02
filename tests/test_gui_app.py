@@ -29,7 +29,7 @@ def test_hover_tooltip_can_be_constructed() -> None:
 
     root = _tk_root()
     try:
-        label = ttk.Label(root, text="Project ID")
+        label = ttk.Label(root, text="Run filter")
         tip = HoverTooltip(label, "Optional. Only process files whose name contains this text.")
         assert tip.delay_ms == 500
         assert tip._tip is None
@@ -48,7 +48,7 @@ def test_hover_tooltip_shown_label_has_dark_text() -> None:
 
     root = _tk_root()
     try:
-        label = ttk.Label(root, text="Project ID")
+        label = ttk.Label(root, text="Run filter")
         label.pack()
         root.update_idletasks()
         tip = HoverTooltip(
@@ -114,8 +114,10 @@ def test_gui_app_attaches_hover_notes_to_option_labels() -> None:
     root = _tk_root()
     try:
         app = MetabWatchApp(root)
+        assert str(app.project_id_label.cget("text")) == "Run filter"
         texts = _tooltip_texts(app)
         assert "Choose packaged method shortcuts, or a config file you already have." in texts
+        assert any(t.startswith("Run filter.") for t in texts)
         assert "Packaged chromatography / CoreMS / QC settings." in texts
         assert any("Only process files whose name contains this text" in t for t in texts)
         assert "Folder of Thermo `.raw` files." in texts
@@ -134,8 +136,10 @@ def test_starter_dialog_attaches_hover_notes() -> None:
     root = _tk_root()
     try:
         dialog = StarterConfigDialog(root, on_saved=lambda _result: None)
+        assert str(dialog.project_id_label.cget("text")) == "Run filter"
         texts = _tooltip_texts(dialog)
         assert "Folder of Thermo `.raw` files. Copied into the new JSON." in texts
+        assert any(t.startswith("Run filter.") for t in texts)
         assert "How close a peak's mass must be to a target (parts per million)." in texts
         assert any("Parent folder" in t for t in texts)
         assert any("numbered name" in t for t in texts)

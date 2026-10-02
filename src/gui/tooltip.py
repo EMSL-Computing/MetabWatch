@@ -19,7 +19,7 @@ MAIN_HOVER = {
         "from the first matching sample."
     ),
     "project_id": (
-        "Optional. Only process files whose name contains this text "
+        "Run filter. Optional. Only process files whose name contains this text "
         "(not case-sensitive). Leave empty to keep the usual sample filter "
         "(`QC_Metab_` or `Pool`) with no extra restriction."
     ),
