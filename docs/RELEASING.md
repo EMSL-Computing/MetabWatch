@@ -1,6 +1,6 @@
 # Releasing MetabWatch
 
-How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin` → `code.emsl.pnl.gov`). Keep this process simple: human-edited changelog, version bump only at release time, one merge request into `main`.
+How maintainers cut a versioned release. Day-to-day work stays on **internal GitLab** (`origin` → `code.emsl.pnl.gov`). The published release is the **GitHub Release** on `EMSL-Computing/MetabWatch`. Create the version tag on GitLab and push it; the mirror already copies tags to GitHub. There is no GitLab Release for a version. Keep the process simple: human-edited changelog, version bump only at release time, one merge request into `main`.
 
 ## Day-to-day
 
@@ -52,9 +52,7 @@ How maintainers cut a versioned release. Hosted on **internal GitLab** (`origin`
    git tag -a vX.Y.Z -m "MetabWatch X.Y.Z"
    git push origin main --tags
    ```
-   Optionally create a GitLab **Release** from the tag in the UI (notes = the changelog section). Tags alone are enough if you do not use GitLab Releases.
-
-   The push mirror copies `main` and the tag to GitHub (`EMSL-Computing/MetabWatch`). Confirm the tag is on GitHub. The **Build Windows exe** workflow then runs `packaging/build.ps1 -Clean`, including the exe `--self-test`, and opens a **draft** GitHub Release titled `MetabWatch X.Y.Z` with `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`. Notes are the `## [X.Y.Z]` section of [CHANGELOG.md](CHANGELOG.md). A push to `dev` does not start this build. [BUILDING.md](BUILDING.md) covers building the exe by hand on Windows.
+   That push creates the tag on GitLab. The mirror copies `main` and the tag to GitHub. The **Build Windows exe** workflow then runs `packaging/build.ps1 -Clean`, including the exe `--self-test`, and opens a **draft** GitHub Release titled `MetabWatch X.Y.Z` with `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`. Notes are the `## [X.Y.Z]` section of [CHANGELOG.md](CHANGELOG.md). Publish that draft after the checks in step 9. A push to `dev` does not start this build. [BUILDING.md](BUILDING.md) covers building the exe by hand on Windows.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
 9. On that draft GitHub Release, before you publish it:
    - Download the exe and the `.sha256` file.
@@ -114,7 +112,7 @@ Use the normal cut-a-release steps. Choose the version with semver (for example 
 - [ ] `src/__init__.py` `_FALLBACK_VERSION` = `X.Y.Z`
 - [ ] If dashboard/packaging changed: vendored `src/synthesis/static/plotly-*.min.js` present, filename pin matches, `package-data` still includes `static/*`
 - [ ] MR into `main` opened and merged
-- [ ] Annotated tag `vX.Y.Z` pushed to `origin` and visible on GitHub
+- [ ] Annotated tag `vX.Y.Z` created on GitLab and pushed to `origin` (the mirror copies it to GitHub)
 - [ ] `dev` updated from `main` if needed
 - [ ] If dependencies changed: `packaging/requirements-build.txt` refreshed ([BUILDING.md](BUILDING.md#dependencies-changed))
 - [ ] **Build Windows exe** workflow green; draft GitHub Release has `MetabWatch-X.Y.Z.exe` and `.sha256`
