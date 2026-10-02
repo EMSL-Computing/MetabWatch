@@ -364,7 +364,7 @@ def test_simplified_project_id_optional(tmp_path: Path, project_root: Path) -> N
             "corems_params": "data/corems_params/params.toml",
             "targeted": False,
             "sample_name_regex": "(?i)Pool",
-            "project_id": " 25-02 ",
+            "run-filter": " 25-02 ",
         },
     )
     cfg = load_pipeline_config(config_path, project_root)
@@ -382,7 +382,7 @@ def test_simplified_empty_project_id(tmp_path: Path, project_root: Path) -> None
             "targeted": True,
             "qc_compounds": "data/qc_search_space/hilic_qc_search.csv",
             "sample_name_regex": "QC_Metab_(.+)",
-            "project_id": "",
+            "run-filter": "",
         },
     )
     cfg = load_pipeline_config(config_path, project_root)

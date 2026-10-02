@@ -864,14 +864,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--project-id",
+        "--run-filter",
         default=None,
         dest="project_id",
         help=(
             "Run filter. Optional text the file name must contain "
             "(not case-sensitive), in addition to the sample-name filter "
             "(QC_Metab_ / Pool). Same as the GUI Run filter field. Omit or "
-            "leave empty for no extra filter. For --config, set project_id "
+            "leave empty for no extra filter. For --config, set run-filter "
             "in the JSON."
         ),
     )
@@ -901,7 +901,7 @@ def resolve_config_from_args(args: argparse.Namespace) -> PipelineConfig:
             )
         if args.project_id is not None:
             raise ValueError(
-                "Use --project-id with preset flags, or set project_id in the JSON."
+                "Use --run-filter with preset flags, or set run-filter in the JSON."
             )
         return load_pipeline_config(args.config)
     if using_preset:

@@ -46,8 +46,8 @@ from a configured Python environment. Setup: [Maintainer / development](docs/MAI
   lock before the first sample. One polarity per output folder. Opposite-polarity
   files are skipped; matching files still run.
 - **Run filter:** extra file-name filter. Leave empty to keep only the usual
-  sample filter. In a config file this is `project_id`; on the command line
-  it is `--project-id`.
+  sample filter. In a config file this is `run-filter`; on the command line
+  it is `--run-filter`.
 - **Force reprocess:** run again even if that file was already done.
 
 Do not mix positive and negative into one output folder. If polarity is set up

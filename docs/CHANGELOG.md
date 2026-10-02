@@ -16,7 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Watch and process logs are shorter. Each sample is the file name, then one line such as `15 of 15 matched`. A polarity mismatch is one `Skipped` line. Paths are plain text in the GUI (terminal runs still get clickable links). After a batch the log says it is waiting, then stays quiet for an hour unless a new file arrives. Empty progress bars are not written.
-- The GUI field **Project ID** is now **Run filter** (main window and Create custom config). Hover notes, the watch log, the README, command-line help, and the custom-config README use that name. The JSON key is still `project_id` and the flag is still `--project-id`.
+- The GUI field **Project ID** is now **Run filter** (main window and Create custom config). Hover notes, the watch log, the README, command-line help, and the custom-config README use that name. The JSON key is `run-filter` and the flag is `--run-filter`. Older `project_id` keys and `--project-id` are not read.
 
 ### Fixed
 

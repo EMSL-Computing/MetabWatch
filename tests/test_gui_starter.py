@@ -143,7 +143,7 @@ def test_starter_writes_polarity_and_project_id(tmp_path: Path) -> None:
     write_rp_starter_folder(dest, settings)
     payload = json.loads((dest / CONFIG_FILENAME).read_text(encoding="utf-8"))
     assert payload["polarity"] == "negative"
-    assert payload["project_id"] == "25-02"
+    assert payload["run-filter"] == "25-02"
 
     cfg = load_pipeline_config(dest / CONFIG_FILENAME)
     assert cfg.polarity == "negative"
@@ -255,7 +255,7 @@ def test_starter_readme_tells_operator_to_fill_csv(tmp_path: Path) -> None:
     assert "negative" in text
     assert "blank template" in text
     assert CONFIG_FILENAME in text
-    assert "project_id" in text
+    assert "run-filter" in text
     assert "Run filter" in text
     assert "sample_name_regex" in text
     assert "QC_Metab_(.+)" in text

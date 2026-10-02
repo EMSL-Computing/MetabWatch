@@ -88,6 +88,7 @@ class WatcherConfig:
     project_id : str
         Optional run filter: case-insensitive substring of the filename
         stem. Empty means no extra filter; the regex still applies.
+        Loaded from the JSON key ``run-filter`` (not ``project_id``).
     discovery_mode : str
         How new files are discovered: ``hybrid`` (watchdog + fallback poll,
         default), ``watchdog`` (FS events + startup scan only), or ``poll``
@@ -424,7 +425,7 @@ def _normalize_simplified(payload: dict[str, Any]) -> _NormalizedConfig:
         polarity=_normalize_optional_polarity(
             payload.get("polarity"), context=context
         ),
-        project_id=_normalize_project_id(payload.get("project_id")),
+        project_id=_normalize_project_id(payload.get("run-filter")),
     )
 
 
@@ -505,7 +506,7 @@ def _normalize_legacy(payload: dict[str, Any]) -> _NormalizedConfig:
             payload.get("polarity"), context="legacy config"
         ),
         project_id=_normalize_project_id(
-            payload.get("project_id", watcher.get("project_id"))
+            payload.get("run-filter", watcher.get("run-filter"))
         ),
     )
 
