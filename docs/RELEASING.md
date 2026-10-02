@@ -55,8 +55,7 @@ How maintainers cut a versioned release. Day-to-day work stays on **internal Git
    That push creates the tag on GitLab. The mirror copies `main` and the tag to GitHub. The **Build Windows exe** workflow then runs `packaging/build.ps1 -Clean`, including the exe `--self-test`, and opens a **draft** GitHub Release titled `MetabWatch X.Y.Z` with `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`. Notes are the `## [X.Y.Z]` section of [CHANGELOG.md](CHANGELOG.md). Publish that draft after the checks in step 9. A push to `dev` does not start this build. [BUILDING.md](BUILDING.md) covers building the exe by hand on Windows.
 8. Merge `main` back into `dev` if needed so `dev` has the release merge commit.
 9. On that draft GitHub Release, before you publish it:
-   - Download the exe and the `.sha256` file.
-   - Check the checksum. The file is a lowercase hash, two spaces, then the file name. `Get-FileHash` prints uppercase:
+   - Download the exe and the `.sha256` file. The `.sha256` file is the fingerprint the build wrote for that exe: a lowercase hash, two spaces, then the file name. Hash the downloaded exe and compare it with the hash in the file. The same hash means the download is the file CI built. The two lines from this command should match (`Get-FileHash` prints uppercase, so the first line is lowercased):
      ```powershell
      (Get-FileHash .\MetabWatch-X.Y.Z.exe -Algorithm SHA256).Hash.ToLower()
      (Get-Content .\MetabWatch-X.Y.Z.exe.sha256).Split()[0]
@@ -117,7 +116,7 @@ Do these in order. The commands are in [Cut a release](#cut-a-release) above.
 - [ ] On `main`, create annotated tag `vX.Y.Z` and push it to GitLab (`git push origin main --tags`).
 - [ ] Merge `main` back into `dev`.
 - [ ] On GitHub, wait until **Build Windows exe** is green. The draft release contains `MetabWatch-X.Y.Z.exe` and `MetabWatch-X.Y.Z.exe.sha256`.
-- [ ] Download both files and confirm the checksum matches.
+- [ ] Download the exe and the `.sha256` file. Hash the exe and confirm it equals the hash in that file (the download matches the file CI built).
 - [ ] Smoke-test the exe on one targeted `.raw` run and one untargeted run.
 - [ ] Publish the draft. Copy both files to the lab share if the lab uses one.
 - [ ] Update each lab PC per [INSTALL.md](INSTALL.md): new exe and shortcut, or `git pull`, `pip install .`, and a new shortcut.
