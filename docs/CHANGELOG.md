@@ -11,7 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - GUI Log panel lines start with the time (`HH:MM:SS`); each run's `---` line and the first line after midnight also show the date. Turn off with `--no-log-timestamps` (`metabwatch-gui`, `Start-MetabWatch.ps1`).
 - GUI **Save log** writes the Log panel to a text file. The button stays available while a run is going. If an output folder is already chosen, the save dialog starts there.
-- Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. Build with `packaging\build.ps1` ([BUILDING.md](BUILDING.md)); the build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
+- Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. A version tag builds it and attaches the exe and `.sha256` to a draft GitHub Release ([RELEASING.md](RELEASING.md)). The build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
 
 ### Changed
 

@@ -17,16 +17,20 @@ There are two ways to install:
 
 ## Standalone exe (recommended)
 
-Get `MetabWatch-X.Y.Z.exe` (and its `.sha256`) from the GitLab Release or the
-lab share. Maintainers build it with [BUILDING.md](BUILDING.md).
+Get `MetabWatch-X.Y.Z.exe` (and its `.sha256`) from the GitHub Release for
+that version, or from the lab share. A version tag builds it
+([RELEASING.md](RELEASING.md)). [BUILDING.md](BUILDING.md) is the manual build.
 
 1. Copy the exe to a folder on the PC's **local** disk, for example
    `C:\MetabWatch\`. Do **not** run it straight from a network share: .NET
    will not load the Thermo reader from a remote path, and startup is slower.
-2. Optional: check the file arrived intact by comparing its hash with the
-   `.sha256` file:
+2. Optional: confirm the copy matches the file from the release. The
+   `.sha256` file is the fingerprint published with the exe. These two lines
+   should be the same hash (`Get-FileHash` prints uppercase, so the first
+   line is lowercased):
    ```powershell
-   Get-FileHash C:\MetabWatch\MetabWatch-X.Y.Z.exe -Algorithm SHA256
+   (Get-FileHash C:\MetabWatch\MetabWatch-X.Y.Z.exe -Algorithm SHA256).Hash.ToLower()
+   (Get-Content C:\MetabWatch\MetabWatch-X.Y.Z.exe.sha256).Split()[0]
    ```
 3. Optional health check (no window opens; prints PASS/FAIL to a text file):
    ```powershell
