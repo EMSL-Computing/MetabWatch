@@ -7,11 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-02
+
 ### Added
 
 - GUI Log panel lines start with the time (`HH:MM:SS`); each run's `---` line and the first line after midnight also show the date. Turn off with `--no-log-timestamps` (`metabwatch-gui`, `Start-MetabWatch.ps1`).
 - GUI **Save log** writes the Log panel to a text file. The button stays available while a run is going. If an output folder is already chosen, the save dialog starts there.
 - Standalone Windows exe (`MetabWatch-X.Y.Z.exe`, PyInstaller, single file). Lab PCs no longer need Python or a venv. A version tag builds it and attaches the exe and `.sha256` to a draft GitHub Release ([RELEASING.md](RELEASING.md)). The build runs a `--self-test` that checks bundled modules, the Thermo .NET reader and package data. The exe writes output and errors to `%LOCALAPPDATA%\MetabWatch\logs\`.
+- Source installs on a PC with no internet can use a wheelhouse plus the Python installer. Build the wheelhouse with `pip wheel` so `hopcroftkarp` is included. See [INSTALL.md](INSTALL.md#offline-pcs-no-internet).
 
 ### Changed
 
