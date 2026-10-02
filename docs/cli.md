@@ -133,6 +133,8 @@ moved on the next process or dashboard rebuild.
 - `pipeline_manifest.json`
 - `untargeted_search_space.csv` (untargeted only)
 
+Watch mode treats `x_Foo.raw` as the same run as `Foo.raw` when both names are in the same folder and the file size matches, and it does not process the `x_` name again. A different size is processed. `--force-reprocess` still runs a lone `x_` file. When both names are present it runs the name without `x_`.
+
 ## Old JSON files
 
 Configs with nested `processor` / `watcher` / `synthesizer` / `search_space`
