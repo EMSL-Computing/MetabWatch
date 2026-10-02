@@ -9,6 +9,7 @@ import sys
 import tkinter as tk
 import webbrowser
 from collections.abc import Callable
+from datetime import date, datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
@@ -33,14 +34,33 @@ from metabwatch.gui.validation import GuiRunRequest, preset_summary_text
 from metabwatch.presets import METHOD_KEYS, PRESET_SPECS
 
 
+def _stamp_log_line(
+    line: str, now: datetime, last_date: date | None, *, separator: bool = False
+) -> tuple[str, date]:
+    """Prefix a log line with ``HH:MM:SS``; include the date on day change or run separator."""
+    if separator or now.date() != last_date:
+        prefix = now.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        prefix = now.strftime("%H:%M:%S")
+    return f"{prefix} {line}", now.date()
+
+
 class MetabWatchApp(ttk.Frame):
     """Main application frame."""
 
-    def __init__(self, master: tk.Tk, *, config_path: str | None = None) -> None:
+    def __init__(
+        self,
+        master: tk.Tk,
+        *,
+        config_path: str | None = None,
+        log_timestamps: bool = True,
+    ) -> None:
         super().__init__(master, padding=12)
         self.master = master
         self.runner = PipelineRunner()
         self._tooltips: list[HoverTooltip] = []
+        self._log_timestamps = log_timestamps
+        self._log_last_date: date | None = None
 
         self.source_var = tk.StringVar(value="preset")
         self.method_var = tk.StringVar(value="hilic_metab_pnnl")
@@ -302,6 +322,10 @@ class MetabWatchApp(ttk.Frame):
             log_frame, height=16, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 9)
         )
         self.log.grid(row=0, column=0, sticky="nsew")
+        self.save_log_btn = ttk.Button(
+            log_frame, text="Save log", command=self._save_log
+        )
+        self.save_log_btn.grid(row=1, column=0, sticky="w", pady=(4, 0))
         self._attach_hover_notes()
 
     def _attach_hover_notes(self) -> None:
@@ -485,7 +509,7 @@ class MetabWatchApp(ttk.Frame):
             messagebox.showerror("Failed to start", str(exc))
             return
 
-        self._append_log("---")
+        self._append_log("---", separator=True)
         mode = "once" if request.once else "watch"
         src = "preset" if request.source == "preset" else "JSON config"
         self.status_var.set(f"Status: Running ({src}, {mode})…")
@@ -548,11 +572,38 @@ class MetabWatchApp(ttk.Frame):
             pass
         self.after(150, self._drain_log)
 
-    def _append_log(self, line: str) -> None:
+    def _append_log(self, line: str, *, separator: bool = False) -> None:
+        if self._log_timestamps:
+            line, self._log_last_date = _stamp_log_line(
+                line, datetime.now(), self._log_last_date, separator=separator
+            )
         self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, line + "\n")
         self.log.see(tk.END)
         self.log.configure(state=tk.DISABLED)
+
+    def _save_log(self) -> None:
+        """Write the Log panel text to a file the user chooses."""
+        initial = self.output_var.get().strip()
+        dialog_kwargs: dict[str, str] = {}
+        if initial and Path(initial).is_dir():
+            dialog_kwargs["initialdir"] = initial
+        path = filedialog.asksaveasfilename(
+            title="Save log",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile="metabwatch-log.txt",
+            **dialog_kwargs,
+        )
+        if not path:
+            return
+        text = self.log.get("1.0", "end-1c")
+        if text and not text.endswith("\n"):
+            text += "\n"
+        try:
+            Path(path).write_text(text, encoding="utf-8")
+        except OSError as exc:
+            messagebox.showerror("Save log", str(exc))
 
     def _open_dashboard(self) -> None:
         path = self.runner.dashboard_path()
@@ -1018,6 +1069,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Pre-select Custom JSON mode with this pipeline config file",
     )
+    parser.add_argument(
+        "--no-log-timestamps",
+        action="store_true",
+        help="Do not prefix Log panel lines with the time",
+    )
     args = parser.parse_args(argv)
 
     version = get_version()
@@ -1037,7 +1093,11 @@ def main(argv: list[str] | None = None) -> int:
         pass
 
     try:
-        MetabWatchApp(root, config_path=args.config)
+        MetabWatchApp(
+            root,
+            config_path=args.config,
+            log_timestamps=not args.no_log_timestamps,
+        )
     except Exception as exc:  # pragma: no cover - UI error path
         messagebox.showerror(
             "MetabWatch failed to start",

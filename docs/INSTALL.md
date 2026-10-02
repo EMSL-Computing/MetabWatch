@@ -153,6 +153,10 @@ Double-click the shortcut. Pick method, folders, and **Start**.
 `Start-MetabWatch.ps1` uses `.venv` next to the script and opens an unconfigured
 GUI. Folders are chosen in the window, not by the script.
 
+Log lines are timestamped by default. To turn this off, add
+`--no-log-timestamps` after the `.ps1` path in the shortcut's **Target**. See
+[GUI options](cli.md#gui-options).
+
 ## Troubleshooting
 
 | Symptom | What to check |

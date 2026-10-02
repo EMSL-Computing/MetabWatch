@@ -129,24 +129,102 @@ def _sample_allowed(
     return _sample_ignore_reason(raw_file, sample_regex, project_id) is None
 
 
+# How often an idle watch run may repeat "still waiting" in the log.
+_IDLE_LOG_INTERVAL_SEC = 3600.0
+
+
 def _clickable_path(path: Path) -> str:
-    """Return an OSC-8 terminal hyperlink for a filesystem path.
+    """Return a path, wrapped as an OSC-8 link when stdout is a terminal.
 
-    Parameters
-    ----------
-    path : Path
-        Path to make clickable in terminals that support OSC-8 links.
-
-    Returns
-    -------
-    str
-        A string containing the OSC-8 escape sequences wrapping the path.
+    The GUI log is not a terminal. Escape sequences would show up as garbage
+    there, so a plain path is used unless ``sys.stdout`` reports a TTY.
     """
 
     abs_path = path.resolve()
-    uri = f"file://{quote(str(abs_path))}"
     label = str(abs_path)
+    if not sys.stdout.isatty():
+        return label
+    uri = f"file://{quote(str(abs_path))}"
     return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
+
+
+def _files_queued_line(count: int, *, force: bool) -> str:
+    noun = "file" if count == 1 else "files"
+    line = f"{count} {noun} queued"
+    if force:
+        line += " (force reprocess)"
+    return line
+
+
+def _ignored_line(name: str, reason: str) -> str:
+    if reason == "project_id no match":
+        return f"Ignored {name}: name does not contain the project ID"
+    return f"Ignored {name}: name does not match the sample filter"
+
+
+def _sample_result_line(result: ProcessResult, *, locked: bool) -> str:
+    if result.targets is not None:
+        body = f"{result.rows} of {result.targets} matched"
+    else:
+        body = f"{result.rows} matched"
+    if locked and result.polarity:
+        return f"  {body}. Run locked to {result.polarity}."
+    return f"  {body}"
+
+
+def _polarity_skip_line(name: str, error: str | None) -> str:
+    actual = expected = None
+    if error:
+        match = re.search(
+            r"is '([^']+)' but this run is locked to '([^']+)'",
+            error,
+        )
+        if match:
+            actual, expected = match.group(1), match.group(2)
+    if actual and expected:
+        return f"Skipped {name} — {actual} file; this run is {expected}"
+    return f"Skipped {name} — polarity does not match this run"
+
+
+def _announce_result(result: ProcessResult, *, locked: bool) -> str:
+    """Print one outcome line. Return ``finished``, ``skipped``, or ``failed``."""
+    name = result.raw_file.name
+    if result.status == "completed":
+        print(_sample_result_line(result, locked=locked))
+        return "finished"
+    if is_polarity_mismatch_error(result.error):
+        print(_polarity_skip_line(name, result.error))
+        return "skipped"
+    print(f"Failed {name}: {result.error or 'unknown error'}")
+    return "failed"
+
+
+def _idle_message(
+    *,
+    announced: bool,
+    elapsed_sec: float,
+    finished: int,
+    skipped: int,
+    failed: int,
+    interval_sec: float | None = None,
+) -> str | None:
+    """Return the idle log line, or None when the run should stay quiet."""
+    if interval_sec is None:
+        interval_sec = _IDLE_LOG_INTERVAL_SEC
+    if not announced:
+        counts: list[str] = []
+        if finished:
+            counts.append(f"{finished} finished")
+        if skipped:
+            counts.append(f"{skipped} skipped")
+        if failed:
+            counts.append(f"{failed} failed")
+        if counts:
+            return f"Waiting for new .raw files. {', '.join(counts)}."
+        return "Waiting for new .raw files."
+    if elapsed_sec >= interval_sec:
+        return "Still waiting for new .raw files."
+    return None
 
 
 def apply_configured_polarity(
@@ -241,16 +319,6 @@ def _run_synthesis(
         Path to the generated landing dashboard HTML.
     """
     html_path = synthesizer.render()
-    export_labels = ", ".join(sorted(synthesizer.last_export_paths))
-    print(
-        "[synthesized] Dashboard: "
-        f"{_clickable_path(html_path)} "
-        f"(compound pages: {synthesizer.last_compound_pages}, "
-        f"skipped samples: {synthesizer.last_skipped_samples}, "
-        f"exports: {export_labels or 'none'})"
-    )
-    for label, export_path in sorted(synthesizer.last_export_paths.items()):
-        print(f"[export] {label}: {_clickable_path(export_path)}")
     output_tracker.clear()
     return html_path
 
@@ -299,7 +367,6 @@ def _process_one(
             expected_polarity=expected_polarity,
         )
         if result.status == "completed":
-            was_unlocked = state_store.get_run_polarity() is None
             state_store.mark_completed(
                 raw_file=raw_file,
                 output_csv=result.output_csv,
@@ -307,35 +374,21 @@ def _process_one(
                 acquisition_time=result.acquisition_time,
                 polarity=result.polarity,
             )
-            if was_unlocked and result.polarity:
-                print(
-                    f"[polarity] run locked to {state_store.get_run_polarity()} "
-                    f"(from {raw_file.name})"
-                )
             output_tracker.register_new_output()
-            print(f"[completed] {raw_file.name} rows={result.rows}")
             return result
 
         state_store.mark_failed(raw_file, result.error or "unknown error")
         can_retry = result.retryable and attempts <= retry_policy.max_retries
-        print(f"[failed] {raw_file.name} retryable={result.retryable} attempt={attempts} error={result.error}")
-
+        if can_retry:
+            print(
+                f"Failed {raw_file.name} (attempt {attempts}, will retry): "
+                f"{result.error or 'unknown error'}"
+            )
         if not can_retry:
             return result
 
         time.sleep(backoff)
         backoff = backoff * retry_policy.backoff_multiplier
-
-
-def _discovery_mode_description(discovery_mode: str, poll_interval_sec: float) -> str:
-    if discovery_mode == "hybrid":
-        return (
-            f"discovery_mode=hybrid (watchdog + fallback poll every "
-            f"{poll_interval_sec}s)"
-        )
-    if discovery_mode == "watchdog":
-        return "discovery_mode=watchdog (FS events + startup scan)"
-    return f"discovery_mode=poll (directory scan every {poll_interval_sec}s)"
 
 
 def _wait_for_poll(
@@ -399,13 +452,11 @@ def run_watch_mode(
     try:
         configured_polarity = apply_configured_polarity(config, state_store)
     except ValueError as exc:
-        print(f"[polarity] {exc}")
+        print(exc)
         return 2
 
     # Openable waiting page while the first sample is still processing.
-    placeholder = synthesizer.write_placeholder_if_missing()
-    if placeholder.is_file():
-        print(f"[dashboard] {_clickable_path(placeholder)}")
+    synthesizer.write_placeholder_if_missing()
 
     discovery_mode = config.watcher.discovery_mode
     # --once uses a full scan only (deterministic smoke tests; no observer).
@@ -421,28 +472,23 @@ def run_watch_mode(
 
     try:
         stop_hint = (
-            "Use Stop in the GUI to exit."
+            "Use Stop to exit."
             if stop_event is not None
             else "Press Ctrl+C to exit."
         )
-        print(
-            "[watching] Monitoring for stable .raw files "
-            f"in {config.watcher.raw_dir} "
-            f"({_discovery_mode_description(discovery_mode, config.watcher.poll_interval_sec)}). "
-            f"{stop_hint}"
-        )
+        action = "Processing" if once else "Watching"
+        print(f"{action} {config.watcher.raw_dir}. {stop_hint}")
+        print(f"Output: {config.processor.output_dir}")
+        if configured_polarity:
+            print(f"Run locked to {configured_polarity}.")
+        elif state_store.get_run_polarity():
+            print(f"Run locked to {state_store.get_run_polarity()}.")
         if config.watcher.project_id:
             print(
-                f"[watching] project_id substring {config.watcher.project_id!r} "
-                "(in addition to sample_name_regex)"
+                "Only files whose name contains "
+                f"{config.watcher.project_id!r}."
             )
-
-        if configured_polarity:
-            print(f"[polarity] run locked to {configured_polarity} (from config)")
-        elif state_store.get_run_polarity():
-            print(
-                f"[polarity] run locked to {state_store.get_run_polarity()} (from manifest)"
-            )
+        print(f"Dashboard: {_clickable_path(config.synthesizer.html_output)}")
 
         forced_enqueued: set[Path] = set()
 
@@ -452,33 +498,29 @@ def run_watch_mode(
 
         if force_reprocess or not state_store.has_entries():
             bootstrap_files = reconcile_files
-            if bootstrap_files:
-                if force_reprocess:
-                    print(
-                        f"[bootstrap] force-reprocess enabled; enqueueing "
-                        f"{len(bootstrap_files)} existing raw files"
-                    )
-                else:
-                    print(
-                        f"[bootstrap] first run detected; enqueueing "
-                        f"{len(bootstrap_files)} existing raw files"
-                    )
+            enqueued = 0
             for raw_file in bootstrap_files:
                 reason = _sample_ignore_reason(
                     raw_file, sample_regex, config.watcher.project_id
                 )
                 if reason:
-                    print(f"[ignored] {raw_file.name} ({reason})")
+                    print(_ignored_line(raw_file.name, reason))
                     continue
                 if force_reprocess or state_store.should_process(raw_file):
                     queue.enqueue(raw_file)
                     forced_enqueued.add(raw_file)
+                    enqueued += 1
+            if enqueued:
+                print(_files_queued_line(enqueued, force=force_reprocess))
 
         state_store.recover_stale_in_progress()
 
+        idle_announced = False
+        last_idle_log = 0.0
+
         while True:
             if stop_event is not None and stop_event.is_set():
-                print("[stopped] Stop requested.")
+                print("Stop requested.")
                 return 0
 
             if observer is not None:
@@ -491,7 +533,7 @@ def run_watch_mode(
                     raw_file, sample_regex, config.watcher.project_id
                 )
                 if reason:
-                    print(f"[ignored] {raw_file.name} ({reason})")
+                    print(_ignored_line(raw_file.name, reason))
                     continue
                 if force_reprocess and raw_file in forced_enqueued:
                     continue
@@ -511,28 +553,31 @@ def run_watch_mode(
                 batch.append(raw_file)
 
             total = len(batch)
+            finished = skipped = failed = 0
             synthesized_this_cycle = False
-            for index, raw_file in enumerate(
-                tqdm(batch, total=total, unit="file", desc="Processing raw files"),
-                start=1,
-            ):
+            if total and sys.stderr.isatty():
+                file_iter = tqdm(
+                    batch, total=total, unit="file", desc="Processing raw files"
+                )
+            else:
+                file_iter = batch
+            for index, raw_file in enumerate(file_iter, start=1):
                 if stop_event is not None and stop_event.is_set():
-                    print(
-                        f"[stopped] Stop requested; "
-                        f"skipping {total - index + 1} remaining file(s) in batch."
-                    )
+                    left = total - index + 1
+                    print(f"Stop requested. {left} files left in this batch.")
                     break
 
-                print(f"[processing {index}/{total}] {raw_file.name}")
+                print(raw_file.name)
                 if (
                     config.search_space.mode == "untargeted"
                     and not config.search_space.csv_path.exists()
                     and state_store.get_attempts(raw_file) > retry_policy.max_retries
                 ):
                     print(
-                        f"[skipped] {raw_file.name} exceeded max_retries "
-                        f"({retry_policy.max_retries}) on untargeted search space build"
+                        f"Skipped {raw_file.name}: too many attempts "
+                        "to build the search space"
                     )
+                    skipped += 1
                     continue
                 try:
                     bootstrap_polarity = _ensure_untargeted_search_space(
@@ -545,23 +590,18 @@ def run_watch_mode(
                     state_store.mark_failed(
                         raw_file, f"untargeted search space build failed: {exc}"
                     )
-                    print(
-                        f"[failed] {raw_file.name} untargeted search space build: {exc}"
-                    )
-                    if is_polarity_mismatch_error(str(exc)):
-                        print(
-                            f"[polarity] {raw_file.name} does not match lock "
-                            f"{state_store.get_run_polarity()}; "
-                            "continuing with remaining files"
-                        )
+                    message = str(exc)
+                    if is_polarity_mismatch_error(message):
+                        print(_polarity_skip_line(raw_file.name, message))
+                        skipped += 1
+                    else:
+                        print(f"Failed {raw_file.name}: {message}")
+                        failed += 1
                     continue
 
-                if bootstrap_polarity and state_store.get_run_polarity() is None:
+                polarity_before = state_store.get_run_polarity()
+                if bootstrap_polarity and polarity_before is None:
                     state_store.set_run_polarity(bootstrap_polarity)
-                    print(
-                        f"[polarity] run locked to {state_store.get_run_polarity()} "
-                        f"(from {raw_file.name})"
-                    )
 
                 result = _process_one(
                     raw_file=raw_file,
@@ -570,15 +610,17 @@ def run_watch_mode(
                     state_store=state_store,
                     output_tracker=output_tracker,
                 )
-
-                if result.status != "completed" and is_polarity_mismatch_error(
-                    result.error
-                ):
-                    print(
-                        f"[polarity] {raw_file.name} does not match lock "
-                        f"{state_store.get_run_polarity()}; "
-                        "continuing with remaining files"
-                    )
+                locked = (
+                    polarity_before is None
+                    and state_store.get_run_polarity() is not None
+                )
+                outcome = _announce_result(result, locked=locked)
+                if outcome == "finished":
+                    finished += 1
+                elif outcome == "skipped":
+                    skipped += 1
+                else:
+                    failed += 1
 
                 # Refresh HTML + wide CSV exports immediately after each completed
                 # sample (same artifacts the end-of-batch synthesizer would write).
@@ -597,17 +639,32 @@ def run_watch_mode(
                 synthesized_this_cycle = True
 
             if stop_event is not None and stop_event.is_set():
-                print("[stopped] Stop requested.")
+                print("Stop requested.")
                 return 0
 
-            if synthesized_this_cycle and not once:
-                print(
-                    f"[watching] Waiting for new stable .raw files. {stop_hint}"
-                )
-            elif not batch and not once:
-                print(
-                    f"[watching] No new stable .raw files yet. {stop_hint}"
-                )
+            if not once:
+                now = time.monotonic()
+                if batch:
+                    message = _idle_message(
+                        announced=False,
+                        elapsed_sec=0,
+                        finished=finished,
+                        skipped=skipped,
+                        failed=failed,
+                    )
+                else:
+                    elapsed = now - last_idle_log if idle_announced else 0
+                    message = _idle_message(
+                        announced=idle_announced,
+                        elapsed_sec=elapsed,
+                        finished=0,
+                        skipped=0,
+                        failed=0,
+                    )
+                if message:
+                    print(message)
+                    idle_announced = True
+                    last_idle_log = now
 
             if once:
                 break
@@ -617,11 +674,11 @@ def run_watch_mode(
                 observer.event.wait(timeout=1.0)
                 observer.event.clear()
                 if stop_event is not None and stop_event.is_set():
-                    print("[stopped] Stop requested.")
+                    print("Stop requested.")
                     return 0
             else:
                 if _wait_for_poll(config.watcher.poll_interval_sec, stop_event):
-                    print("[stopped] Stop requested.")
+                    print("Stop requested.")
                     return 0
 
         return 0
@@ -664,12 +721,18 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
     try:
         configured_polarity = apply_configured_polarity(config, state_store)
     except ValueError as exc:
-        print(f"[polarity] {exc}")
+        print(exc)
         return 2
+
+    print(f"Processing {raw_file.name}.")
+    print(f"Output: {config.processor.output_dir}")
     if configured_polarity:
-        print(f"[polarity] run locked to {configured_polarity} (from config)")
+        print(f"Run locked to {configured_polarity}.")
+    elif state_store.get_run_polarity():
+        print(f"Run locked to {state_store.get_run_polarity()}.")
 
     synthesizer.write_placeholder_if_missing()
+    print(f"Dashboard: {_clickable_path(config.synthesizer.html_output)}")
 
     if not raw_file.exists():
         print(f"Raw file missing: {raw_file}")
@@ -677,7 +740,7 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
 
     reason = _sample_ignore_reason(raw_file, sample_regex, config.watcher.project_id)
     if reason:
-        print(f"[ignored] {raw_file.name} ({reason})")
+        print(_ignored_line(raw_file.name, reason))
         return 0
 
     if (
@@ -686,8 +749,7 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         and state_store.get_attempts(raw_file) > retry_policy.max_retries
     ):
         print(
-            f"[skipped] {raw_file.name} exceeded max_retries "
-            f"({retry_policy.max_retries}) on untargeted search space build"
+            f"Skipped {raw_file.name}: too many attempts to build the search space"
         )
         return 1
 
@@ -702,15 +764,16 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         state_store.mark_failed(
             raw_file, f"untargeted search space build failed: {exc}"
         )
-        print(f"[failed] {raw_file.name} untargeted search space build: {exc}")
+        message = str(exc)
+        if is_polarity_mismatch_error(message):
+            print(_polarity_skip_line(raw_file.name, message))
+        else:
+            print(f"Failed {raw_file.name}: {message}")
         return 1
 
-    if bootstrap_polarity and state_store.get_run_polarity() is None:
+    polarity_before = state_store.get_run_polarity()
+    if bootstrap_polarity and polarity_before is None:
         state_store.set_run_polarity(bootstrap_polarity)
-        print(
-            f"[polarity] run locked to {state_store.get_run_polarity()} "
-            f"(from {raw_file.name})"
-        )
 
     result = _process_one(
         raw_file=raw_file,
@@ -719,6 +782,8 @@ def run_process_mode(config: PipelineConfig, raw_file: Path) -> int:
         state_store=state_store,
         output_tracker=output_tracker,
     )
+    locked = polarity_before is None and state_store.get_run_polarity() is not None
+    _announce_result(result, locked=locked)
 
     # Rebuild dashboard HTML and wide pivot CSVs after every process run.
     _run_synthesis(synthesizer, output_tracker)
@@ -902,7 +967,7 @@ def main(argv: list[str] | None = None) -> int:
             force_reprocess=args.force_reprocess,
         )
     except KeyboardInterrupt:
-        print("\n[stopped] Watch mode interrupted by user (Ctrl+C).")
+        print("\nStop requested.")
         return 130
 
 

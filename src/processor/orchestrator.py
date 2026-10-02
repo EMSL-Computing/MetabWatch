@@ -57,6 +57,8 @@ class ProcessResult:
         Acquisition timestamp extracted from CoreMS metadata.
     polarity : str | None
         CoreMS ionization polarity when known (``positive`` / ``negative``).
+    targets : int | None
+        Number of standards considered for this file, when known.
     """
 
     raw_file: Path
@@ -68,6 +70,7 @@ class ProcessResult:
     retryable: bool = False
     acquisition_time: str | None = None
     polarity: str | None = None
+    targets: int | None = None
 
 
 class ProcessorOrchestrator:
@@ -166,6 +169,9 @@ class ProcessorOrchestrator:
             polarity = results_df.attrs.get("polarity")
             if polarity is not None:
                 polarity = str(polarity).strip().lower()
+            targets = results_df.attrs.get("targets")
+            if targets is not None:
+                targets = int(targets)
             return ProcessResult(
                 raw_file=raw_file,
                 status="completed",
@@ -175,6 +181,7 @@ class ProcessorOrchestrator:
                 retryable=False,
                 acquisition_time=acquisition_time,
                 polarity=polarity,
+                targets=targets,
             )
         except Exception as exc:
             retryable = self._is_retryable(exc)

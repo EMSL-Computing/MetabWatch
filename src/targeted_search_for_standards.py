@@ -347,7 +347,8 @@ def process_raw_to_observed_features_df(
     -------
     pd.DataFrame
         DataFrame containing matched observed features. ``attrs['polarity']``
-        holds the normalized CoreMS polarity string.
+        holds the normalized CoreMS polarity string. ``attrs['targets']`` is
+        how many standards were considered for that polarity.
     """
     _validate_inputs(
         raw_file=raw_file,
@@ -367,7 +368,6 @@ def process_raw_to_observed_features_df(
 
     standards_df = _load_and_validate_standards(standards_csv)
 
-    print(f"Loading raw file: {raw_file}")
     try:
         parser = ImportMassSpectraThermoMSFileReader(raw_file)
         skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
@@ -511,8 +511,6 @@ def process_raw_to_observed_features_df(
                 pdf.savefig(fig)
                 fig.clf()
 
-        print(f"EIC plots saved to: {plot_pdf}")
-
     if plot_tic:
         tic_png.parent.mkdir(parents=True, exist_ok=True)
 
@@ -525,8 +523,6 @@ def process_raw_to_observed_features_df(
         fig.tight_layout()
         fig.savefig(tic_png, dpi=200)
         plt.close(fig)
-
-        print(f"TIC plot saved to: {tic_png}")
 
     trace_csv.parent.mkdir(parents=True, exist_ok=True)
 
@@ -605,19 +601,10 @@ def process_raw_to_observed_features_df(
     ms1_df = ms1_df.drop(columns=["scan"])
     ms1_df["acquisition_time"] = acquisition_time
     ms1_df.to_csv(trace_csv, index=False)
-    print(f"MS1 EIC/TIC trace table saved to: {trace_csv}")
 
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     results_df.to_csv(output_csv, index=False)
-
-    print("=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    print(f"Raw file processed: {raw_file.name}")
-    print(f"Polarity: {raw_polarity}")
-    print(f"Standards considered: {len(target_df)}")
-    print(f"Matched features: {len(results_df)}")
-    print(f"Output CSV: {output_csv}")
+    results_df.attrs["targets"] = len(target_df)
 
     return results_df
 
