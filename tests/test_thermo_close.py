@@ -34,6 +34,60 @@ class _CountingParser:
         return "2026-01-01T00:00:00+00:00"
 
 
+class _FakeFeature:
+    def __init__(self, mz: float, scan_time: float, area: float) -> None:
+        self.mz = mz
+        self.scan_time = scan_time
+        self.area = area
+        self.isotopologue_type = None
+        # Survive the packaged HILIC peak-metric keep-rules.
+        self._gaussian_similarity = 0.91
+        self.tailing_factor = 1.1
+        self.noise_score_min = 0.6
+        self.noise_score_max = 0.9
+
+
+class _FakeLcms:
+    """Minimal LCMS stand-in for the untargeted close tests."""
+
+    def __init__(self) -> None:
+        self.polarity = "positive"
+        self.parameters = LCMSParameters(use_defaults=True)
+        self.mass_features = {
+            1: _FakeFeature(100.1, 1.2, 1.0e6),
+            2: _FakeFeature(150.2, 2.3, 5.0e5),
+        }
+        self.scan_df = pd.DataFrame(
+            {"ms_level": [1, 1], "ms_format": ["profile", "profile"]}
+        )
+
+    def find_mass_features(self) -> None:
+        return None
+
+    def integrate_mass_features(self, **kwargs) -> None:
+        return None
+
+    def cluster_mass_features(self, **kwargs) -> None:
+        return None
+
+    def add_peak_metrics(self, **kwargs) -> None:
+        return None
+
+    def find_c13_mass_features(self) -> None:
+        return None
+
+    def mass_features_to_df(self, drop_na_cols: bool = True) -> pd.DataFrame:
+        rows = [
+            {
+                "mz": mass_feature.mz,
+                "scan_time": mass_feature.scan_time,
+                "area": mass_feature.area,
+            }
+            for mass_feature in self.mass_features.values()
+        ]
+        return pd.DataFrame(rows)
+
+
 def test_close_thermo_reader_ignores_missing_and_failed_close() -> None:
     class _Boom:
         def close_file(self) -> None:
@@ -50,8 +104,6 @@ def test_close_thermo_reader_ignores_missing_and_failed_close() -> None:
 
 
 def test_untargeted_closes_reader_after_success(tmp_path: Path, monkeypatch) -> None:
-    from tests.test_untargeted import _FakeLcms
-
     raw = tmp_path / "Pool.raw"
     raw.write_bytes(b"x")
     out = tmp_path / "untargeted_search_space.csv"
@@ -87,8 +139,6 @@ def test_untargeted_closes_reader_after_success(tmp_path: Path, monkeypatch) -> 
 def test_untargeted_closes_reader_when_peak_picking_fails(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from tests.test_untargeted import _FakeLcms
-
     raw = tmp_path / "Pool.raw"
     raw.write_bytes(b"x")
     out = tmp_path / "untargeted_search_space.csv"
