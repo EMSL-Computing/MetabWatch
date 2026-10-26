@@ -53,7 +53,7 @@ newest log with any bug report.
 
 ## From source (developers)
 
-1. Install **64-bit Python 3.10+** from [python.org](https://www.python.org/downloads/).
+1. Install **64-bit Python 3.11+** from [python.org](https://www.python.org/downloads/).
    Prefer the official installer so **tkinter** is included. Optionally check
    **Add python.exe to PATH**.
 2. Clone this repository to a local disk path.

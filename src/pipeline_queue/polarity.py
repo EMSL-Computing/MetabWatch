@@ -30,6 +30,25 @@ def polarity_from_lcms(lcms_obj) -> str:
     return str(lcms_obj.polarity).strip().lower()
 
 
+def close_thermo_reader(parser) -> None:
+    """Release a Thermo RawFileReader handle opened by CoreMS.
+
+    ``close_file`` drops the lock so the ``.raw`` can be opened or deleted
+    while MetabWatch is still running. A second call is safe. Parsers without
+    ``close_file`` are ignored. Errors from close are swallowed so a failed
+    release does not hide the sample error that triggered it.
+    """
+    if parser is None:
+        return
+    close = getattr(parser, "close_file", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:
+        return
+
+
 def skip_if_locked_polarity_mismatch(
     parser,
     raw_file: Path,
@@ -48,12 +67,7 @@ def skip_if_locked_polarity_mismatch(
     actual = polarity_from_scan_filter(parser)
     if actual == expected:
         return
-    close = getattr(parser, "close_file", None)
-    if callable(close):
-        try:
-            close()
-        except Exception:
-            pass
+    close_thermo_reader(parser)
     raise ValueError(
         f"Polarity mismatch: file {raw_file.name} is '{actual}' "
         f"but this run is locked to '{expected}'. "

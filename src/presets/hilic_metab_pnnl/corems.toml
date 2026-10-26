@@ -1,6 +1,5 @@
-# CoreMS 4.0.1 LC-MS overrides used by MetabWatch.
+# CoreMS 4.1.0 LC-MS overrides used by MetabWatch.
 # Omitted LiquidChromatograph keys keep CoreMS defaults.
-# Empty [mass_spectrum] is required by CoreMS 4.0.1's TOML loader.
 
 [LiquidChromatograph]
 smooth_window = 9
@@ -25,5 +24,3 @@ operator = ">="
 [LiquidChromatograph.mass_feature_attribute_filter_dict.gaussian_similarity]
 value = 0.7
 operator = ">="
-
-[mass_spectrum]
