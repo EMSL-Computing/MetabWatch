@@ -10,7 +10,6 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - MetabWatch uses CoreMS 4.1.0. Source installs need Python 3.11 or newer. Packaged method settings are unchanged: HILIC still clusters within 0.15 min and RP within 0.10 min. CoreMS 4.1's own default retention-time window is 0.3 min, and that default applies only when a custom CoreMS file omits `mass_feature_cluster_rt_tolerance`.
-- Untargeted peak-metric filtering still reads Gaussian similarity from CoreMS's private `_gaussian_similarity`. CoreMS 4.1 does not expose a public name, and its own filter would drop every feature.
 
 ### Fixed
 
