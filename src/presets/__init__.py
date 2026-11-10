@@ -2,7 +2,7 @@
 
 Scientific assets (CoreMS TOML + QC compound CSVs) ship as package data under
 ``metabwatch.presets.<method_key>/``. Packaged ``corems.toml`` files list only
-LC-MS keys that differ from CoreMS 4.0.1 defaults and that MetabWatch uses
+LC-MS keys that differ from CoreMS 4.1.0 defaults and that MetabWatch uses
 (peak picking, EIC integration, clustering). Call :func:`build_pipeline_config`
 for standard method × search modes; the CLI and GUI both use this API.
 

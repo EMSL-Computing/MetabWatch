@@ -24,7 +24,7 @@ cloudpickle==3.1.2
 clr_loader==0.3.1
 colorama==0.4.6
 contourpy==1.4.0
-CoreMS==4.0.1
+CoreMS==4.1.0
 cycler==0.12.1
 Cython==3.3.0
 Deprecated==3.0.0
@@ -47,14 +47,18 @@ netCDF4==1.7.4
 numpy==2.5.3
 openpyxl==3.1.5
 packaging==26.3
-pandas==3.0.6
+pandas==2.3.3
 persim==0.3.8
 pillow==12.3.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
 psycopg2-binary==2.9.13
 pycparser==3.0
+pyarrow==26.0.0
 pymzml==2.7.0
 pyparsing==3.3.3
 pyswarm==1.0.1
+pytz==2026.5
 python-dateutil==2.9.0.post0
 pythonnet==3.2.0
 regex==2026.9.29
@@ -72,6 +76,7 @@ soupsieve==2.10
 SQLAlchemy==2.1.1
 threadpoolctl==3.7.0
 toml==0.10.2
+tomlkit==0.15.2
 tqdm==4.70.1
 typing_extensions==4.16.0
 tzdata==2026.4

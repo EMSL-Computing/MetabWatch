@@ -21,6 +21,7 @@ from corems.encapsulation.input.parameter_from_json import load_and_set_toml_par
 from corems.mass_spectra.input.rawFileReader import ImportMassSpectraThermoMSFileReader
 
 from metabwatch.pipeline_queue import (
+    close_thermo_reader,
     polarity_from_lcms,
     skip_if_locked_polarity_mismatch,
 )
@@ -39,11 +40,11 @@ _PEAK_METRIC_OPERATORS = {
 
 
 def _peak_metric_value(mass_feature, name: str):
-    """Return a peak-metric attribute, including CoreMS 4.0.1 private aliases.
+    """Return a peak-metric attribute, including CoreMS private aliases.
 
-    CoreMS 4.0.1 stores Gaussian similarity as ``_gaussian_similarity`` and does
-    not expose a public ``gaussian_similarity`` property. Its own filter treats
-    a missing attribute as a failed keep-rule and would drop every feature.
+    CoreMS stores Gaussian similarity as ``_gaussian_similarity`` and does not
+    expose a public ``gaussian_similarity`` property. Its own filter treats a
+    missing attribute as a failed keep-rule and would drop every feature.
     """
     candidates = (name,) if name.startswith("_") else (name, f"_{name}")
     for candidate in candidates:
@@ -178,91 +179,95 @@ def build_untargeted_search_space(
         mz_tolerance_ppm=mz_tolerance_ppm,
     )
 
+    parser = None
     try:
-        parser = ImportMassSpectraThermoMSFileReader(raw_file)
-        skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
-        lcms_obj = parser.get_lcms_obj(spectra="ms1")
-    except ValueError:
-        raise
-    except Exception as exc:
-        raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
+        try:
+            parser = ImportMassSpectraThermoMSFileReader(raw_file)
+            skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
+            lcms_obj = parser.get_lcms_obj(spectra="ms1")
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
 
-    if lcms_obj is None:
-        raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
+        if lcms_obj is None:
+            raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
 
-    try:
-        load_and_set_toml_parameters_lcms(lcms_obj, params_path)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to load CoreMS parameter file {params_path}: {exc}"
-        ) from exc
+        try:
+            load_and_set_toml_parameters_lcms(lcms_obj, params_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load CoreMS parameter file {params_path}: {exc}"
+            ) from exc
 
-    polarity = polarity_from_lcms(lcms_obj)
+        polarity = polarity_from_lcms(lcms_obj)
 
-    align_peak_picking_to_ms1_format(lcms_obj)
+        align_peak_picking_to_ms1_format(lcms_obj)
 
-    # Override cluster m/z on this object only (do not mutate the shared TOML).
-    # Targeted reads the same file and keeps the packaged window. Bump to
-    # 1.5e-5 (15 ppm) so post-integration clustering collapses residual ~5-13
-    # ppm duplicates that survive the default 5 ppm window.
-    lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
+        # Override cluster m/z on this object only (do not mutate the shared TOML).
+        # Targeted reads the same file and keeps the packaged window. Bump to
+        # 1.5e-5 (15 ppm) so post-integration clustering collapses residual ~5-13
+        # ppm duplicates that survive the default 5 ppm window.
+        lcms_obj.parameters.lc_ms.mass_feature_cluster_mz_tolerance_rel = 1.5e-5
 
-    lcms_obj.find_mass_features()
-    # Keep the full feature set: do not drop failed/duplicate peaks during integration.
-    lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
-    lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
-    # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
-    lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
-    # Compute metrics without CoreMS's remover: CoreMS 4.0.1 has no public
-    # gaussian_similarity attribute, so its filter would drop every feature.
-    # Targeted never calls this path.
-    lcms_obj.add_peak_metrics(remove_by_metrics=False)
-    if lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics:
-        _apply_peak_metric_filters(lcms_obj)
-    lcms_obj.find_c13_mass_features()
-    lcms_obj.mass_features = {
-        mf_id: mf
-        for mf_id, mf in lcms_obj.mass_features.items()
-        if not getattr(mf, "isotopologue_type", None)
-    }
+        lcms_obj.find_mass_features()
+        # Keep the full feature set: do not drop failed/duplicate peaks during integration.
+        lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+        lcms_obj.cluster_mass_features(drop_children=True, sort_by="persistence")
+        # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
+        lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+        # Compute metrics without CoreMS's remover: CoreMS has no public
+        # gaussian_similarity attribute, so its filter would drop every feature.
+        # Targeted never calls this path.
+        lcms_obj.add_peak_metrics(remove_by_metrics=False)
+        if lcms_obj.parameters.lc_ms.remove_mass_features_by_peak_metrics:
+            _apply_peak_metric_filters(lcms_obj)
+        lcms_obj.find_c13_mass_features()
+        lcms_obj.mass_features = {
+            mf_id: mf
+            for mf_id, mf in lcms_obj.mass_features.items()
+            if not getattr(mf, "isotopologue_type", None)
+        }
 
-    mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
-    if mf_df.empty:
-        raise RuntimeError(
-            f"CoreMS produced 0 untargeted mass features for {raw_file.name} "
-            "(after integration / quality filter / clustering)"
-        )
-    required = {"mz", "scan_time", "area"}
-    missing = sorted(required - set(mf_df.columns))
-    if missing:
-        raise RuntimeError(
-            "CoreMS untargeted features missing required columns: "
-            + ", ".join(missing)
-            + " (integration may have failed)"
-        )
+        mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
+        if mf_df.empty:
+            raise RuntimeError(
+                f"CoreMS produced 0 untargeted mass features for {raw_file.name} "
+                "(after integration / quality filter / clustering)"
+            )
+        required = {"mz", "scan_time", "area"}
+        missing = sorted(required - set(mf_df.columns))
+        if missing:
+            raise RuntimeError(
+                "CoreMS untargeted features missing required columns: "
+                + ", ".join(missing)
+                + " (integration may have failed)"
+            )
 
-    ranked = mf_df.sort_values("area", ascending=False).reset_index(drop=True)
-    kept = ranked.head(top_n).copy()
-    if len(kept) < top_n:
+        ranked = mf_df.sort_values("area", ascending=False).reset_index(drop=True)
+        kept = ranked.head(top_n).copy()
+        if len(kept) < top_n:
+            print(
+                f"[warning] only {len(kept)} peaks found; requested top_n={top_n}"
+            )
+
+        name_width = max(3, len(str(top_n)))
+        kept["compound_name"] = [
+            f"feature_{i:0{name_width}d}" for i in range(1, len(kept) + 1)
+        ]
+        kept["ion_type"] = "unknown"
+        kept["polarity"] = polarity
+        kept = kept.rename(columns={"scan_time": "retention_time"})
+
+        diagnostic_df = kept[SEARCH_SPACE_COLUMNS + ["area"]].copy()
+        tmp_path = output_csv.with_suffix(output_csv.suffix + ".tmp")
+        diagnostic_df.drop(columns=["area"]).to_csv(tmp_path, index=False)
+        tmp_path.replace(output_csv)
         print(
-            f"[warning] only {len(kept)} peaks found; requested top_n={top_n}"
+            f"[untargeted] wrote {output_csv} with {len(diagnostic_df)} features "
+            f"(polarity={polarity})"
         )
-
-    name_width = max(3, len(str(top_n)))
-    kept["compound_name"] = [
-        f"feature_{i:0{name_width}d}" for i in range(1, len(kept) + 1)
-    ]
-    kept["ion_type"] = "unknown"
-    kept["polarity"] = polarity
-    kept = kept.rename(columns={"scan_time": "retention_time"})
-
-    diagnostic_df = kept[SEARCH_SPACE_COLUMNS + ["area"]].copy()
-    tmp_path = output_csv.with_suffix(output_csv.suffix + ".tmp")
-    diagnostic_df.drop(columns=["area"]).to_csv(tmp_path, index=False)
-    tmp_path.replace(output_csv)
-    print(
-        f"[untargeted] wrote {output_csv} with {len(diagnostic_df)} features "
-        f"(polarity={polarity})"
-    )
-    diagnostic_df.attrs["polarity"] = polarity
-    return diagnostic_df
+        diagnostic_df.attrs["polarity"] = polarity
+        return diagnostic_df
+    finally:
+        close_thermo_reader(parser)

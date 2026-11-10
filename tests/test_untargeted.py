@@ -248,6 +248,7 @@ def test_untargeted_skips_locked_mismatch_before_ms1_load(
 
         def close_file(self) -> None:
             self.closed = True
+            self.close_calls = getattr(self, "close_calls", 0) + 1
 
         def get_lcms_obj(self, spectra: str = "ms1") -> _FakeLcms:
             self.loaded_ms1 = True
@@ -277,5 +278,6 @@ def test_untargeted_skips_locked_mismatch_before_ms1_load(
 
     assert fake_parser is not None
     assert fake_parser.closed is True
+    assert fake_parser.close_calls == 2
     assert fake_parser.loaded_ms1 is False
     assert not out.exists()
