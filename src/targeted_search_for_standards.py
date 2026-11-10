@@ -32,6 +32,7 @@ from metabwatch.output.layout import (
     sample_trace_csv,
 )
 from metabwatch.pipeline_queue import (
+    close_thermo_reader,
     polarity_from_lcms,
     skip_if_locked_polarity_mismatch,
 )
@@ -368,203 +369,228 @@ def process_raw_to_observed_features_df(
 
     standards_df = _load_and_validate_standards(standards_csv)
 
+    parser = None
     try:
-        parser = ImportMassSpectraThermoMSFileReader(raw_file)
-        skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
-        lcms_obj = parser.get_lcms_obj(spectra="ms1")
-    except ValueError:
-        raise
-    except Exception as exc:
-        raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
+        try:
+            parser = ImportMassSpectraThermoMSFileReader(raw_file)
+            skip_if_locked_polarity_mismatch(parser, raw_file, expected_polarity)
+            lcms_obj = parser.get_lcms_obj(spectra="ms1")
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"Failed to parse raw file {raw_file}: {exc}") from exc
 
-    if lcms_obj is None:
-        raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
+        if lcms_obj is None:
+            raise RuntimeError(f"Failed to instantiate LCMS object for {raw_file}")
 
-    acquisition_time = _extract_acquisition_time_iso(parser=parser, lcms_obj=lcms_obj)
+        acquisition_time = _extract_acquisition_time_iso(parser=parser, lcms_obj=lcms_obj)
 
-    try:
-        load_and_set_toml_parameters_lcms(lcms_obj, params_path)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to load CoreMS parameter file {params_path}: {exc}"
-        ) from exc
-
-    raw_polarity = polarity_from_lcms(lcms_obj)
-    target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
-    if target_df.empty:
-        raise ValueError(
-            f"No standards found for raw file polarity '{raw_polarity}'. "
-            "Confirm the standards CSV polarity column values."
-        )
-
-    target_search_dict = {
-        "target_mz_list": target_df["mz"].tolist(),
-        "target_rt_list": target_df["retention_time"].tolist(),
-        "mz_tolerance_ppm": mz_tolerance_ppm,
-        "rt_tolerance": rt_tolerance,
-        "type": "qc standard",
-    }
-
-    align_peak_picking_to_ms1_format(lcms_obj)
-
-    lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
-    if integrate_mass_features:
-        # Keep the full feature set: do not drop failed/duplicate peaks so
-        # intensity-based match selection stays stable vs pre-integration runs.
-        lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
-    lcms_obj.add_associated_ms1()
-    if cluster_mass_features:
-        lcms_obj.cluster_mass_features()
-        # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
-        if integrate_mass_features:
-            lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
-
-    mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
-    required_mf_columns = {"mz", "scan_time"}
-    missing_mf_columns = sorted(required_mf_columns - set(mf_df.columns))
-    if missing_mf_columns:
-        raise RuntimeError(
-            "CoreMS mass features DataFrame missing required columns: "
-            + ", ".join(missing_mf_columns)
-        )
-
-    has_area = "area" in mf_df.columns
-    if min_area > 0 and not has_area:
-        print(
-            "[warning] 'area' is unavailable in CoreMS mass features; "
-            "skipping min_area filtering"
-        )
-
-    file_results = []
-    for idx, mf_row in mf_df.iterrows():
-        observed_mz = mf_row.get("mz")
-        observed_rt = mf_row.get("scan_time")
-
-        mz_ppm_diff = abs((target_df["mz"] - observed_mz) / target_df["mz"] * 1e6)
-        rt_diff = abs(target_df["retention_time"] - observed_rt)
-
-        matches = target_df[
-            (mz_ppm_diff <= mz_tolerance_ppm) & (rt_diff <= rt_tolerance)
-        ]
-
-        for _, match_row in matches.iterrows():
-            result = {
-                "mf_id": idx,
-                "filename": raw_file.name,
-                "compound_name": match_row["compound_name"],
-                "ion_type": match_row["ion_type"],
-                "polarity": match_row["polarity"],
-                "target_mz": match_row["mz"],
-                "target_rt": match_row["retention_time"],
-                "observed_mz": observed_mz,
-                "observed_rt": observed_rt,
-                "mz_error_ppm": (observed_mz - match_row["mz"]) / match_row["mz"] * 1e6,
-                "rt_error": observed_rt - match_row["retention_time"],
-            }
-            for col in mf_df.columns:
-                if col not in result:
-                    result[col] = mf_row[col]
-            file_results.append(result)
-
-    results_df = pd.DataFrame(file_results)
-
-    if min_area > 0 and not results_df.empty and has_area:
-        results_df = results_df[results_df["area"] >= min_area].copy()
-
-    # Keep one hit per compound by selecting the highest-intensity matched feature.
-    if not results_df.empty:
-        if "intensity" not in results_df.columns:
+        try:
+            load_and_set_toml_parameters_lcms(lcms_obj, params_path)
+        except Exception as exc:
             raise RuntimeError(
-                "Expected 'intensity' in matched results for duplicate resolution"
+                f"Failed to load CoreMS parameter file {params_path}: {exc}"
+            ) from exc
+
+        raw_polarity = polarity_from_lcms(lcms_obj)
+        target_df = standards_df[standards_df["polarity"] == raw_polarity].copy()
+        if target_df.empty:
+            raise ValueError(
+                f"No standards found for raw file polarity '{raw_polarity}'. "
+                "Confirm the standards CSV polarity column values."
             )
-        results_df = (
-            results_df.sort_values("intensity", ascending=False)
-            .drop_duplicates(subset=["compound_name"], keep="first")
+
+        target_search_dict = {
+            "target_mz_list": target_df["mz"].tolist(),
+            "target_rt_list": target_df["retention_time"].tolist(),
+            "mz_tolerance_ppm": mz_tolerance_ppm,
+            "rt_tolerance": rt_tolerance,
+            "type": "qc standard",
+        }
+
+        align_peak_picking_to_ms1_format(lcms_obj)
+
+        lcms_obj.find_mass_features(targeted_search=True, target_search_dict=target_search_dict)
+        if integrate_mass_features:
+            # Keep the full feature set: do not drop failed/duplicate peaks so
+            # intensity-based match selection stays stable vs pre-integration runs.
+            lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+        lcms_obj.add_associated_ms1()
+        if cluster_mass_features:
+            lcms_obj.cluster_mass_features()
+            # Re-integrate surviving parents so area/EIC bounds match the post-cluster set.
+            if integrate_mass_features:
+                lcms_obj.integrate_mass_features(drop_if_fail=False, drop_duplicates=False)
+
+        mf_df = lcms_obj.mass_features_to_df(drop_na_cols=True)
+        required_mf_columns = {"mz", "scan_time"}
+        missing_mf_columns = sorted(required_mf_columns - set(mf_df.columns))
+        if missing_mf_columns:
+            raise RuntimeError(
+                "CoreMS mass features DataFrame missing required columns: "
+                + ", ".join(missing_mf_columns)
+            )
+
+        has_area = "area" in mf_df.columns
+        if min_area > 0 and not has_area:
+            print(
+                "[warning] 'area' is unavailable in CoreMS mass features; "
+                "skipping min_area filtering"
+            )
+
+        file_results = []
+        for idx, mf_row in mf_df.iterrows():
+            observed_mz = mf_row.get("mz")
+            observed_rt = mf_row.get("scan_time")
+
+            mz_ppm_diff = abs((target_df["mz"] - observed_mz) / target_df["mz"] * 1e6)
+            rt_diff = abs(target_df["retention_time"] - observed_rt)
+
+            matches = target_df[
+                (mz_ppm_diff <= mz_tolerance_ppm) & (rt_diff <= rt_tolerance)
+            ]
+
+            for _, match_row in matches.iterrows():
+                result = {
+                    "mf_id": idx,
+                    "filename": raw_file.name,
+                    "compound_name": match_row["compound_name"],
+                    "ion_type": match_row["ion_type"],
+                    "polarity": match_row["polarity"],
+                    "target_mz": match_row["mz"],
+                    "target_rt": match_row["retention_time"],
+                    "observed_mz": observed_mz,
+                    "observed_rt": observed_rt,
+                    "mz_error_ppm": (observed_mz - match_row["mz"]) / match_row["mz"] * 1e6,
+                    "rt_error": observed_rt - match_row["retention_time"],
+                }
+                for col in mf_df.columns:
+                    if col not in result:
+                        result[col] = mf_row[col]
+                file_results.append(result)
+
+        results_df = pd.DataFrame(file_results)
+
+        if min_area > 0 and not results_df.empty and has_area:
+            results_df = results_df[results_df["area"] >= min_area].copy()
+
+        # Keep one hit per compound by selecting the highest-intensity matched feature.
+        if not results_df.empty:
+            if "intensity" not in results_df.columns:
+                raise RuntimeError(
+                    "Expected 'intensity' in matched results for duplicate resolution"
+                )
+            results_df = (
+                results_df.sort_values("intensity", ascending=False)
+                .drop_duplicates(subset=["compound_name"], keep="first")
+                .reset_index(drop=True)
+            )
+
+        results_df["acquisition_time"] = acquisition_time
+        results_df.attrs["acquisition_time"] = acquisition_time
+        results_df.attrs["polarity"] = raw_polarity
+
+        if plot_eics and not results_df.empty:
+            plot_pdf.parent.mkdir(parents=True, exist_ok=True)
+
+            mf_compounds = (
+                results_df.groupby("mf_id")["compound_name"]
+                .apply(lambda s: sorted(set(s.astype(str).tolist())))
+                .to_dict()
+            )
+
+            with PdfPages(plot_pdf) as pdf:
+                for mf_id in sorted(mf_compounds):
+                    if mf_id not in lcms_obj.mass_features:
+                        continue
+                    fig = lcms_obj.mass_features[mf_id].plot()
+                    compounds = ", ".join(mf_compounds[mf_id])
+                    fig.suptitle(
+                        f"Mass Feature ID: {mf_id} | Compound(s): {compounds}",
+                        fontsize=9,
+                        y=0.98,
+                    )
+                    fig.tight_layout()
+                    pdf.savefig(fig)
+                    fig.clf()
+
+        if plot_tic:
+            tic_png.parent.mkdir(parents=True, exist_ok=True)
+
+            tic_df = lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1]
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(tic_df["scan_time"], tic_df["tic"], linewidth=0.8)
+            ax.set_xlabel("Retention Time (min)")
+            ax.set_ylabel("TIC")
+            ax.set_title(f"TIC | Sample: {raw_file.name} | Polarity: {raw_polarity}")
+            fig.tight_layout()
+            fig.savefig(tic_png, dpi=200)
+            plt.close(fig)
+
+        trace_csv.parent.mkdir(parents=True, exist_ok=True)
+
+        ms1_df = (
+            lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1][["scan", "scan_time", "tic"]]
+            .copy()
+            .rename(columns={"scan_time": "time"})
+            .sort_values("scan")
             .reset_index(drop=True)
         )
 
-    results_df["acquisition_time"] = acquisition_time
-    results_df.attrs["acquisition_time"] = acquisition_time
-    results_df.attrs["polarity"] = raw_polarity
+        # Integration-disabled mode does not populate `lcms_obj.eics`; build target and
+        # matched-feature EICs directly so dashboard traces are still available.
+        if not getattr(lcms_obj, "eics", None):
+            mz_values_for_eics = target_df["mz"].dropna().astype(float).tolist()
+            if not results_df.empty and "observed_mz" in results_df.columns:
+                mz_values_for_eics.extend(
+                    results_df["observed_mz"].dropna().astype(float).tolist()
+                )
+            _build_eics_for_mz_list(
+                lcms_obj=lcms_obj,
+                mz_values=mz_values_for_eics,
+                mz_tolerance_ppm=mz_tolerance_ppm,
+            )
 
-    if plot_eics and not results_df.empty:
-        plot_pdf.parent.mkdir(parents=True, exist_ok=True)
+        if not results_df.empty:
+            final_hits = (
+                results_df[["mf_id", "compound_name"]]
+                .drop_duplicates(subset=["mf_id"], keep="first")
+                .sort_values("mf_id")
+            )
 
-        mf_compounds = (
-            results_df.groupby("mf_id")["compound_name"]
-            .apply(lambda s: sorted(set(s.astype(str).tolist())))
-            .to_dict()
-        )
-
-        with PdfPages(plot_pdf) as pdf:
-            for mf_id in sorted(mf_compounds):
+            for _, row in final_hits.iterrows():
+                mf_id = int(row["mf_id"])
+                compound_name = str(row["compound_name"])
                 if mf_id not in lcms_obj.mass_features:
                     continue
-                fig = lcms_obj.mass_features[mf_id].plot()
-                compounds = ", ".join(mf_compounds[mf_id])
-                fig.suptitle(
-                    f"Mass Feature ID: {mf_id} | Compound(s): {compounds}",
-                    fontsize=9,
-                    y=0.98,
-                )
-                fig.tight_layout()
-                pdf.savefig(fig)
-                fig.clf()
 
-    if plot_tic:
-        tic_png.parent.mkdir(parents=True, exist_ok=True)
+                safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
+                col_name = f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
 
-        tic_df = lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1]
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(tic_df["scan_time"], tic_df["tic"], linewidth=0.8)
-        ax.set_xlabel("Retention Time (min)")
-        ax.set_ylabel("TIC")
-        ax.set_title(f"TIC | Sample: {raw_file.name} | Polarity: {raw_polarity}")
-        fig.tight_layout()
-        fig.savefig(tic_png, dpi=200)
-        plt.close(fig)
+                eic_data = _eic_data_for_mass_feature(lcms_obj, mf_id, mz_tolerance_ppm)
+                if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
+                    continue
+                if eic_data.scans is None or eic_data.eic is None:
+                    continue
+                eic_df = pd.DataFrame({
+                    "scan": eic_data.scans,
+                    col_name: eic_data.eic,
+                })
+                ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
 
-    trace_csv.parent.mkdir(parents=True, exist_ok=True)
-
-    ms1_df = (
-        lcms_obj.scan_df[lcms_obj.scan_df["ms_level"] == 1][["scan", "scan_time", "tic"]]
-        .copy()
-        .rename(columns={"scan_time": "time"})
-        .sort_values("scan")
-        .reset_index(drop=True)
-    )
-
-    # Integration-disabled mode does not populate `lcms_obj.eics`; build target and
-    # matched-feature EICs directly so dashboard traces are still available.
-    if not getattr(lcms_obj, "eics", None):
-        mz_values_for_eics = target_df["mz"].dropna().astype(float).tolist()
-        if not results_df.empty and "observed_mz" in results_df.columns:
-            mz_values_for_eics.extend(
-                results_df["observed_mz"].dropna().astype(float).tolist()
-            )
-        _build_eics_for_mz_list(
-            lcms_obj=lcms_obj,
-            mz_values=mz_values_for_eics,
-            mz_tolerance_ppm=mz_tolerance_ppm,
+        # Always export target-based EIC traces for each expected compound so
+        # non-detected compounds still have a real CoreMS-extracted chromatogram.
+        target_export = (
+            target_df[["compound_name", "mz"]]
+            .dropna(subset=["compound_name", "mz"])
+            .drop_duplicates(subset=["compound_name"], keep="first")
         )
-
-    if not results_df.empty:
-        final_hits = (
-            results_df[["mf_id", "compound_name"]]
-            .drop_duplicates(subset=["mf_id"], keep="first")
-            .sort_values("mf_id")
-        )
-
-        for _, row in final_hits.iterrows():
-            mf_id = int(row["mf_id"])
+        for _, row in target_export.iterrows():
             compound_name = str(row["compound_name"])
-            if mf_id not in lcms_obj.mass_features:
-                continue
+            target_mz = float(row["mz"])
+            col_name = _target_trace_col(compound_name)
 
-            safe_name = re.sub(r"[^0-9A-Za-z]+", "_", compound_name).strip("_")
-            col_name = f"mf_{mf_id}_{safe_name}" if safe_name else f"mf_{mf_id}"
-
-            eic_data = _eic_data_for_mass_feature(lcms_obj, mf_id, mz_tolerance_ppm)
+            eic_data = _eic_data_for_mz(lcms_obj, target_mz, mz_tolerance_ppm)
             if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
                 continue
             if eic_data.scans is None or eic_data.eic is None:
@@ -575,38 +601,18 @@ def process_raw_to_observed_features_df(
             })
             ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
 
-    # Always export target-based EIC traces for each expected compound so
-    # non-detected compounds still have a real CoreMS-extracted chromatogram.
-    target_export = (
-        target_df[["compound_name", "mz"]]
-        .dropna(subset=["compound_name", "mz"])
-        .drop_duplicates(subset=["compound_name"], keep="first")
-    )
-    for _, row in target_export.iterrows():
-        compound_name = str(row["compound_name"])
-        target_mz = float(row["mz"])
-        col_name = _target_trace_col(compound_name)
+        ms1_df = ms1_df.drop(columns=["scan"])
+        ms1_df["acquisition_time"] = acquisition_time
+        ms1_df.to_csv(trace_csv, index=False)
 
-        eic_data = _eic_data_for_mz(lcms_obj, target_mz, mz_tolerance_ppm)
-        if eic_data is None or not hasattr(eic_data, "scans") or not hasattr(eic_data, "eic"):
-            continue
-        if eic_data.scans is None or eic_data.eic is None:
-            continue
-        eic_df = pd.DataFrame({
-            "scan": eic_data.scans,
-            col_name: eic_data.eic,
-        })
-        ms1_df = ms1_df.merge(eic_df, on="scan", how="left")
+        output_csv.parent.mkdir(parents=True, exist_ok=True)
+        results_df.to_csv(output_csv, index=False)
+        results_df.attrs["targets"] = len(target_df)
 
-    ms1_df = ms1_df.drop(columns=["scan"])
-    ms1_df["acquisition_time"] = acquisition_time
-    ms1_df.to_csv(trace_csv, index=False)
+        return results_df
 
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
-    results_df.to_csv(output_csv, index=False)
-    results_df.attrs["targets"] = len(target_df)
-
-    return results_df
+    finally:
+        close_thermo_reader(parser)
 
 
 if __name__ == "__main__":

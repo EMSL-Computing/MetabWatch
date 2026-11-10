@@ -8,7 +8,7 @@ Windows setup.
 
 ## Python
 
-Use **Python 3.10+**. From the repo root:
+Use **Python 3.11+**. From the repo root:
 
 ```bash
 python3 -m venv .venv
@@ -27,5 +27,5 @@ After a versioned release, make a new Windows shortcut per [INSTALL.md](INSTALL.
 
 Lab use is **Windows**. macOS is unsupported for operators.
 
-If you develop on a Mac, install Python 3.10+ and the venv as above, then follow
+If you develop on a Mac, install Python 3.11+ and the venv as above, then follow
 CoreMS for Mono + pythonnet.

@@ -1,4 +1,4 @@
-"""Packaged CoreMS TOMLs are LC-MS overrides vs CoreMS 4.0.1 defaults."""
+"""Packaged CoreMS TOMLs are LC-MS overrides vs CoreMS 4.1.0 defaults."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
 
 _PRESETS = Path(__file__).resolve().parents[1] / "src" / "presets"
 
-# Keys MetabWatch actually uses that differ from CoreMS 4.0.1 defaults.
+# Keys MetabWatch actually uses that differ from CoreMS 4.1.0 defaults.
 _SHARED_LC_KEYS = {
     "smooth_window",
     "consecutive_scan_min",
@@ -72,8 +72,7 @@ def _apply(method: str) -> SimpleNamespace:
 @pytest.mark.parametrize("method", sorted(_EXPECTED_KEYS))
 def test_preset_toml_is_lc_overrides_only(method: str) -> None:
     data = _load_toml(method)
-    assert set(data) == {"LiquidChromatograph", "mass_spectrum"}
-    assert data["mass_spectrum"] == {}
+    assert set(data) == {"LiquidChromatograph"}
     assert set(data["LiquidChromatograph"]) == _EXPECTED_KEYS[method]
 
 
@@ -131,7 +130,12 @@ def test_preset_toml_does_not_replace_ms1_defaults(method: str) -> None:
     assert "ms2_cid" not in _apply(method).parameters.mass_spectrum
 
 
-def test_corems_4_0_1_loader_requires_mass_spectrum_table() -> None:
+def test_loader_applies_lc_settings_without_mass_spectrum_table() -> None:
     obj = SimpleNamespace(parameters=LCMSParameters(use_defaults=True))
-    with pytest.raises(KeyError):
-        _set_dict_data_lcms({"LiquidChromatograph": {"smooth_window": 9}}, obj)
+    fresh_ms1 = LCMSParameters(use_defaults=True).mass_spectrum["ms1"]
+    _set_dict_data_lcms({"LiquidChromatograph": {"smooth_window": 9}}, obj)
+    assert obj.parameters.lc_ms.smooth_window == 9
+    assert (
+        obj.parameters.mass_spectrum["ms1"].mass_spectrum.noise_min_mz
+        == fresh_ms1.mass_spectrum.noise_min_mz
+    )
